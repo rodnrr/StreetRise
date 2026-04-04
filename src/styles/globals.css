@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base resets ── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-white text-gray-900 font-sans antialiased;
+    /* Safe area insets for notched phones */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Remove tap highlight on mobile */
+  a, button {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Smooth focus rings */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary-600;
+  }
+}
+
+/* ── Reusable component layer ── */
+@layer components {
+  /* Cards */
+  .card {
+    @apply bg-white rounded-2xl shadow-card p-4;
+  }
+  .card-hover {
+    @apply card transition-shadow duration-200 hover:shadow-card-hover cursor-pointer;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold
+           transition-all duration-150 focus-visible:ring-2 focus-visible:ring-primary-600
+           focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed
+           select-none active:scale-95;
+  }
+  .btn-primary {
+    @apply btn bg-primary-600 text-white hover:bg-primary-700 px-5 py-2.5;
+  }
+  .btn-secondary {
+    @apply btn bg-gray-100 text-gray-900 hover:bg-gray-200 px-5 py-2.5;
+  }
+  .btn-danger {
+    @apply btn bg-danger-500 text-white hover:bg-danger-600 px-5 py-2.5;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+  .btn-lg {
+    @apply px-7 py-3.5 text-base;
+  }
+  .btn-icon {
+    @apply btn p-2.5;
+  }
+
+  /* Form inputs */
+  .input {
+    @apply w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm
+           placeholder:text-gray-400 focus:border-primary-600 focus:ring-2
+           focus:ring-primary-600/20 focus:outline-none transition-colors;
+  }
+  .input-error {
+    @apply input border-danger-500 focus:border-danger-500 focus:ring-danger-500/20;
+  }
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+  .error-text {
+    @apply text-xs text-danger-600 mt-1;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .badge-available { @apply badge bg-success-50 text-success-600; }
+  .badge-limited   { @apply badge bg-warning-50 text-warning-600; }
+  .badge-full      { @apply badge bg-danger-50 text-danger-600; }
+  .badge-unknown   { @apply badge bg-gray-100 text-gray-500; }
+  .badge-verified  { @apply badge bg-primary-50 text-primary-700; }
+  .badge-pending   { @apply badge bg-yellow-50 text-yellow-700; }
+
+  /* Map container */
+  .map-container {
+    @apply w-full rounded-2xl overflow-hidden shadow-map;
+  }
+
+  /* Skeleton loader */
+  .skeleton {
+    @apply bg-gray-200 rounded-lg animate-pulse;
+  }
+
+  /* Bottom sheet (mobile) */
+  .bottom-sheet {
+    @apply fixed inset-x-0 bottom-0 z-50 rounded-t-3xl bg-white shadow-2xl
+           transform transition-transform duration-300;
+  }
+  .bottom-sheet-handle {
+    @apply mx-auto mt-3 h-1 w-12 rounded-full bg-gray-300;
+  }
+}
+
+/* ── Leaflet overrides ── */
+.leaflet-container {
+  font-family: 'Inter', sans-serif;
+}
+
+.leaflet-popup-content-wrapper {
+  @apply rounded-2xl shadow-card-hover border-0 p-0 overflow-hidden;
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  width: auto !important;
+}
+
+.leaflet-popup-tip-container {
+  display: none;
+}
+
+/* Custom map markers */
+.map-marker {
+  @apply flex items-center justify-center rounded-full border-2 border-white shadow-lg
+         text-white text-xs font-bold cursor-pointer transition-transform duration-150
+         hover:scale-110;
+}
+.map-marker-available { @apply map-marker bg-available; }
+.map-marker-limited   { @apply map-marker bg-limited; }
+.map-marker-full      { @apply map-marker bg-full; }
+
+/* ── Scrollbar (desktop) ── */
+@media (pointer: fine) {
+  ::-webkit-scrollbar       { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-gray-300 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-gray-400; }
+}

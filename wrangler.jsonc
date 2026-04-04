@@ -1,0 +1,22 @@
+{
+  // Cloudflare Pages config for StreetRise
+  // Deploy: wrangler pages deploy dist --project-name=streetrise
+  // Dashboard: https://dash.cloudflare.com → Pages → streetrise
+  "name": "streetrise",
+  "pages_build_output_dir": "dist",
+  "compatibility_date": "2024-04-04",
+
+  // Environment variables — set secrets via: wrangler pages secret put <KEY>
+  // VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in Cloudflare Pages dashboard
+  // under Settings → Environment Variables for both Preview and Production
+
+  "env": {
+    "production": {
+      // Production is live at app.streetrise.org
+      // Set custom domain in Cloudflare Pages → Custom domains
+    },
+    "preview": {
+      // Preview deploys auto-generated at *.streetrise.pages.dev
+    }
+  }
+}

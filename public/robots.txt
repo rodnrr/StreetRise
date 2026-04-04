@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+Sitemap: https://app.streetrise.org/sitemap.xml

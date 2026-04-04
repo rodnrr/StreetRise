@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- PWA / Mobile -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="StreetRise" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+    <!-- SEO baseline -->
+    <title>StreetRise — Find Shelter, Food & Support Near You</title>
+    <meta name="description" content="StreetRise helps you find real-time shelter availability, food resources, work exchange, and community support in your area." />
+    <meta name="keywords" content="shelter, homeless resources, food bank, work exchange, social services, community support" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://app.streetrise.org" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://app.streetrise.org" />
+    <meta property="og:title" content="StreetRise — Find Shelter, Food & Support Near You" />
+    <meta property="og:description" content="Real-time resource discovery for people in need. Shelter, food, work exchange, and more." />
+    <meta property="og:image" content="https://app.streetrise.org/icons/og-image.png" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="StreetRise" />
+    <meta name="twitter:description" content="Real-time resource discovery for people in need." />
+    <meta name="twitter:image" content="https://app.streetrise.org/icons/og-image.png" />
+
+    <!-- Theme -->
+    <meta name="theme-color" content="#1a56db" />
+    <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Structured data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "StreetRise",
+      "url": "https://app.streetrise.org",
+      "description": "Real-time resource discovery for people in need — shelter, food, work exchange, and community support.",
+      "applicationCategory": "SocialApplication",
+      "operatingSystem": "Web, iOS, Android",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
