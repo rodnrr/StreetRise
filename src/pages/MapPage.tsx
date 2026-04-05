@@ -15,36 +15,42 @@ import 'leaflet/dist/leaflet.css'
 function MapSync() {
   const { mapCenter, mapZoom, setMapCenter, setMapZoom } = useMapStore()
   const map = useMap()
+  // Prevent feedback loop: ignore moveend/zoomend triggered by our own setView calls
+  const isProgrammatic = useRef(false)
 
   useEffect(() => {
+    isProgrammatic.current = true
     map.setView([mapCenter.lat, mapCenter.lng], mapZoom, { animate: true })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    const timer = setTimeout(() => { isProgrammatic.current = false }, 600)
+    return () => clearTimeout(timer)
+  }, [mapCenter.lat, mapCenter.lng, mapZoom]) // re-runs on any store-driven center/zoom change
 
   useMapEvents({
     moveend: () => {
+      if (isProgrammatic.current) return
       const c = map.getCenter()
       setMapCenter({ lat: c.lat, lng: c.lng })
     },
-    zoomend: () => setMapZoom(map.getZoom()),
+    zoomend: () => {
+      if (isProgrammatic.current) return
+      setMapZoom(map.getZoom())
+    },
   })
-
   return null
 }
 
-// ── Fetch resources near current center ──
-async function fetchResources(lat: number, lng: number, radiusKm = 20, category?: ResourceCategory) {
+// ── Fetch resources near current center (no hard cap) ──
+async function fetchResources(lat: number, lng: number, radiusKm = 40, category?: ResourceCategory) {
   let query = db.resources()
     .select('*')
     .eq('is_active', true)
     .eq('verification_status', 'verified')
-    // Simple bounding box filter (approx 1 deg lat ≈ 111 km)
+    // Bounding box filter (approx 1 deg lat ≈ 111 km)
     .gte('lat', lat - radiusKm / 111)
     .lte('lat', lat + radiusKm / 111)
     .gte('lng', lng - radiusKm / 111)
     .lte('lng', lng + radiusKm / 111)
     .order('availability_status', { ascending: true }) // available first
-    .limit(100)
 
   if (category) query = query.eq('category', category)
 
@@ -55,16 +61,21 @@ async function fetchResources(lat: number, lng: number, radiusKm = 20, category?
 
 // ── Main MapPage ──
 export default function MapPage() {
-  const { mapCenter, mapZoom, filters, selectedId, setSelectedId, setUserLocation } = useMapStore()
-  const [searchQuery, setSearchQuery]       = useState('')
-  const [showFilters, setShowFilters]       = useState(false)
-  const [showListView, setShowListView]     = useState(false)
+  const {
+    mapCenter, mapZoom, filters, selectedId,
+    setSelectedId, setUserLocation, setMapZoom,
+  } = useMapStore()
+
+  const [searchQuery, setSearchQuery]   = useState('')
+  const [showFilters, setShowFilters]   = useState(false)
+  const [showListView, setShowListView] = useState(false)
+  const [locating, setLocating]         = useState(false)
   const channelRef = useRef<ReturnType<typeof subscribeToBedUpdates> | null>(null)
 
   // Fetch resources
   const { data: resources = [], refetch } = useQuery({
     queryKey: ['resources', mapCenter, filters],
-    queryFn: () => fetchResources(mapCenter.lat, mapCenter.lng, filters.radius ?? 20, filters.category),
+    queryFn: () => fetchResources(mapCenter.lat, mapCenter.lng, filters.radius ?? 40, filters.category),
     staleTime: 1000 * 60, // 1 min
   })
 
@@ -74,10 +85,7 @@ export default function MapPage() {
     channelRef.current?.unsubscribe()
     channelRef.current = subscribeToBedUpdates(
       resources.map((r) => r.id),
-      (_id, _beds, _status) => {
-        // Invalidate and refetch on any bed update
-        refetch()
-      }
+      (_id, _beds, _status) => { refetch() }
     )
     return () => { channelRef.current?.unsubscribe() }
   }, [resources.map((r) => r.id).join(',')]) // eslint-disable-line
@@ -91,13 +99,20 @@ export default function MapPage() {
            (r.address.city?.toLowerCase() ?? '').includes(q)
   })
 
-  // Geolocation
+  // Geolocation — updates store center+zoom, MapSync picks it up and pans the map
   function locateUser() {
+    setLocating(true)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setMapZoom(15) // zoom in when located
+        setLocating(false)
       },
-      () => alert('Unable to get your location. Please enable location access.')
+      () => {
+        alert('Unable to get your location. Please enable location access.')
+        setLocating(false)
+      },
+      { timeout: 10000 }
     )
   }
 
@@ -132,8 +147,16 @@ export default function MapPage() {
         >
           <SlidersHorizontal size={18} className={Object.keys(filters).length > 0 ? 'text-primary-600' : 'text-gray-600'} />
         </button>
-        <button onClick={locateUser} className="btn-icon bg-white shadow-map" aria-label="Locate me">
-          <LocateFixed size={18} className="text-gray-600" />
+        <button
+          onClick={locateUser}
+          disabled={locating}
+          className={clsx('btn-icon bg-white shadow-map', locating && 'opacity-60')}
+          aria-label="Locate me"
+        >
+          <LocateFixed
+            size={18}
+            className={clsx('transition-colors', locating ? 'text-primary-600 animate-pulse' : 'text-gray-600')}
+          />
         </button>
       </div>
 
@@ -149,7 +172,6 @@ export default function MapPage() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <MapSync />
-
         {filtered.map((resource) => (
           <ResourceMarker
             key={resource.id}
@@ -162,8 +184,8 @@ export default function MapPage() {
 
       {/* ── Resource count pill ── */}
       <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[30]
-                       bg-white/90 backdrop-blur-sm rounded-full px-3 py-1
-                       text-xs font-medium text-gray-600 shadow-sm pointer-events-none">
+                      bg-white/90 backdrop-blur-sm rounded-full px-3 py-1
+                      text-xs font-medium text-gray-600 shadow-sm pointer-events-none">
         {filtered.length} resource{filtered.length !== 1 ? 's' : ''} nearby
       </div>
 
@@ -182,8 +204,8 @@ export default function MapPage() {
         <button
           onClick={() => setShowListView(!showListView)}
           className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[30]
-                       flex items-center gap-1.5 bg-gray-900 text-white
-                       rounded-full px-4 py-2 text-sm font-medium shadow-lg"
+                     flex items-center gap-1.5 bg-gray-900 text-white
+                     rounded-full px-4 py-2 text-sm font-medium shadow-lg"
         >
           <ChevronUp size={16} className={clsx('transition-transform', showListView && 'rotate-180')} />
           {showListView ? 'Map View' : 'List View'}
