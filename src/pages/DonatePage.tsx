@@ -1,5 +1,8 @@
-import { useState } from 'react'
-import { Heart, CheckCircle, Shield, Zap } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Heart, CheckCircle, Shield, Zap, Loader2 } from 'lucide-react'
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 const PRESET_AMOUNTS = [10, 25, 50, 100, 250]
 
@@ -21,16 +24,47 @@ export default function DonatePage() {
   const [amount, setAmount]   = useState<number>(25)
   const [custom, setCustom]   = useState('')
   const [frequency, setFreq]  = useState<'once' | 'monthly'>('once')
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState<string | null>(null)
   const [done, setDone]       = useState(false)
+
+  // Detect Stripe redirect back to /donate?success=true
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('success') === 'true') {
+      setDone(true)
+      window.history.replaceState({}, '', '/donate')
+    }
+  }, [])
 
   const finalAmount = custom ? parseInt(custom) : amount
   const impact      = IMPACT.find(i => i.amount <= finalAmount)
 
-  function handleCheckout() {
-    // In production: call Stripe Checkout with the selected price
-    // stripe.redirectToCheckout({ lineItems: [{ price: VITE_STRIPE_PRICE_ID, quantity: 1 }], mode: 'payment' })
-    // For now, show success state as placeholder
-    setDone(true)
+  async function handleCheckout() {
+    if (!finalAmount || finalAmount < 1) return
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/functions/v1/create-checkout-session`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ amount: finalAmount, frequency }),
+        }
+      )
+      const data = await res.json()
+      if (!res.ok || !data.url) {
+        throw new Error(data.error ?? 'Could not start checkout')
+      }
+      window.location.href = data.url
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      setLoading(false)
+    }
   }
 
   if (done) return (
@@ -118,14 +152,27 @@ export default function DonatePage() {
         ))}
       </div>
 
+      {/* Error */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {/* CTA */}
       <button
         onClick={handleCheckout}
-        disabled={!finalAmount || finalAmount < 1}
+        disabled={!finalAmount || finalAmount < 1 || loading}
         className="btn-primary w-full btn-lg gap-2"
       >
-        <Heart size={18} />
-        Donate ${finalAmount || '—'}{frequency === 'monthly' ? '/mo' : ''}
+        {loading
+          ? <Loader2 size={18} className="animate-spin" />
+          : <Heart size={18} />
+        }
+        {loading
+          ? 'Redirecting to Stripe…'
+          : `Donate $${finalAmount || '—'}${frequency === 'monthly' ? '/mo' : ''}`
+        }
       </button>
 
       <p className="text-center text-xs text-gray-400 mt-3">
