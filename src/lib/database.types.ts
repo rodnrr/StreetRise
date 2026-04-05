@@ -69,8 +69,11 @@ export interface Database {
           category: string
           subcategory: string | null
           address: AddressJson
-          lat: number
-          lng: number
+          // Nullable since migration 004 — pending-geocode and intake-only rows have no coords
+          lat: number | null
+          lng: number | null
+          access_type: Database['public']['Enums']['resource_access_type']
+          is_map_ready: boolean
           phone: string | null
           email: string | null
           website: string | null
@@ -97,6 +100,10 @@ export interface Database {
           Omit<Database['public']['Tables']['resources']['Row'], 'id' | 'created_at' | 'updated_at'>,
           | 'description'
           | 'subcategory'
+          | 'lat'
+          | 'lng'
+          | 'access_type'
+          | 'is_map_ready'
           | 'address'
           | 'phone'
           | 'email'
@@ -235,6 +242,13 @@ export interface Database {
 
     Views: Record<string, never>
     Functions: Record<string, never>
-    Enums: Record<string, never>
+    Enums: {
+      resource_access_type:
+        | 'onsite'
+        | 'phone_intake'
+        | 'web_intake'
+        | 'confidential_address'
+        | 'not_map_ready'
+    }
   }
 }

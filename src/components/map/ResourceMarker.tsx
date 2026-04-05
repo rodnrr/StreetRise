@@ -65,6 +65,9 @@ interface Props {
 }
 
 export default function ResourceMarker({ resource, isSelected, onClick }: Props) {
+  // Only render a marker if we have real coordinates (is_map_ready guard)
+  if (resource.lat == null || resource.lng == null) return null
+
   return (
     <Marker
       position={[resource.lat, resource.lng]}

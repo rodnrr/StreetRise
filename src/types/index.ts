@@ -21,6 +21,13 @@ export type AvailabilityStatus = 'available' | 'limited' | 'full' | 'unknown' | 
 
 export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'suspended'
 
+export type ResourceAccessType =
+  | 'onsite'
+  | 'phone_intake'
+  | 'web_intake'
+  | 'confidential_address'
+  | 'not_map_ready'
+
 export interface GeoPoint {
   lat: number
   lng: number
@@ -42,10 +49,12 @@ export interface Resource {
   category: ResourceCategory
   subcategory?: string
 
-  // Location
+  // Location — lat/lng are nullable for intake-only and pending-geocode resources
   address: Address
-  lat: number
-  lng: number
+  lat: number | null
+  lng: number | null
+  access_type: ResourceAccessType
+  is_map_ready: boolean
 
   // Contact
   phone?: string

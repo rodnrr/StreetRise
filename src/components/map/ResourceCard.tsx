@@ -1,7 +1,25 @@
 import { Link } from 'react-router-dom'
-import { Phone, Globe, MapPin, Users, X, ChevronRight } from 'lucide-react'
+import { Phone, Globe, MapPin, Users, X, ChevronRight, CheckCircle, Clock } from 'lucide-react'
 import clsx from 'clsx'
 import type { Resource } from '@/types'
+
+function VerificationBadge({ status }: { status: string }) {
+  if (status === 'verified') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">
+        <CheckCircle size={11} /> Verified
+      </span>
+    )
+  }
+  if (status === 'pending') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">
+        <Clock size={11} /> Community Listed
+      </span>
+    )
+  }
+  return null
+}
 
 const STATUS_LABEL: Record<string, string> = {
   available: 'Beds Available',
@@ -45,7 +63,10 @@ export default function ResourceCard({ resource, compact, onClose, onClick }: Pr
           <p className="font-semibold text-gray-900 text-sm truncate">{r.name}</p>
           <p className="text-xs text-gray-500 truncate">{r.address.city}, {r.address.state}</p>
         </div>
-        <span className={STATUS_BADGE[r.availability_status]}>{STATUS_LABEL[r.availability_status]}</span>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <span className={STATUS_BADGE[r.availability_status]}>{STATUS_LABEL[r.availability_status]}</span>
+          <VerificationBadge status={r.verification_status} />
+        </div>
         <ChevronRight size={16} className="text-gray-400 shrink-0" />
       </button>
     )
@@ -56,9 +77,12 @@ export default function ResourceCard({ resource, compact, onClose, onClick }: Pr
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0 pr-2">
-          <span className={`${STATUS_BADGE[r.availability_status]} mb-1.5`}>
-            {STATUS_LABEL[r.availability_status]}
-          </span>
+          <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+            <span className={STATUS_BADGE[r.availability_status]}>
+              {STATUS_LABEL[r.availability_status]}
+            </span>
+            <VerificationBadge status={r.verification_status} />
+          </div>
           <h3 className="font-bold text-gray-900 text-base leading-tight">{r.name}</h3>
           <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
             <MapPin size={11} />

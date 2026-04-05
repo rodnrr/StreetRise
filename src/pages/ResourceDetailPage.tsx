@@ -4,6 +4,24 @@ import { Phone, Globe, MapPin, Clock, BedDouble, ChevronLeft, CheckCircle, XCirc
 import { db } from '@/lib/supabase'
 import type { Resource } from '@/types'
 
+function VerificationBadge({ status }: { status: string }) {
+  if (status === 'verified') {
+    return (
+      <span className="badge-verified shrink-0 flex items-center gap-1">
+        <CheckCircle size={12} /> Verified
+      </span>
+    )
+  }
+  if (status === 'pending') {
+    return (
+      <span className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 rounded-full px-2.5 py-1">
+        <Clock size={12} /> Community Listed
+      </span>
+    )
+  }
+  return null
+}
+
 const STATUS_COLOR: Record<string, string> = {
   available: 'badge-available',
   limited:   'badge-limited',
@@ -60,11 +78,7 @@ export default function ResourceDetailPage() {
               <MapPin size={13} /> {resource.address.street}, {resource.address.city}, {resource.address.state}
             </p>
           </div>
-          {resource.verification_status === 'verified' && (
-            <span className="badge-verified shrink-0 flex items-center gap-1">
-              <CheckCircle size={12} /> Verified
-            </span>
-          )}
+          <VerificationBadge status={resource.verification_status} />
         </div>
 
         <p className="text-gray-700 text-sm leading-relaxed">{resource.description}</p>
