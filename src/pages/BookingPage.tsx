@@ -38,7 +38,7 @@ export default function BookingPage() {
     queryKey: ['resource', resourceId],
     queryFn: async () => {
       const { data } = await db.resources().select('*').eq('id', resourceId!).single()
-      return data as Resource
+      return data as unknown as Resource
     },
     enabled: !!resourceId,
   })

@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Phone, Globe, MapPin, Clock, Users, BedDouble, ChevronLeft, CheckCircle, XCircle } from 'lucide-react'
+import { Phone, Globe, MapPin, Clock, BedDouble, ChevronLeft, CheckCircle, XCircle } from 'lucide-react'
 import { db } from '@/lib/supabase'
 import type { Resource } from '@/types'
 
@@ -21,7 +21,7 @@ export default function ResourceDetailPage() {
     queryKey: ['resource', id],
     queryFn: async () => {
       const { data } = await db.resources().select('*, providers(organization_name, website)').eq('id', id!).single()
-      return data as Resource
+      return data as unknown as Resource
     },
     enabled: !!id,
   })

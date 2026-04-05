@@ -52,7 +52,7 @@ export default function ProviderListingEdit() {
     queryFn: async () => {
       if (isNew) return null
       const { data } = await db.resources().select('*').eq('id', id!).single()
-      return data as Resource
+      return data as unknown as Resource
     },
     enabled: !isNew,
   })

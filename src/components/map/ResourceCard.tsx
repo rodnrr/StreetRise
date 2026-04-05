@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Phone, Globe, MapPin, Clock, Users, X, ChevronRight } from 'lucide-react'
+import { Phone, Globe, MapPin, Users, X, ChevronRight } from 'lucide-react'
 import clsx from 'clsx'
 import type { Resource } from '@/types'
 

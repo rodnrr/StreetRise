@@ -29,7 +29,7 @@ export default function ProviderListings() {
     queryKey: ['provider-resources', providerId],
     queryFn: async () => {
       const { data } = await db.resources().select('*').eq('provider_id', providerId!).order('created_at', { ascending: false })
-      return (data ?? []) as Resource[]
+      return (data ?? []) as unknown as Resource[]
     },
     enabled: !!providerId,
   })

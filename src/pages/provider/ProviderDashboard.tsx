@@ -29,7 +29,7 @@ export default function ProviderDashboard() {
     queryKey: ['provider-resources', providerId],
     queryFn: async () => {
       const { data } = await db.resources().select('*').eq('provider_id', providerId!)
-      return (data ?? []) as Resource[]
+      return (data ?? []) as unknown as Resource[]
     },
     enabled: !!providerId,
   })

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Pencil, Eye, EyeOff } from 'lucide-react'
 import { db } from '@/lib/supabase'
 import { useAuthStore, useToast } from '@/lib/store'
@@ -23,7 +23,7 @@ export default function ProviderWorkExchange() {
     queryFn: async () => {
       const { data } = await db.work_exchanges()
         .select('*').eq('provider_id', providerId!).order('created_at', { ascending: false })
-      return (data ?? []) as WorkExchange[]
+      return (data ?? []) as unknown as WorkExchange[]
     },
     enabled: !!providerId,
   })

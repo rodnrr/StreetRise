@@ -31,7 +31,7 @@ export interface Address {
   city: string
   state: string
   zip: string
-  country: string
+  country?: string
 }
 
 export interface Resource {

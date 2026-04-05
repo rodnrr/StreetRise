@@ -1,6 +1,4 @@
-// Auto-generated Supabase types skeleton
-// Run `supabase gen types typescript --project-id YOUR_REF > src/lib/database.types.ts`
-// after your migrations are applied to get the fully-generated version.
+type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>
 
 export type Json =
   | string
@@ -9,6 +7,31 @@ export type Json =
   | null
   | { [key: string]: Json | undefined }
   | Json[]
+
+type AddressJson = {
+  street: string
+  city: string
+  state: string
+  zip: string
+  country?: string
+}
+
+type DayHoursJson = {
+  open?: string
+  close?: string
+  closed?: boolean
+}
+
+type HoursOfOperationJson = {
+  monday?: DayHoursJson
+  tuesday?: DayHoursJson
+  wednesday?: DayHoursJson
+  thursday?: DayHoursJson
+  friday?: DayHoursJson
+  saturday?: DayHoursJson
+  sunday?: DayHoursJson
+  notes?: string
+}
 
 export interface Database {
   public: {
@@ -30,9 +53,13 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['providers']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Optional<
+          Omit<Database['public']['Tables']['providers']['Row'], 'id' | 'created_at' | 'updated_at'>,
+          'contact_phone' | 'website' | 'ein' | 'logo_url' | 'verification_status' | 'role' | 'bio'
+        >
         Update: Partial<Database['public']['Tables']['providers']['Insert']>
       }
+
       resources: {
         Row: {
           id: string
@@ -41,7 +68,7 @@ export interface Database {
           description: string
           category: string
           subcategory: string | null
-          address: Json
+          address: AddressJson
           lat: number
           lng: number
           phone: string | null
@@ -57,7 +84,7 @@ export interface Database {
           age_min: number | null
           age_max: number | null
           gender_restriction: string | null
-          hours_of_operation: Json
+          hours_of_operation: HoursOfOperationJson
           verification_status: string
           is_active: boolean
           languages_spoken: string[]
@@ -66,9 +93,34 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['resources']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Optional<
+          Omit<Database['public']['Tables']['resources']['Row'], 'id' | 'created_at' | 'updated_at'>,
+          | 'description'
+          | 'subcategory'
+          | 'address'
+          | 'phone'
+          | 'email'
+          | 'website'
+          | 'availability_status'
+          | 'beds_total'
+          | 'beds_available'
+          | 'beds_updated_at'
+          | 'walk_ins_accepted'
+          | 'requires_id'
+          | 'requires_referral'
+          | 'age_min'
+          | 'age_max'
+          | 'gender_restriction'
+          | 'hours_of_operation'
+          | 'verification_status'
+          | 'is_active'
+          | 'languages_spoken'
+          | 'tags'
+          | 'photos'
+        >
         Update: Partial<Database['public']['Tables']['resources']['Insert']>
       }
+
       bookings: {
         Row: {
           id: string
@@ -86,9 +138,21 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['bookings']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Optional<
+          Omit<Database['public']['Tables']['bookings']['Row'], 'id' | 'created_at' | 'updated_at'>,
+          | 'user_id'
+          | 'requester_phone'
+          | 'requester_email'
+          | 'notes'
+          | 'status'
+          | 'check_in_date'
+          | 'check_out_date'
+          | 'adults'
+          | 'children'
+        >
         Update: Partial<Database['public']['Tables']['bookings']['Insert']>
       }
+
       work_exchanges: {
         Row: {
           id: string
@@ -103,13 +167,17 @@ export interface Database {
           is_active: boolean
           lat: number
           lng: number
-          address: Json
+          address: AddressJson
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['work_exchanges']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Optional<
+          Omit<Database['public']['Tables']['work_exchanges']['Row'], 'id' | 'created_at' | 'updated_at'>,
+          'description' | 'exchange_type' | 'hours_per_week' | 'compensation' | 'skills_required' | 'skills_gained' | 'is_active' | 'address'
+        >
         Update: Partial<Database['public']['Tables']['work_exchanges']['Insert']>
       }
+
       faq: {
         Row: {
           id: string
@@ -119,9 +187,13 @@ export interface Database {
           order: number
           is_active: boolean
         }
-        Insert: Omit<Database['public']['Tables']['faq']['Row'], 'id'>
+        Insert: Optional<
+          Omit<Database['public']['Tables']['faq']['Row'], 'id'>,
+          'category' | 'order' | 'is_active'
+        >
         Update: Partial<Database['public']['Tables']['faq']['Insert']>
       }
+
       moderation_logs: {
         Row: {
           id: string
@@ -133,9 +205,13 @@ export interface Database {
           notes: string | null
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['moderation_logs']['Row'], 'id' | 'created_at'>
+        Insert: Optional<
+          Omit<Database['public']['Tables']['moderation_logs']['Row'], 'id' | 'created_at'>,
+          'reason' | 'notes'
+        >
         Update: Partial<Database['public']['Tables']['moderation_logs']['Insert']>
       }
+
       donation_campaigns: {
         Row: {
           id: string
@@ -149,10 +225,14 @@ export interface Database {
           ends_at: string | null
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['donation_campaigns']['Row'], 'id' | 'created_at'>
+        Insert: Optional<
+          Omit<Database['public']['Tables']['donation_campaigns']['Row'], 'id' | 'created_at'>,
+          'provider_id' | 'description' | 'goal_amount' | 'raised_amount' | 'stripe_price_id' | 'is_active' | 'ends_at'
+        >
         Update: Partial<Database['public']['Tables']['donation_campaigns']['Insert']>
       }
     }
+
     Views: Record<string, never>
     Functions: Record<string, never>
     Enums: Record<string, never>

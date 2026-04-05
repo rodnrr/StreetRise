@@ -50,7 +50,7 @@ async function fetchResources(lat: number, lng: number, radiusKm = 20, category?
 
   const { data, error } = await query
   if (error) throw error
-  return (data ?? []) as Resource[]
+  return (data ?? []) as unknown as Resource[]
 }
 
 // ── Main MapPage ──
