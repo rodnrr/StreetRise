@@ -27,14 +27,15 @@ export default function LoginPage() {
         // Fetch provider profile
         const { data: provider } = await supabase
           .from('providers')
-          .select('id, role')
+          .select('id, role, verification_status')
           .eq('user_id', data.user.id)
           .single()
         setAuth({
-          userId:    data.user.id,
-          userEmail: data.user.email ?? '',
-          role:      (provider?.role as 'provider'|'admin'|'super_admin') ?? 'provider',
-          providerId: provider?.id,
+          userId:             data.user.id,
+          userEmail:          data.user.email ?? '',
+          role:               (provider?.role as 'provider'|'admin'|'super_admin') ?? 'provider',
+          providerId:         provider?.id,
+          verificationStatus: (provider?.verification_status as 'pending'|'verified'|'rejected'|'suspended') ?? null,
         })
         // New users (no provider record yet) go to onboarding; existing users go to next destination
         const destination = (!provider && mode === 'signup') ? '/portal/onboarding' : next

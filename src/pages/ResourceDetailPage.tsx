@@ -58,6 +58,7 @@ export default function ResourceDetailPage() {
   )
 
   const hours = resource.hours_of_operation as Record<string, { open: string; close: string; closed: boolean } | undefined>
+  const showBedCount = resource.category === 'shelter' && resource.beds_total != null
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 pb-32 md:pb-8 space-y-5">
@@ -84,7 +85,7 @@ export default function ResourceDetailPage() {
         <p className="text-gray-700 text-sm leading-relaxed">{resource.description}</p>
 
         {/* Bed availability */}
-        {resource.beds_total != null && (
+        {showBedCount && (
           <div className="mt-4 p-3 bg-gray-50 rounded-xl flex items-center gap-3">
             <BedDouble size={18} className="text-gray-500" />
             <div>

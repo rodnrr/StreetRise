@@ -43,7 +43,7 @@ export default function ProviderOnboarding() {
       bio:               data.bio || null,
     }).select().single()
     if (error) { toast.error('Submission failed', error.message); return }
-    setAuth({ userId, userEmail: data.contact_email, role: 'provider', providerId: provider.id })
+    setAuth({ userId, userEmail: data.contact_email, role: 'provider', providerId: provider.id, verificationStatus: 'pending' })
     setSubmitted(true)
   }
 
@@ -51,8 +51,11 @@ export default function ProviderOnboarding() {
     <div className="max-w-md mx-auto pt-20 text-center px-4">
       <CheckCircle size={56} className="text-success-600 mx-auto mb-4" />
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Application submitted!</h1>
-      <p className="text-gray-500 mb-6">Our team reviews new providers within 2 business days. You'll receive an email when verified.</p>
-      <button onClick={() => navigate('/portal/dashboard')} className="btn-primary">Go to Dashboard</button>
+      <p className="text-gray-500 mb-6">
+        Our team manually reviews every provider application within 2 business days.
+        You'll receive an email at <strong>{useAuthStore.getState().userEmail}</strong> once your account is verified.
+      </p>
+      <p className="text-sm text-gray-400">You won't be able to access the provider portal until your account is approved.</p>
     </div>
   )
 

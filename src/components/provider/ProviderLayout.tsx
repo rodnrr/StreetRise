@@ -1,5 +1,5 @@
 import { Outlet, NavLink, Navigate } from 'react-router-dom'
-import { LayoutDashboard, ListChecks, CalendarDays, Briefcase, LogOut } from 'lucide-react'
+import { LayoutDashboard, ListChecks, CalendarDays, Briefcase, LogOut, Clock, XCircle, ShieldOff } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuthStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
@@ -12,8 +12,52 @@ const LINKS = [
   { to: '/portal/work',      label: 'Work Exchange', icon: Briefcase },
 ]
 
+function PendingScreen({ status, onLogout }: { status: string; onLogout: () => void }) {
+  const isRejected  = status === 'rejected'
+  const isSuspended = status === 'suspended'
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full card text-center py-12 px-8">
+        {isRejected || isSuspended ? (
+          <>
+            {isRejected
+              ? <XCircle size={52} className="text-danger-500 mx-auto mb-4" />
+              : <ShieldOff size={52} className="text-gray-400 mx-auto mb-4" />}
+            <h1 className="text-xl font-bold text-gray-900 mb-2">
+              {isRejected ? 'Application not approved' : 'Account suspended'}
+            </h1>
+            <p className="text-gray-500 text-sm mb-6">
+              {isRejected
+                ? 'Your provider application was not approved. Contact support@streetrise.org if you believe this is an error.'
+                : 'Your account has been suspended. Contact support@streetrise.org for assistance.'}
+            </p>
+          </>
+        ) : (
+          <>
+            <Clock size={52} className="text-amber-500 mx-auto mb-4" />
+            <h1 className="text-xl font-bold text-gray-900 mb-2">Application under review</h1>
+            <p className="text-gray-500 text-sm mb-2">
+              Your provider application has been submitted and is pending manual review by our team.
+            </p>
+            <p className="text-gray-500 text-sm mb-6">
+              This typically takes <strong>1–2 business days</strong>. You'll receive an email when your account is verified.
+            </p>
+          </>
+        )}
+        <button
+          onClick={onLogout}
+          className="btn-secondary w-full flex items-center justify-center gap-2"
+        >
+          <LogOut size={15} /> Sign Out
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function ProviderLayout() {
-  const { role, clearAuth } = useAuthStore()
+  const { role, verificationStatus, clearAuth } = useAuthStore()
 
   // Redirect unauthenticated users
   if (role === 'guest') {
@@ -23,6 +67,11 @@ export default function ProviderLayout() {
   async function handleLogout() {
     await supabase.auth.signOut()
     clearAuth()
+  }
+
+  // Block unverified providers — show holding screen instead of portal
+  if (role === 'provider' && verificationStatus !== 'verified') {
+    return <PendingScreen status={verificationStatus ?? 'pending'} onLogout={handleLogout} />
   }
 
   return (

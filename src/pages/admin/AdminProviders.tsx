@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Search } from 'lucide-react'
+import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Search, Pencil } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { db } from '@/lib/supabase'
 import { useAuthStore, useToast } from '@/lib/store'
 import type { Provider, VerificationStatus } from '@/types'
@@ -121,6 +122,12 @@ export default function AdminProviders() {
 
             {/* Actions */}
             <div className="flex flex-wrap gap-2">
+              <Link
+                to={`/admin/providers/${p.id}`}
+                className="flex items-center gap-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-medium rounded-xl px-3 py-1.5 transition-colors"
+              >
+                <Pencil size={12} /> Edit Details
+              </Link>
               {p.verification_status !== 'verified' && (
                 <button
                   onClick={() => moderate.mutate({ providerId: p.id, status: 'verified' })}

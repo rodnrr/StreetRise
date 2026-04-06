@@ -37,6 +37,30 @@ const STATUS_BADGE: Record<string, string> = {
   closed:    'badge-unknown',
 }
 
+function getAvailabilityLabel(resource: Resource) {
+  const isShelter = resource.category === 'shelter'
+
+  if (isShelter) {
+    const shelterLabels: Record<string, string> = {
+      available: 'Beds Available',
+      limited:   'Limited Beds',
+      full:      'Shelter Full',
+      unknown:   'Availability Unknown',
+      closed:    'Closed',
+    }
+    return shelterLabels[resource.availability_status] ?? 'Availability Unknown'
+  }
+
+  const serviceLabels: Record<string, string> = {
+    available: 'Open Now',
+    limited:   'Limited Availability',
+    full:      'Unavailable',
+    unknown:   'Availability Unknown',
+    closed:    'Closed',
+  }
+  return serviceLabels[resource.availability_status] ?? 'Availability Unknown'
+}
+
 interface Props {
   resource:  Resource
   compact?:  boolean
@@ -46,6 +70,8 @@ interface Props {
 
 export default function ResourceCard({ resource, compact, onClose, onClick }: Props) {
   const r = resource
+  const availabilityLabel = getAvailabilityLabel(r)
+  const showBedCount = r.category === 'shelter' && r.beds_total != null
 
   if (compact) {
     return (
@@ -64,7 +90,7 @@ export default function ResourceCard({ resource, compact, onClose, onClick }: Pr
           <p className="text-xs text-gray-500 truncate">{r.address.city}, {r.address.state}</p>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className={STATUS_BADGE[r.availability_status]}>{STATUS_LABEL[r.availability_status]}</span>
+          <span className={STATUS_BADGE[r.availability_status]}>{availabilityLabel}</span>
           <VerificationBadge status={r.verification_status} />
         </div>
         <ChevronRight size={16} className="text-gray-400 shrink-0" />
@@ -78,9 +104,7 @@ export default function ResourceCard({ resource, compact, onClose, onClick }: Pr
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-            <span className={STATUS_BADGE[r.availability_status]}>
-              {STATUS_LABEL[r.availability_status]}
-            </span>
+            <span className={STATUS_BADGE[r.availability_status]}>{availabilityLabel}</span>
             <VerificationBadge status={r.verification_status} />
           </div>
           <h3 className="font-bold text-gray-900 text-base leading-tight">{r.name}</h3>
@@ -97,7 +121,7 @@ export default function ResourceCard({ resource, compact, onClose, onClick }: Pr
       </div>
 
       {/* Bed count */}
-      {r.beds_total != null && (
+      {showBedCount && (
         <div className="flex items-center gap-2 bg-gray-50 rounded-xl p-3 mb-3">
           <Users size={16} className="text-gray-500" />
           <span className="text-sm text-gray-700">

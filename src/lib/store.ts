@@ -41,14 +41,16 @@ export const useMapStore = create<MapState>()(
 
 // ── Auth / User State ──
 interface AuthState {
-  userId:         string | null
-  userEmail:      string | null
-  role:           'guest' | 'provider' | 'admin' | 'super_admin'
-  providerId:     string | null
-  isLoading:      boolean
+  userId:             string | null
+  userEmail:          string | null
+  role:               'guest' | 'provider' | 'admin' | 'super_admin'
+  providerId:         string | null
+  verificationStatus: 'pending' | 'verified' | 'rejected' | 'suspended' | null
+  isLoading:          boolean
   setAuth: (auth: {
     userId: string; userEmail: string;
     role: AuthState['role']; providerId?: string
+    verificationStatus?: AuthState['verificationStatus']
   }) => void
   clearAuth: () => void
   setLoading: (loading: boolean) => void
@@ -57,21 +59,23 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      userId:    null,
-      userEmail: null,
-      role:      'guest',
-      providerId: null,
-      isLoading: false,
-      setAuth: ({ userId, userEmail, role, providerId = null }) =>
-        set({ userId, userEmail, role, providerId, isLoading: false }),
+      userId:             null,
+      userEmail:          null,
+      role:               'guest',
+      providerId:         null,
+      verificationStatus: null,
+      isLoading:          false,
+      setAuth: ({ userId, userEmail, role, providerId = null, verificationStatus = null }) =>
+        set({ userId, userEmail, role, providerId, verificationStatus, isLoading: false }),
       clearAuth: () =>
-        set({ userId: null, userEmail: null, role: 'guest', providerId: null }),
+        set({ userId: null, userEmail: null, role: 'guest', providerId: null, verificationStatus: null }),
       setLoading: (isLoading) => set({ isLoading }),
     }),
     {
       name: 'streetrise-auth',
       partialize: (s) => ({
-        userId: s.userId, userEmail: s.userEmail, role: s.role, providerId: s.providerId
+        userId: s.userId, userEmail: s.userEmail, role: s.role,
+        providerId: s.providerId, verificationStatus: s.verificationStatus,
       }),
     }
   )

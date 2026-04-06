@@ -31,7 +31,9 @@ const ProviderOnboarding   = lazy(() => import('@/pages/provider/ProviderOnboard
 // Admin
 const AdminDashboard       = lazy(() => import('@/pages/admin/AdminDashboard'))
 const AdminProviders       = lazy(() => import('@/pages/admin/AdminProviders'))
+const AdminProviderEdit    = lazy(() => import('@/pages/admin/AdminProviderEdit'))
 const AdminResources       = lazy(() => import('@/pages/admin/AdminResources'))
+const AdminResourceEdit    = lazy(() => import('@/pages/admin/AdminResourceEdit'))
 const AdminBookings        = lazy(() => import('@/pages/admin/AdminBookings'))
 const AdminFaq             = lazy(() => import('@/pages/admin/AdminFaq'))
 
@@ -79,11 +81,13 @@ export default function App() {
         {/* ── Admin ── */}
         <Route path="admin" element={<AdminLayout />}>
           <Route index               element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard"    element={<AdminDashboard />} />
-          <Route path="providers"    element={<AdminProviders />} />
-          <Route path="resources"    element={<AdminResources />} />
-          <Route path="bookings"     element={<AdminBookings />} />
-          <Route path="faq"          element={<AdminFaq />} />
+          <Route path="dashboard"        element={<AdminDashboard />} />
+          <Route path="providers"        element={<AdminProviders />} />
+          <Route path="providers/:id"    element={<AdminProviderEdit />} />
+          <Route path="resources"        element={<AdminResources />} />
+          <Route path="resources/:id"    element={<AdminResourceEdit />} />
+          <Route path="bookings"         element={<AdminBookings />} />
+          <Route path="faq"              element={<AdminFaq />} />
         </Route>
       </Routes>
     </Suspense>

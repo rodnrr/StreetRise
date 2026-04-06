@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle, XCircle, MapPin, Search } from 'lucide-react'
+import { CheckCircle, XCircle, MapPin, Search, Pencil } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { db } from '@/lib/supabase'
 import { useAuthStore, useToast } from '@/lib/store'
@@ -109,7 +109,12 @@ export default function AdminResources() {
                   <p className="text-xs text-gray-500 mt-0.5">{r.beds_available ?? '?'} / {r.beds_total} beds</p>
                 )}
               </div>
-              <Link to={`/resources/${r.id}`} className="text-xs text-primary-400 hover:underline shrink-0">View →</Link>
+              <div className="flex items-center gap-2 shrink-0">
+                <Link to={`/admin/resources/${r.id}`} className="flex items-center gap-1 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-medium rounded-xl px-3 py-1.5 transition-colors">
+                  <Pencil size={11} /> Edit
+                </Link>
+                <Link to={`/resources/${r.id}`} className="text-xs text-primary-400 hover:underline">View →</Link>
+              </div>
             </div>
 
             <p className="text-sm text-gray-500 mb-3 line-clamp-2">{r.description}</p>
