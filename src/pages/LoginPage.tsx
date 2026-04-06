@@ -37,8 +37,13 @@ export default function LoginPage() {
           providerId:         provider?.id,
           verificationStatus: (provider?.verification_status as 'pending'|'verified'|'rejected'|'suspended') ?? null,
         })
-        // New users (no provider record yet) go to onboarding; existing users go to next destination
-        const destination = (!provider && mode === 'signup') ? '/portal/onboarding' : next
+        // Route based on role and account state
+        let destination = next
+        if (!provider && mode === 'signup') {
+          destination = '/portal/onboarding'
+        } else if (provider?.role === 'admin' || provider?.role === 'super_admin') {
+          destination = '/admin/dashboard'
+        }
         navigate(destination, { replace: true })
       }
     } catch (err: unknown) {
