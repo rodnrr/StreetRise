@@ -172,15 +172,15 @@ export interface Database {
           skills_required: string[]
           skills_gained: string[]
           is_active: boolean
-          lat: number
-          lng: number
+          lat: number | null
+          lng: number | null
           address: AddressJson
           created_at: string
           updated_at: string
         }
         Insert: Optional<
           Omit<Database['public']['Tables']['work_exchanges']['Row'], 'id' | 'created_at' | 'updated_at'>,
-          'description' | 'exchange_type' | 'hours_per_week' | 'compensation' | 'skills_required' | 'skills_gained' | 'is_active' | 'address'
+          'description' | 'exchange_type' | 'hours_per_week' | 'compensation' | 'skills_required' | 'skills_gained' | 'is_active' | 'address' | 'lat' | 'lng'
         >
         Update: Partial<Database['public']['Tables']['work_exchanges']['Insert']>
       }

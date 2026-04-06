@@ -85,7 +85,10 @@ export default function ProviderWorkExchange() {
                 >
                   {wx.is_active ? <Eye size={17} /> : <EyeOff size={17} />}
                 </button>
-                <button className="btn-secondary btn-sm gap-1">
+                <button
+                  onClick={() => navigate(`/portal/work/${wx.id}`)}
+                  className="btn-secondary btn-sm gap-1"
+                >
                   <Pencil size={14} /> Edit
                 </button>
               </div>

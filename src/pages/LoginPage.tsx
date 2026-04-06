@@ -36,7 +36,9 @@ export default function LoginPage() {
           role:      (provider?.role as 'provider'|'admin'|'super_admin') ?? 'provider',
           providerId: provider?.id,
         })
-        navigate(next, { replace: true })
+        // New users (no provider record yet) go to onboarding; existing users go to next destination
+        const destination = (!provider && mode === 'signup') ? '/portal/onboarding' : next
+        navigate(destination, { replace: true })
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Authentication failed')

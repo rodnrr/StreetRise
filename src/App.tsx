@@ -25,6 +25,7 @@ const ProviderListings     = lazy(() => import('@/pages/provider/ProviderListing
 const ProviderListingEdit  = lazy(() => import('@/pages/provider/ProviderListingEdit'))
 const ProviderBookings     = lazy(() => import('@/pages/provider/ProviderBookings'))
 const ProviderWorkExchange = lazy(() => import('@/pages/provider/ProviderWorkExchange'))
+const WorkExchangeEdit     = lazy(() => import('@/pages/provider/WorkExchangeEdit'))
 const ProviderOnboarding   = lazy(() => import('@/pages/provider/ProviderOnboarding'))
 
 // Admin
@@ -71,6 +72,8 @@ export default function App() {
           <Route path="listings/:id" element={<ProviderListingEdit />} />
           <Route path="bookings"     element={<ProviderBookings />} />
           <Route path="work"         element={<ProviderWorkExchange />} />
+          <Route path="work/new"     element={<WorkExchangeEdit />} />
+          <Route path="work/:id"     element={<WorkExchangeEdit />} />
         </Route>
 
         {/* ── Admin ── */}

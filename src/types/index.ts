@@ -170,8 +170,8 @@ export interface WorkExchange {
   skills_required: string[]
   skills_gained: string[]
   is_active: boolean
-  lat: number
-  lng: number
+  lat: number | null
+  lng: number | null
   address: Address
   created_at: string
   updated_at: string
