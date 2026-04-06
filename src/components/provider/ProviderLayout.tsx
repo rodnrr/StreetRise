@@ -64,6 +64,11 @@ export default function ProviderLayout() {
     return <Navigate to="/login?next=/portal/dashboard" replace />
   }
 
+  // Admins who land on the provider portal get sent to their panel
+  if (role === 'admin' || role === 'super_admin') {
+    return <Navigate to="/admin/dashboard" replace />
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut()
     clearAuth()
