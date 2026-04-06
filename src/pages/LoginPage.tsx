@@ -4,13 +4,14 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
 
 export default function LoginPage() {
+  const [params]      = useSearchParams()
+  const initialMode   = params.get('signup') === '1' ? 'signup' : 'login'
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [mode, setMode]         = useState<'login'|'signup'>('login')
+  const [mode, setMode]         = useState<'login'|'signup'>(initialMode)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
   const navigate      = useNavigate()
-  const [params]      = useSearchParams()
   const next          = params.get('next') ?? '/portal/dashboard'
   const { setAuth }   = useAuthStore()
 

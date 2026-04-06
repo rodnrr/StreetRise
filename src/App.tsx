@@ -27,6 +27,7 @@ const ProviderBookings     = lazy(() => import('@/pages/provider/ProviderBooking
 const ProviderWorkExchange = lazy(() => import('@/pages/provider/ProviderWorkExchange'))
 const WorkExchangeEdit     = lazy(() => import('@/pages/provider/WorkExchangeEdit'))
 const ProviderOnboarding   = lazy(() => import('@/pages/provider/ProviderOnboarding'))
+const ProviderLandingPage  = lazy(() => import('@/pages/ProviderLandingPage'))
 
 // Admin
 const AdminDashboard       = lazy(() => import('@/pages/admin/AdminDashboard'))
@@ -59,7 +60,8 @@ export default function App() {
           <Route path="work"       element={<WorkExchangePage />} />
           <Route path="donate"     element={<DonatePage />} />
           <Route path="faq"        element={<FaqPage />} />
-          <Route path="login"      element={<LoginPage />} />
+          <Route path="login"              element={<LoginPage />} />
+          <Route path="provider/onboarding" element={<ProviderLandingPage />} />
           <Route path="404"        element={<NotFoundPage />} />
           <Route path="*"          element={<Navigate to="/404" replace />} />
         </Route>
