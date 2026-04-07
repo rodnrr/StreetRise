@@ -3,6 +3,7 @@ import { MapPin, Briefcase, Heart, HelpCircle, Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import clsx from 'clsx'
 import ToastContainer from './ToastContainer'
+import Footer from './Footer'
 
 const NAV_LINKS = [
   { to: '/map',    label: 'Find Resources', icon: MapPin },
@@ -44,6 +45,17 @@ export default function RootLayout() {
                   {label}
                 </NavLink>
               ))}
+              <NavLink
+                to="/provider/onboarding"
+                className={({ isActive }) =>
+                  clsx('px-4 py-2 rounded-xl text-sm font-medium transition-colors ml-1', {
+                    'bg-primary-50 text-primary-700': isActive,
+                    'text-gray-600 hover:bg-gray-50': !isActive,
+                  })
+                }
+              >
+                Become a Provider
+              </NavLink>
               <NavLink to="/portal" className="btn-primary btn-sm ml-2">
                 Provider Login
               </NavLink>
@@ -78,6 +90,18 @@ export default function RootLayout() {
                   {label}
                 </NavLink>
               ))}
+              <NavLink
+                to="/provider/onboarding"
+                onClick={() => setMenuOpen(false)}
+                className={({ isActive }) =>
+                  clsx('flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium my-1 transition-colors', {
+                    'bg-primary-50 text-primary-700': isActive,
+                    'text-gray-700 hover:bg-gray-50': !isActive,
+                  })
+                }
+              >
+                Become a Provider
+              </NavLink>
               <NavLink to="/portal" className="btn-primary w-full mt-2" onClick={() => setMenuOpen(false)}>
                 Provider Login
               </NavLink>
@@ -90,6 +114,9 @@ export default function RootLayout() {
       <main className="flex-1">
         <Outlet />
       </main>
+
+      {/* ── Footer (hidden on full-screen map) ── */}
+      {!isMapPage && <Footer />}
 
       {/* ── Bottom tab bar (mobile) ── */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200

@@ -85,7 +85,7 @@ export default function DonatePage() {
         </div>
         <h1 className="text-2xl font-bold text-gray-900">Support StreetRise</h1>
         <p className="text-gray-500 mt-1 text-sm max-w-sm mx-auto">
-          StreetRise is free for everyone in need. Your donation keeps real-time shelter data flowing.
+          StreetRise is free for everyone in need. Your donation helps us verify more providers and keep listings current.
         </p>
       </div>
 

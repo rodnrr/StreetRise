@@ -113,14 +113,13 @@ export default function ProviderLandingPage() {
       <div className="card border border-primary-100 bg-primary-50/40 space-y-3">
         <div className="flex items-center gap-2">
           <CheckCircle size={18} className="text-primary-600 shrink-0" />
-          <p className="font-semibold text-gray-900 text-sm">Every provider is manually verified</p>
+          <p className="font-semibold text-gray-900 text-sm">Manually reviewed — no automated approvals</p>
         </div>
         <p className="text-xs text-gray-500 leading-relaxed">
-          We don't use automated sign-up approvals. A real person on our team reviews every
-          application to confirm you represent the organization you're listing. Verified providers
-          receive a <span className="inline-flex items-center gap-0.5 font-medium text-primary-700">
+          A real person on our team reviews every application to confirm you represent the
+          organization you're listing. Approved providers receive a <span className="inline-flex items-center gap-0.5 font-medium text-primary-700">
             <CheckCircle size={11} /> Verified
-          </span> badge on all their listings — a signal that the people using StreetRise can trust.
+          </span> badge on all their listings — a visible trust signal for everyone who depends on StreetRise.
         </p>
         <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">
           <Clock size={13} className="shrink-0" />

@@ -85,7 +85,7 @@ export default function BookingPage() {
       <CheckCircle size={60} className="text-success-600 mx-auto mb-4" />
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Request sent!</h1>
       <p className="text-gray-500 mb-2">Your request has been sent to <strong>{resource?.name}</strong>.</p>
-      <p className="text-gray-400 text-sm mb-8">The provider will contact you to confirm. Average response time: under 2 hours.</p>
+      <p className="text-gray-400 text-sm mb-8">The provider will review your request and reach out to confirm. Check your phone or email for a follow-up.</p>
       <div className="flex flex-col gap-3">
         <Link to="/map" className="btn-primary">Find More Resources</Link>
         <Link to="/" className="btn-secondary">Return Home</Link>
