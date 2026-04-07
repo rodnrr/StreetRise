@@ -30,6 +30,27 @@ const STATUS_COLOR: Record<string, string> = {
   closed:    'badge-unknown',
 }
 
+function getAvailabilityLabel(resource: Resource): string {
+  if (resource.category === 'shelter') {
+    const labels: Record<string, string> = {
+      available: 'Beds Available',
+      limited:   'Limited Beds',
+      full:      'Shelter Full',
+      unknown:   'Availability Unknown',
+      closed:    'Closed',
+    }
+    return labels[resource.availability_status] ?? 'Availability Unknown'
+  }
+  const labels: Record<string, string> = {
+    available: 'Open Now',
+    limited:   'Limited Availability',
+    full:      'Unavailable',
+    unknown:   'Availability Unknown',
+    closed:    'Closed',
+  }
+  return labels[resource.availability_status] ?? 'Availability Unknown'
+}
+
 const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] as const
 
 export default function ResourceDetailPage() {
@@ -72,7 +93,7 @@ export default function ResourceDetailPage() {
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
             <span className={`${STATUS_COLOR[resource.availability_status]} mb-2 inline-flex`}>
-              {resource.availability_status.charAt(0).toUpperCase() + resource.availability_status.slice(1)}
+              {getAvailabilityLabel(resource)}
             </span>
             <h1 className="text-2xl font-bold text-gray-900">{resource.name}</h1>
             <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
@@ -103,7 +124,9 @@ export default function ResourceDetailPage() {
 
         {/* CTA */}
         <div className="mt-4 flex gap-3">
-          <Link to={`/book/${resource.id}`} className="btn-primary flex-1">Request a Spot</Link>
+          <Link to={`/book/${resource.id}`} className="btn-primary flex-1">
+            {resource.category === 'shelter' ? 'Request a Spot' : 'Request Help'}
+          </Link>
           {resource.phone && (
             <a href={`tel:${resource.phone}`} className="btn-secondary flex-1 text-center">Call</a>
           )}
@@ -197,7 +220,7 @@ export default function ResourceDetailPage() {
       {/* Sticky book button (mobile) */}
       <div className="fixed bottom-16 md:hidden inset-x-4 z-30">
         <Link to={`/book/${resource.id}`} className="btn-primary w-full btn-lg shadow-lg">
-          Request a Spot
+          {resource.category === 'shelter' ? 'Request a Spot' : 'Request Help'}
         </Link>
       </div>
     </div>

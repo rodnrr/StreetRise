@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import { useQuery } from '@tanstack/react-query'
 import { Search, SlidersHorizontal, X, LocateFixed, ChevronUp } from 'lucide-react'
@@ -6,10 +7,28 @@ import clsx from 'clsx'
 import { useMapStore } from '@/lib/store'
 import { db, subscribeToBedUpdates } from '@/lib/supabase'
 import type { Resource, ResourceCategory } from '@/types'
+
 import ResourceMarker from '@/components/map/ResourceMarker'
 import ResourceCard from '@/components/map/ResourceCard'
 import FilterDrawer from '@/components/map/FilterDrawer'
 import 'leaflet/dist/leaflet.css'
+
+// Maps URL slugs (incl. homepage-generated ones) → canonical ResourceCategory values.
+// 'legal_help' is what the homepage generates; the DB type uses 'legal'.
+const CATEGORY_SLUG_MAP: Record<string, ResourceCategory> = {
+  shelter:        'shelter',
+  food:           'food',
+  work_exchange:  'work_exchange',
+  mental_health:  'mental_health',
+  medical:        'medical',
+  legal:          'legal',
+  legal_help:     'legal',   // homepage generates this slug
+  hygiene:        'hygiene',
+  clothing:       'clothing',
+  childcare:      'childcare',
+  transportation: 'transportation',
+  other:          'other',
+}
 
 // ── Map sync component ──
 function MapSync() {
@@ -66,14 +85,25 @@ async function fetchResources(lat: number, lng: number, radiusKm = 40, category?
 export default function MapPage() {
   const {
     mapCenter, mapZoom, filters, selectedId,
-    setSelectedId, setUserLocation, setMapZoom,
+    setSelectedId, setUserLocation, setMapZoom, setFilters,
   } = useMapStore()
+
+  const [searchParams] = useSearchParams()
 
   const [searchQuery, setSearchQuery]   = useState('')
   const [showFilters, setShowFilters]   = useState(false)
   const [showListView, setShowListView] = useState(false)
   const [locating, setLocating]         = useState(false)
   const channelRef = useRef<ReturnType<typeof subscribeToBedUpdates> | null>(null)
+
+  // Sync ?category= query param into the store filter on mount.
+  // Unknown slugs are silently ignored — the map just shows unfiltered results.
+  useEffect(() => {
+    const raw = searchParams.get('category')
+    if (!raw) return
+    const resolved = CATEGORY_SLUG_MAP[raw]
+    if (resolved) setFilters({ category: resolved })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch resources
   const { data: resources = [], refetch } = useQuery({

@@ -21,14 +21,6 @@ function VerificationBadge({ status }: { status: string }) {
   return null
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  available: 'Beds Available',
-  limited:   'Limited Availability',
-  full:      'No Beds Available',
-  unknown:   'Availability Unknown',
-  closed:    'Closed',
-}
-
 const STATUS_BADGE: Record<string, string> = {
   available: 'badge-available',
   limited:   'badge-limited',

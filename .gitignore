@@ -42,3 +42,7 @@ lerna-debug.log*
 
 # Test coverage
 coverage/
+
+# local seeding / geocode artifacts
+geocode_results_log.json
+streetrise_resource_outreach_tracker_geocoded.xlsx

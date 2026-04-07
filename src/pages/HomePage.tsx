@@ -11,8 +11,8 @@ const CATEGORIES = [
 ]
 
 const TRUST_POINTS = [
-  'All providers are verified by StreetRise staff',
-  'Real-time shelter bed availability — updated by providers',
+  'Verified providers are confirmed by StreetRise staff and clearly badged on every listing',
+  'Community Listed resources are publicly submitted — a wider net, clearly labeled so you know what you\'re looking at',
   'Free to use — no account required to search',
   'Anonymous booking option for privacy',
 ]
@@ -27,8 +27,8 @@ export default function HomePage() {
             Find shelter, food &amp; support — right now
           </h1>
           <p className="text-primary-100 text-lg md:text-xl mb-8 leading-relaxed">
-            StreetRise connects people in need with verified local resources.
-            Real-time availability. No sign-up required.
+            StreetRise maps local shelters, food, and support services — verified
+            providers and community listings, clearly labeled. No sign-up required.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link to="/map" className="btn bg-white text-primary-700 hover:bg-primary-50 btn-lg font-bold shadow-lg">
@@ -82,7 +82,7 @@ export default function HomePage() {
           <Heart size={32} className="text-danger-500 mx-auto mb-3" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Help us keep the lights on</h2>
           <p className="text-gray-500 text-sm mb-5">
-            StreetRise is free for everyone. Your donation keeps real-time data flowing.
+            StreetRise is free for everyone. Your donation helps us verify more providers and keep listings current.
           </p>
           <Link to="/donate" className="btn-primary btn-lg">
             Donate Now

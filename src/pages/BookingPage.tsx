@@ -29,6 +29,20 @@ const STATUS_STYLE: Record<string, string> = {
   closed:    'text-gray-500 bg-gray-100',
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  available: 'Open Now',
+  limited:   'Limited Availability',
+  full:      'Unavailable',
+  unknown:   'Availability Unknown',
+  closed:    'Closed',
+}
+
+// Shelter resources use bed/spot language; other service types use generic request language
+function getBookingLabel(resource: Resource, isFull: boolean): string {
+  if (isFull) return 'Join the Waitlist'
+  return resource.category === 'shelter' ? 'Request a Spot' : 'Request Help'
+}
+
 export default function BookingPage() {
   const { resourceId }  = useParams<{ resourceId: string }>()
   const [done, setDone] = useState(false)
@@ -101,10 +115,10 @@ export default function BookingPage() {
             <p className="text-sm text-gray-500">{resource.address.city}, {resource.address.state}</p>
           </div>
           <span className={`badge ${STATUS_STYLE[resource.availability_status]}`}>
-            {resource.availability_status.charAt(0).toUpperCase() + resource.availability_status.slice(1)}
+            {STATUS_LABEL[resource.availability_status] ?? resource.availability_status}
           </span>
         </div>
-        {resource.beds_total != null && (
+        {resource.category === 'shelter' && resource.beds_total != null && (
           <div className="flex items-center gap-2 mt-3 text-sm text-gray-600">
             <BedDouble size={15} />
             <span><strong>{resource.beds_available ?? '?'}</strong> of <strong>{resource.beds_total}</strong> beds available</span>
@@ -120,7 +134,7 @@ export default function BookingPage() {
       {/* Booking form */}
       <div className="card">
         <h1 className="font-bold text-gray-900 text-lg mb-4">
-          {isFull ? 'Join the Waitlist' : 'Request a Spot'}
+          {getBookingLabel(resource, isFull)}
         </h1>
 
         <form onSubmit={handleSubmit(d => submit.mutate(d))} className="space-y-4">
@@ -183,7 +197,7 @@ export default function BookingPage() {
           </div>
 
           <button type="submit" disabled={isSubmitting || submit.isPending} className="btn-primary w-full btn-lg">
-            {submit.isPending ? 'Sending request…' : isFull ? 'Join Waitlist' : 'Send Request'}
+            {submit.isPending ? 'Sending request…' : getBookingLabel(resource, isFull)}
           </button>
         </form>
       </div>

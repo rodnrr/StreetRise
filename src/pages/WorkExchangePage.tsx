@@ -26,7 +26,7 @@ export default function WorkExchangePage() {
     queryKey: ['work-exchanges', mapCenter],
     queryFn: async () => {
       const { data } = await db.work_exchanges()
-        .select('*, providers(organization_name)')
+        .select('*, providers(organization_name, contact_email, website)')
         .eq('is_active', true)
         .gte('lat', mapCenter.lat - 0.5)
         .lte('lat', mapCenter.lat + 0.5)
@@ -125,7 +125,28 @@ export default function WorkExchangePage() {
               <p className="text-xs text-gray-400">
                 {(wx as unknown as { providers?: { organization_name: string } }).providers?.organization_name ?? 'Organization'}
               </p>
-              <button className="btn-primary btn-sm">Apply</button>
+              {(() => {
+                const provider = (wx as unknown as { providers?: { organization_name: string; contact_email?: string; website?: string } }).providers
+                if (provider?.website) {
+                  return (
+                    <a href={provider.website} target="_blank" rel="noopener noreferrer"
+                       className="btn-primary btn-sm">
+                      Apply on Website
+                    </a>
+                  )
+                }
+                if (provider?.contact_email) {
+                  return (
+                    <a href={`mailto:${provider.contact_email}?subject=Interest in: ${encodeURIComponent(wx.title)}`}
+                       className="btn-primary btn-sm">
+                      Email to Apply
+                    </a>
+                  )
+                }
+                return (
+                  <span className="text-xs text-gray-400 italic">Contact provider directly</span>
+                )
+              })()}
             </div>
           </div>
         ))}
