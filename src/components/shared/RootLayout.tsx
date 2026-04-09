@@ -16,6 +16,8 @@ export default function RootLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
   const isMapPage = location.pathname === '/map'
+  const emergencyUrl = 'https://www.app.streetrise.org'
+  const isEmergencyUrlSafe = emergencyUrl.startsWith('https://')
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -117,6 +119,24 @@ export default function RootLayout() {
 
       {/* ── Footer (hidden on full-screen map) ── */}
       {!isMapPage && <Footer />}
+
+      {/* ── Persistent emergency help CTA ── */}
+      <a
+        href={isEmergencyUrlSafe ? emergencyUrl : '#'}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Get Help Now - Emergency Hotline"
+        className={clsx(
+          'fixed right-4 z-50 rounded-full px-5 py-3 text-sm font-bold uppercase tracking-wide shadow-lg',
+          'focus:outline-none focus:ring-4 focus:ring-offset-2',
+          'transition-transform hover:scale-[1.02] active:scale-[0.98]',
+          'bg-red-600 text-white focus:ring-red-300',
+          'bottom-20 md:bottom-4',
+          { 'pointer-events-none opacity-50': !isEmergencyUrlSafe },
+        )}
+      >
+        Get Help Now
+      </a>
 
       {/* ── Bottom tab bar (mobile) ── */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200
