@@ -35,13 +35,13 @@ jobs:
           VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
           VITE_APP_URL:               https://app.streetrise.org
           VITE_APP_ENV:               production
-
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken:    ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId:   ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: streetrise.org
-          directory:   dist
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          branch:      ${{ github.ref_name }}
+          
+     - name: Deploy to Cloudflare Pages
+  if: ${{ env.HAS_CF_API_TOKEN == 'true' && env.HAS_CF_ACCOUNT_ID == 'true' }}
+  uses: cloudflare/wrangler-action@v3
+  with:
+    apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    command: pages deploy dist --project-name=streetrise.org --branch=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+    gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+     branch:      ${{ github.ref_name }
