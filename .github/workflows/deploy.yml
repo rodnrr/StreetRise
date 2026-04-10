@@ -37,6 +37,7 @@ jobs:
           VITE_APP_ENV:               production
 
       - name: Deploy to Cloudflare Pages
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
         uses: cloudflare/pages-action@v1
         with:
           apiToken:    ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -45,3 +46,7 @@ jobs:
           directory:   dist
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
           branch:      ${{ github.ref_name }}
+
+      - name: Skip deploy (missing Cloudflare secrets)
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN == '' || secrets.CLOUDFLARE_ACCOUNT_ID == '' }}
+        run: echo "Skipping Cloudflare deploy because CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not configured for this run."
