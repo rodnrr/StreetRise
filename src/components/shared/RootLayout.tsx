@@ -16,7 +16,7 @@ export default function RootLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
   const isMapPage = location.pathname === '/map'
-  const emergencyUrl = 'https://app.streetrise.org'
+  const emergencyUrl = 'https://www.app.streetrise.org'
   const isEmergencyUrlSafe = emergencyUrl.startsWith('https://')
 
   return (
