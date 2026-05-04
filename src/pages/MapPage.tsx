@@ -72,7 +72,7 @@ async function fetchResources(lat: number, lng: number, radiusKm = 40, category?
     .lte('lat', lat + radiusKm / 111)
     .gte('lng', lng - radiusKm / 111)
     .lte('lng', lng + radiusKm / 111)
-    .order('availability_status', { ascending: true }) // available first
+    .order('availability_status', { ascending: true }) // alphabetical status ordering
 
   if (category) query = query.eq('category', category)
 
