@@ -2,7 +2,7 @@
   "name": "streetrise",
   "version": "0.1.0",
   "private": true,
-  "description": "StreetRise — real-time resource discovery for people in need",
+  "description": "StreetRise \u2014 real-time resource discovery for people in need",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "deploy": "wrangler pages deploy dist --project-name=streetrise"
+    "deploy": "./scripts/deploy-pages.sh dist"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
