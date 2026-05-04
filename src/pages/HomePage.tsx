@@ -10,7 +10,7 @@ const CATEGORIES = [
 ]
 
 const TRUST_POINTS = [
-  'Verified providers are confirmed by StreetRise staff and clearly badged on every listing',
+  'Staff Verified listings are confirmed by a real person on our team and clearly badged so you know what you\'re looking at',
   'Community Listed resources are publicly submitted — a wider net, clearly labeled so you know what you\'re looking at',
   'Free to use — no account required to search',
   'Anonymous booking option for privacy',

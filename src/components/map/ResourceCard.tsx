@@ -7,7 +7,7 @@ function VerificationBadge({ status }: { status: string }) {
   if (status === 'verified') {
     return (
       <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">
-        <CheckCircle size={11} /> Verified
+        <CheckCircle size={11} /> Staff Verified
       </span>
     )
   }
