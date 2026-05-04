@@ -1,10 +1,9 @@
 import { Link } from 'react-router-dom'
-import { MapPin, Briefcase, Heart, ArrowRight, CheckCircle } from 'lucide-react'
+import { MapPin, Heart, ArrowRight, CheckCircle } from 'lucide-react'
 
 const CATEGORIES = [
   { label: 'Shelter',       color: 'bg-blue-100 text-blue-700',   emoji: '🏠' },
   { label: 'Food',          color: 'bg-green-100 text-green-700',  emoji: '🍽' },
-  { label: 'Work Exchange', color: 'bg-purple-100 text-purple-700', emoji: '🤝' },
   { label: 'Mental Health', color: 'bg-pink-100 text-pink-700',    emoji: '💙' },
   { label: 'Medical',       color: 'bg-red-100 text-red-700',      emoji: '⚕️' },
   { label: 'Legal Help',    color: 'bg-yellow-100 text-yellow-700', emoji: '⚖️' },
@@ -30,14 +29,10 @@ export default function HomePage() {
             StreetRise maps local shelters, food, and support services — verified
             providers and community listings, clearly labeled. No sign-up required.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex justify-center">
             <Link to="/map" className="btn bg-white text-primary-700 hover:bg-primary-50 btn-lg font-bold shadow-lg">
               <MapPin size={20} />
               Find Resources Near Me
-            </Link>
-            <Link to="/work" className="btn border-2 border-white/40 text-white hover:bg-white/10 btn-lg">
-              <Briefcase size={18} />
-              Work Exchange
             </Link>
           </div>
         </div>

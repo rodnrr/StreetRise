@@ -6,8 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-pages-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     name: Build & Deploy
 
@@ -30,18 +37,21 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_SUPABASE_URL:          ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY:     ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL:           ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY:      ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
-          VITE_APP_URL:               https://app.streetrise.org
-          VITE_APP_ENV:               production
-          
-     - name: Deploy to Cloudflare Pages
-  if: ${{ env.HAS_CF_API_TOKEN == 'true' && env.HAS_CF_ACCOUNT_ID == 'true' }}
-  uses: cloudflare/wrangler-action@v3
-  with:
-    apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-    accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-    command: pages deploy dist --project-name=streetrise.org --branch=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
-    gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-     branch:      ${{ github.ref_name }
+          VITE_APP_URL:                https://app.streetrise.org
+          VITE_APP_ENV:                production
+
+      - name: Deploy to Cloudflare Pages
+        if: secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=streetrise --branch=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Skip deploy (missing Cloudflare secrets)
+        if: secrets.CLOUDFLARE_API_TOKEN == '' || secrets.CLOUDFLARE_ACCOUNT_ID == ''
+        run: echo "Skipping Cloudflare deploy — CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID not configured."
