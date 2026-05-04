@@ -8,7 +8,7 @@ function VerificationBadge({ status }: { status: string }) {
   if (status === 'verified') {
     return (
       <span className="badge-verified shrink-0 flex items-center gap-1">
-        <CheckCircle size={12} /> Verified
+        <CheckCircle size={12} /> Staff Verified
       </span>
     )
   }

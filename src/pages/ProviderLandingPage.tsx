@@ -56,7 +56,7 @@ export default function ProviderLandingPage() {
       {/* Hero */}
       <div className="text-center space-y-4">
         <div className="inline-flex items-center gap-1.5 bg-primary-50 text-primary-700 text-xs font-semibold rounded-full px-3 py-1.5 mb-1">
-          <ShieldCheck size={13} /> Verified provider network
+          <ShieldCheck size={13} /> Free for local service providers
         </div>
         <h1 className="text-3xl font-extrabold text-gray-900 leading-tight">
           Help people find you<br />when it matters most
@@ -118,8 +118,8 @@ export default function ProviderLandingPage() {
         <p className="text-xs text-gray-500 leading-relaxed">
           A real person on our team reviews every application to confirm you represent the
           organization you're listing. Approved providers receive a <span className="inline-flex items-center gap-0.5 font-medium text-primary-700">
-            <CheckCircle size={11} /> Verified
-          </span> badge on all their listings — a visible trust signal for everyone who depends on StreetRise.
+            <CheckCircle size={11} /> Staff Verified
+          </span> badge on all their listings — a visible signal that a real person on our team has confirmed the listing.
         </p>
         <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">
           <Clock size={13} className="shrink-0" />
