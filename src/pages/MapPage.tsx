@@ -97,12 +97,14 @@ export default function MapPage() {
   const channelRef = useRef<ReturnType<typeof subscribeToBedUpdates> | null>(null)
 
   // Sync ?category= query param into the store filter on mount.
-  // Unknown slugs are silently ignored — the map just shows unfiltered results.
+  // When the param is present (even empty), always write to the store so that
+  // navigating to /map?category= from "All Resources" clears a stale filter.
+  // When the param is absent entirely, leave the store untouched (preserves
+  // any category chosen via the filter drawer).
   useEffect(() => {
-    const raw = searchParams.get('category')
-    if (!raw) return
-    const resolved = CATEGORY_SLUG_MAP[raw]
-    if (resolved) setFilters({ category: resolved })
+    if (!searchParams.has('category')) return
+    const resolved = CATEGORY_SLUG_MAP[searchParams.get('category') ?? '']
+    setFilters({ category: resolved })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch resources
