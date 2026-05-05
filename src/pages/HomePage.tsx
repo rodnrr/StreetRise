@@ -9,7 +9,7 @@ const CATEGORIES = [
   { label: 'Mental Health', emoji: '💙', cat: 'mental_health' },
   { label: 'Medical',       emoji: '⚕️', cat: 'medical' },
   { label: 'Legal Help',    emoji: '⚖️', cat: 'legal' },
-  { label: 'All Resources', emoji: '📍', cat: null },
+  { label: 'All Resources', emoji: '📍', cat: '' },
 ]
 
 export default function HomePage() {
@@ -67,7 +67,7 @@ export default function HomePage() {
             {CATEGORIES.map(({ label, emoji, cat }) => (
               <Link
                 key={label}
-                to={cat ? `/map?category=${cat}` : '/map'}
+                to={`/map?category=${cat}`}
                 className="rounded-2xl border border-slate-200 bg-white p-4 hover:border-primary-300 transition-colors flex items-center gap-3 shadow-sm"
               >
                 <span className="text-2xl">{emoji}</span>
