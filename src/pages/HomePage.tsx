@@ -20,6 +20,9 @@ export default function HomePage() {
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true)
         .in('verification_status', ['verified', 'pending'])
+        .eq('is_map_ready', true)
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
       if (error) throw error
       return c ?? 0
     },
