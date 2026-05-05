@@ -42,7 +42,7 @@ function MapSync() {
     map.setView([mapCenter.lat, mapCenter.lng], mapZoom, { animate: true })
     const timer = setTimeout(() => { isProgrammatic.current = false }, 600)
     return () => clearTimeout(timer)
-  }, [mapCenter.lat, mapCenter.lng, mapZoom]) // re-runs on any store-driven center/zoom change
+  }, [map, mapCenter.lat, mapCenter.lng, mapZoom]) // re-runs on any store-driven center/zoom change
 
   useMapEvents({
     moveend: () => {
@@ -72,7 +72,7 @@ async function fetchResources(lat: number, lng: number, radiusKm = 40, category?
     .lte('lat', lat + radiusKm / 111)
     .gte('lng', lng - radiusKm / 111)
     .lte('lng', lng + radiusKm / 111)
-    .order('availability_status', { ascending: true }) // available first
+    .order('availability_status', { ascending: true }) // alphabetical status ordering
 
   if (category) query = query.eq('category', category)
 
@@ -118,7 +118,7 @@ export default function MapPage() {
     channelRef.current?.unsubscribe()
     channelRef.current = subscribeToBedUpdates(
       resources.map((r) => r.id),
-      (_id, _beds, _status) => { refetch() }
+      () => { refetch() }
     )
     return () => { channelRef.current?.unsubscribe() }
   }, [resources.map((r) => r.id).join(',')]) // eslint-disable-line
