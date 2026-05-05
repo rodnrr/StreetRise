@@ -13,7 +13,7 @@ const CATEGORIES = [
 ]
 
 export default function HomePage() {
-  const { data: count } = useQuery({
+  const { data: count, isError } = useQuery({
     queryKey: ['resource-count'],
     queryFn: async () => {
       const { count: c, error } = await db.resources()
@@ -59,7 +59,7 @@ export default function HomePage() {
             <h2 className="text-2xl font-bold">Tampa Bay Resources</h2>
             <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600">
               <MapPin size={14} />
-              {count != null ? `${count} listings` : 'Loading…'}
+              {isError ? 'Listings unavailable' : count != null ? `${count} listings` : 'Loading…'}
             </div>
           </div>
 
