@@ -16,10 +16,11 @@ export default function HomePage() {
   const { data: count } = useQuery({
     queryKey: ['resource-count'],
     queryFn: async () => {
-      const { count: c } = await db.resources()
+      const { count: c, error } = await db.resources()
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true)
         .in('verification_status', ['verified', 'pending'])
+      if (error) throw error
       return c ?? 0
     },
     staleTime: 1000 * 60 * 5,
