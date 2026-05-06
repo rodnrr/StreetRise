@@ -115,6 +115,8 @@ export default function MapPage() {
   })
 
   // Subscribe to realtime bed updates
+  // Use string ID join as dependency to avoid array recreation on every render.
+  // This keeps the subscription stable even when resource array reference changes.
   useEffect(() => {
     if (!resources.length) return
     channelRef.current?.unsubscribe()
@@ -123,7 +125,7 @@ export default function MapPage() {
       () => { refetch() }
     )
     return () => { channelRef.current?.unsubscribe() }
-  }, [resources.map((r) => r.id).join(',')]) // eslint-disable-line
+  }, [resources.map((r) => r.id).join(','), refetch]) // eslint-disable-line
 
   // Filter by search query
   const filtered = resources.filter((r) => {
