@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_NAME="${CLOUDFLARE_PAGES_PROJECT_NAME:-streetrise}"
-ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-${CF_ACCOUNT_ID:-}}"
+ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-${CF_ACCOUNT_ID:-3c69f6768af396d8d31e3d40d772ecdf}}"
 DIST_DIR="${1:-dist}"
 
 if [[ -z "$ACCOUNT_ID" ]]; then
@@ -17,6 +17,5 @@ if [[ ! "$ACCOUNT_ID" =~ ^[a-fA-F0-9]{32}$ ]]; then
   exit 1
 fi
 
-npx wrangler pages deploy "$DIST_DIR" \
-  --project-name "$PROJECT_NAME" \
-  --account-id "$ACCOUNT_ID"
+CLOUDFLARE_ACCOUNT_ID="$ACCOUNT_ID" npx wrangler pages deploy "$DIST_DIR" \
+  --project-name "$PROJECT_NAME"
