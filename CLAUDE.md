@@ -152,7 +152,7 @@ scripts/deploy-pages.sh     # Cloudflare Pages deploy helper
 ### Data Model (Key Tables)
 
 #### `providers`
-Organizations that list resources. Created when a user completes signup; start as `verification_status = 'pending'`; admin must manually approve to `verified`.
+Organizations that list resources. **The `providers` row is not created at signup.** `LoginPage.tsx` calls `supabase.auth.signUp()` to create the Supabase auth user, then immediately queries `providers` by `user_id`. For new accounts that row does not exist yet, so the user is routed to `/portal/onboarding`. The `providers` row is created only when the 3-step onboarding form is submitted (`ProviderOnboarding.tsx`, `db.providers().insert(...)`). New rows default to `verification_status = 'pending'`; an admin must manually approve to `verified`.
 - `role`: `'provider' | 'admin' | 'super_admin'`
 - `verification_status`: `'pending' | 'verified' | 'rejected' | 'suspended'`
 - `ein`: optional Tax ID for nonprofits
