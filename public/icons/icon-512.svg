@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">StreetRise icon 512</title>
+  <desc id="desc">StreetRise app icon with blue background and white SR monogram.</desc>
+  <rect width="512" height="512" rx="96" fill="#1a56db"/>
+  <text x="256" y="304" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="192" font-weight="700" fill="#ffffff">SR</text>
+</svg>
