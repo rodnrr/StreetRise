@@ -92,7 +92,7 @@ export default function MapPage() {
 
   const [searchQuery, setSearchQuery]   = useState('')
   const [showFilters, setShowFilters]   = useState(false)
-  const [showListView, setShowListView] = useState(false)
+  const [showListView, setShowListView] = useState(true)
   const [locating, setLocating]         = useState(false)
   const channelRef = useRef<ReturnType<typeof subscribeToBedUpdates> | null>(null)
 
