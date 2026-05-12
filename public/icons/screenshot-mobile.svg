@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" role="img" aria-labelledby="title desc">
+  <title id="title">StreetRise mobile screenshot placeholder</title>
+  <desc id="desc">Illustrative StreetRise mobile interface placeholder for PWA manifest screenshot metadata.</desc>
+  <rect width="390" height="844" fill="#f8fafc"/>
+  <rect x="16" y="24" width="358" height="56" rx="12" fill="#1a56db"/>
+  <text x="36" y="59" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="600" fill="#ffffff">StreetRise</text>
+  <rect x="16" y="96" width="358" height="132" rx="14" fill="#ffffff" stroke="#dbe3ee"/>
+  <rect x="16" y="244" width="358" height="132" rx="14" fill="#ffffff" stroke="#dbe3ee"/>
+  <rect x="16" y="392" width="358" height="132" rx="14" fill="#ffffff" stroke="#dbe3ee"/>
+  <rect x="16" y="540" width="358" height="132" rx="14" fill="#ffffff" stroke="#dbe3ee"/>
+  <rect x="16" y="688" width="170" height="132" rx="14" fill="#ffffff" stroke="#dbe3ee"/>
+  <rect x="204" y="688" width="170" height="132" rx="14" fill="#ffffff" stroke="#dbe3ee"/>
+</svg>
