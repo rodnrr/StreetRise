@@ -12,7 +12,8 @@ const CATEGORIES: { value: ResourceCategory; label: string; emoji: string }[] = 
   { value: 'hygiene',       label: 'Hygiene',        emoji: '🚿' },
   { value: 'clothing',      label: 'Clothing',       emoji: '👕' },
   { value: 'childcare',     label: 'Childcare',      emoji: '👶' },
-  { value: 'transportation',label: 'Transportation', emoji: '🚌' },
+  { value: 'transportation', label: 'Transportation', emoji: '🚌' },
+  { value: 'outdoor_space',  label: 'Parks & Outdoors', emoji: '🌳' },
 ]
 
 const STATUSES: { value: AvailabilityStatus; label: string }[] = [

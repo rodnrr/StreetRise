@@ -31,6 +31,7 @@ type HoursOfOperationJson = {
   saturday?: DayHoursJson
   sunday?: DayHoursJson
   notes?: string
+  summary?: string
 }
 
 export interface Database {
@@ -39,7 +40,7 @@ export interface Database {
       providers: {
         Row: {
           id: string
-          user_id: string
+          user_id: string | null
           organization_name: string
           contact_name: string
           contact_email: string
@@ -55,7 +56,7 @@ export interface Database {
         }
         Insert: Optional<
           Omit<Database['public']['Tables']['providers']['Row'], 'id' | 'created_at' | 'updated_at'>,
-          'contact_phone' | 'website' | 'ein' | 'logo_url' | 'verification_status' | 'role' | 'bio'
+          'user_id' | 'contact_phone' | 'website' | 'ein' | 'logo_url' | 'verification_status' | 'role' | 'bio'
         >
         Update: Partial<Database['public']['Tables']['providers']['Insert']>
       }

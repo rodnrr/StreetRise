@@ -26,8 +26,11 @@ const CATEGORY_SLUG_MAP: Record<string, ResourceCategory> = {
   hygiene:        'hygiene',
   clothing:       'clothing',
   childcare:      'childcare',
-  transportation: 'transportation',
-  other:          'other',
+  transportation:  'transportation',
+  outdoor_space:   'outdoor_space',
+  parks:           'outdoor_space',
+  outdoors:        'outdoor_space',
+  other:           'other',
 }
 
 // ── Map sync component ──
