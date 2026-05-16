@@ -22,8 +22,9 @@ function MarkerIcon({ status, category }: { status: string; category: string }) 
     hygiene:       '🚿',
     clothing:      '👕',
     childcare:     '👶',
-    transportation:'🚌',
-    other:         '📍',
+    transportation: '🚌',
+    outdoor_space:  '🌳',
+    other:          '📍',
   }
 
   const color  = colors[status]  ?? colors.unknown

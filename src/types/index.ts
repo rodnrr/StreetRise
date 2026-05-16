@@ -15,6 +15,7 @@ export type ResourceCategory =
   | 'clothing'
   | 'childcare'
   | 'transportation'
+  | 'outdoor_space'
   | 'other'
 
 export type AvailabilityStatus = 'available' | 'limited' | 'full' | 'unknown' | 'closed'
