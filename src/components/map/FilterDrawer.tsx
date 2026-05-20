@@ -135,18 +135,18 @@ export default function FilterDrawer({ open, onClose }: Props) {
 
           {/* Radius */}
           <section className="mb-6">
-            <h3 className="label mb-2">Search radius: {formatImperialDistance(filters.radius ?? 20)}</h3>
+            <h3 className="label mb-2">Search radius: {formatImperialDistance(filters.radius ?? 120)}</h3>
             <input
               type="range"
               min={1}
-              max={50}
+              max={120}
               step={1}
-              value={filters.radius ?? 20}
+              value={filters.radius ?? 120}
               onChange={(e) => setFilters({ radius: parseInt(e.target.value) })}
               className="w-full accent-primary-600"
             />
             <div className="flex justify-between text-xs text-gray-400 mt-1">
-              <span>{formatImperialDistance(1)}</span><span>{formatImperialDistance(50)}</span>
+              <span>{formatImperialDistance(1)}</span><span>{formatImperialDistance(120)}</span>
             </div>
           </section>
 
