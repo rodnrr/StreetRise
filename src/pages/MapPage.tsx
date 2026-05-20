@@ -59,7 +59,10 @@ function MapSync() {
 }
 
 // ── Fetch resources near current center (no hard cap) ──
-async function fetchResources(lat: number, lng: number, radiusKm = 40, category?: ResourceCategory) {
+async function fetchResources(lat: number, lng: number, radiusKm = 120, category?: ResourceCategory) {
+  const latDelta = radiusKm / 111
+  const lngDelta = radiusKm / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2))
+
   let query = db.resources()
     .select('*')
     .eq('is_active', true)
@@ -67,11 +70,11 @@ async function fetchResources(lat: number, lng: number, radiusKm = 40, category?
     .eq('is_map_ready', true)
     .not('lat', 'is', null)
     .not('lng', 'is', null)
-    // Bounding box filter (approx 1 deg lat ≈ 111 km)
-    .gte('lat', lat - radiusKm / 111)
-    .lte('lat', lat + radiusKm / 111)
-    .gte('lng', lng - radiusKm / 111)
-    .lte('lng', lng + radiusKm / 111)
+    // Bounding box filter; longitude degrees shrink as latitude increases
+    .gte('lat', lat - latDelta)
+    .lte('lat', lat + latDelta)
+    .gte('lng', lng - lngDelta)
+    .lte('lng', lng + lngDelta)
     .order('availability_status', { ascending: true }) // alphabetical status ordering
 
   if (category) query = query.eq('category', category)
@@ -110,7 +113,7 @@ export default function MapPage() {
   // Fetch resources
   const { data: resources = [], refetch } = useQuery({
     queryKey: ['resources', mapCenter, filters],
-    queryFn: () => fetchResources(mapCenter.lat, mapCenter.lng, filters.radius ?? 40, filters.category),
+    queryFn: () => fetchResources(mapCenter.lat, mapCenter.lng, filters.radius ?? 120, filters.category),
     staleTime: 1000 * 60, // 1 min
   })
 
