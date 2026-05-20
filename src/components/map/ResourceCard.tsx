@@ -53,8 +53,12 @@ function getAvailabilityLabel(resource: Resource) {
   return serviceLabels[resource.availability_status] ?? 'Availability Unknown'
 }
 
-
 function buildDirectionsUrl(resource: Resource) {
+  if (resource.lat != null && resource.lng != null) {
+    // Prefer listing coordinates so directions always match map marker placement.
+    return `https://www.google.com/maps/dir/?api=1&destination=${resource.lat},${resource.lng}`
+  }
+
   const destinationAddress = [
     resource.address.street,
     resource.address.city,
@@ -64,10 +68,6 @@ function buildDirectionsUrl(resource: Resource) {
 
   if (destinationAddress) {
     return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destinationAddress)}`
-  }
-
-  if (resource.lat != null && resource.lng != null) {
-    return `https://www.google.com/maps/dir/?api=1&destination=${resource.lat},${resource.lng}`
   }
 
   return null
