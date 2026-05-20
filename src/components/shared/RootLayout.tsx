@@ -120,7 +120,8 @@ export default function RootLayout() {
       {!isMapPage && <Footer />}
 
       {/* ── Persistent emergency help CTA ── */}
-      <a
+      {!isMapPage && (
+        <a
         href={isEmergencyUrlSafe ? emergencyUrl : '#'}
         target="_blank"
         rel="noopener noreferrer"
@@ -136,6 +137,7 @@ export default function RootLayout() {
       >
         Get Help Now
       </a>
+      )}
 
       {/* ── Bottom tab bar (mobile) ── */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200
