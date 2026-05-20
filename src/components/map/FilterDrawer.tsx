@@ -21,6 +21,15 @@ const STATUSES: { value: AvailabilityStatus; label: string }[] = [
   { value: 'full',      label: 'Full' },
 ]
 
+
+function formatImperialDistance(km: number) {
+  const miles = km * 0.621371
+  if (miles < 0.2) {
+    return `${Math.round(miles * 5280)} ft`
+  }
+  return `${miles.toFixed(1)} mi`
+}
+
 interface Props {
   open:    boolean
   onClose: () => void
@@ -126,7 +135,7 @@ export default function FilterDrawer({ open, onClose }: Props) {
 
           {/* Radius */}
           <section className="mb-6">
-            <h3 className="label mb-2">Search radius: {filters.radius ?? 20} km</h3>
+            <h3 className="label mb-2">Search radius: {formatImperialDistance(filters.radius ?? 20)}</h3>
             <input
               type="range"
               min={1}
@@ -137,7 +146,7 @@ export default function FilterDrawer({ open, onClose }: Props) {
               className="w-full accent-primary-600"
             />
             <div className="flex justify-between text-xs text-gray-400 mt-1">
-              <span>1 km</span><span>50 km</span>
+              <span>{formatImperialDistance(1)}</span><span>{formatImperialDistance(50)}</span>
             </div>
           </section>
 
