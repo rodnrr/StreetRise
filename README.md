@@ -52,7 +52,22 @@ StreetRise keeps the controlled resource vocabulary in version control so catego
 | File | Purpose |
 |---|---|
 | `data/reference/controlled_vocab.csv` | Official controlled vocabulary exported from the working spreadsheet. |
+| `data/seed/streetrise_seed_candidates_batch_2_normalized.csv` | Normalized Batch 2 seed candidates with generated `external_id`, normalized category fields, app-compatible category fields, map-readiness flags, and import status. |
 | `docs/data-dictionary.md` | Human-readable explanation of how to use the controlled values. |
+
+### Batch 2 seed candidate summary
+
+The Batch 2 candidate file contains 95 rows:
+
+| Import status | Count | Meaning |
+|---|---:|---|
+| `ready_for_import` | 77 | Has coordinates or a usable public/service location and can be reviewed for import. |
+| `needs_review` | 18 | Confidential, intake-only, missing coordinates, likely duplicate, or otherwise unsafe to map without human review. |
+
+The normalized file includes both:
+
+- `category` — preferred future controlled category, such as `day_use_space` or `employment`
+- `current_app_category` — compatibility value for the current frontend/Supabase enum, such as `outdoor_space`, `work_exchange`, or `other`
 
 Preferred top-level `category` values for new resource imports:
 
@@ -124,8 +139,10 @@ src/
     └── globals.css   # Tailwind + component layer
 
 data/
-└── reference/
-    └── controlled_vocab.csv
+├── reference/
+│   └── controlled_vocab.csv
+└── seed/
+    └── streetrise_seed_candidates_batch_2_normalized.csv
 
 docs/
 └── data-dictionary.md
