@@ -45,6 +45,39 @@ npm run dev
 npx supabase gen types typescript --project-id YOUR_REF > src/lib/database.types.ts
 ```
 
+## Data governance
+
+StreetRise keeps the controlled resource vocabulary in version control so category names, subcategories, provider types, amenities, verification values, and county values do not drift across spreadsheets and imports.
+
+| File | Purpose |
+|---|---|
+| `data/reference/controlled_vocab.csv` | Official controlled vocabulary exported from the working spreadsheet. |
+| `docs/data-dictionary.md` | Human-readable explanation of how to use the controlled values. |
+
+Preferred top-level `category` values for new resource imports:
+
+```text
+shelter
+food
+hygiene
+medical
+mental_health
+substance_abuse
+legal
+employment
+education
+transportation
+financial_assistance
+housing_assistance
+crisis_services
+community_center
+day_use_space
+```
+
+Use `day_use_space` for parks, libraries, cooling/warming centers, drop-in centers, safe rest areas, and other non-overnight public/communal spaces. Use `facility_features` for amenities such as `restrooms`, `showers`, `wifi`, `charging`, `outdoor_space`, and `parking`.
+
+> Current app compatibility note: the existing frontend/database still uses `outdoor_space` for the parks/outdoors filter. Migrate live records and TypeScript/database types to `day_use_space` in a dedicated schema migration before changing the map filter slug.
+
 ## Cloudflare Pages deploy
 
 ```bash
@@ -89,6 +122,13 @@ src/
 │   └── index.ts      # All shared TypeScript types
 └── styles/
     └── globals.css   # Tailwind + component layer
+
+data/
+└── reference/
+    └── controlled_vocab.csv
+
+docs/
+└── data-dictionary.md
 
 supabase/migrations/
 ├── 001_initial_schema.sql   # 7 tables, enums, indexes
