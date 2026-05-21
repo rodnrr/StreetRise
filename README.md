@@ -48,7 +48,8 @@ npx supabase gen types typescript --project-id YOUR_REF > src/lib/database.types
 ## Cloudflare Pages deploy
 
 ```bash
-# Manual deploy (requires a valid 32-char CLOUDFLARE_ACCOUNT_ID)
+# Manual deploy (requires CLOUDFLARE_API_TOKEN + 32-char CLOUDFLARE_ACCOUNT_ID)
+export CLOUDFLARE_API_TOKEN=your_cloudflare_api_token
 export CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
 npm run build
 npm run deploy
