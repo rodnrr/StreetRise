@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "deploy": "./scripts/deploy-pages.sh dist"
+    "deploy": "./scripts/deploy-pages.sh dist",
+    "import:seed": "npx tsx scripts/import-seed-candidates.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
@@ -44,6 +45,7 @@
     "typescript": "^5.4.5",
     "vite": "^5.2.10",
     "vite-plugin-pwa": "^0.20.0",
+    "tsx": "^4.19.4",
     "wrangler": "^3.54.0"
   }
 }
