@@ -4,12 +4,14 @@ import { useQuery } from '@tanstack/react-query'
 import { db } from '@/lib/supabase'
 
 const CATEGORIES = [
-  { label: 'Shelter',       emoji: '🏠', cat: 'shelter' },
-  { label: 'Food',          emoji: '🍽', cat: 'food' },
-  { label: 'Mental Health', emoji: '💙', cat: 'mental_health' },
-  { label: 'Medical',       emoji: '⚕️', cat: 'medical' },
-  { label: 'Legal Help',    emoji: '⚖️', cat: 'legal' },
-  { label: 'All Resources', emoji: '📍', cat: '' },
+  { label: 'Shelter',        emoji: '🏠', cat: 'shelter' },
+  { label: 'Food',           emoji: '🍽', cat: 'food' },
+  { label: 'Parks & Day Use', emoji: '🌳', cat: 'outdoor_space' },
+  { label: 'Hygiene',        emoji: '🚿', cat: 'hygiene' },
+  { label: 'Mental Health',  emoji: '💙', cat: 'mental_health' },
+  { label: 'Medical',        emoji: '⚕️', cat: 'medical' },
+  { label: 'Legal Help',     emoji: '⚖️', cat: 'legal' },
+  { label: 'All Resources',  emoji: '📍', cat: '' },
 ]
 
 export default function HomePage() {
@@ -40,7 +42,7 @@ export default function HomePage() {
             Street<span className="text-primary-300">Rise</span>
           </h1>
           <p className="text-slate-300 text-lg leading-relaxed mb-10">
-            Find nearby shelter, food, and essential resources when you need them most.
+            Find nearby shelter, meals, hygiene access, parks, and essential resources when you need them most.
           </p>
           <Link
             to="/map"
@@ -67,7 +69,7 @@ export default function HomePage() {
             {CATEGORIES.map(({ label, emoji, cat }) => (
               <Link
                 key={label}
-                to={`/map?category=${cat}`}
+                to={cat ? `/map?category=${cat}` : '/map'}
                 className="rounded-2xl border border-slate-200 bg-white p-4 hover:border-primary-300 transition-colors flex items-center gap-3 shadow-sm"
               >
                 <span className="text-2xl">{emoji}</span>

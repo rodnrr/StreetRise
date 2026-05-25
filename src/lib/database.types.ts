@@ -59,6 +59,7 @@ export interface Database {
           'user_id' | 'contact_phone' | 'website' | 'ein' | 'logo_url' | 'verification_status' | 'role' | 'bio'
         >
         Update: Partial<Database['public']['Tables']['providers']['Insert']>
+        Relationships: []
       }
 
       resources: {
@@ -127,6 +128,7 @@ export interface Database {
           | 'photos'
         >
         Update: Partial<Database['public']['Tables']['resources']['Insert']>
+        Relationships: []
       }
 
       bookings: {
@@ -159,6 +161,7 @@ export interface Database {
           | 'children'
         >
         Update: Partial<Database['public']['Tables']['bookings']['Insert']>
+        Relationships: []
       }
 
       work_exchanges: {
@@ -184,6 +187,7 @@ export interface Database {
           'description' | 'exchange_type' | 'hours_per_week' | 'compensation' | 'skills_required' | 'skills_gained' | 'is_active' | 'address' | 'lat' | 'lng'
         >
         Update: Partial<Database['public']['Tables']['work_exchanges']['Insert']>
+        Relationships: []
       }
 
       faq: {
@@ -200,6 +204,7 @@ export interface Database {
           'category' | 'order' | 'is_active'
         >
         Update: Partial<Database['public']['Tables']['faq']['Insert']>
+        Relationships: []
       }
 
       moderation_logs: {
@@ -218,6 +223,7 @@ export interface Database {
           'reason' | 'notes'
         >
         Update: Partial<Database['public']['Tables']['moderation_logs']['Insert']>
+        Relationships: []
       }
 
       donation_campaigns: {
@@ -238,6 +244,7 @@ export interface Database {
           'provider_id' | 'description' | 'goal_amount' | 'raised_amount' | 'stripe_price_id' | 'is_active' | 'ends_at'
         >
         Update: Partial<Database['public']['Tables']['donation_campaigns']['Insert']>
+        Relationships: []
       }
     }
 

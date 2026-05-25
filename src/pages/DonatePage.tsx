@@ -16,7 +16,7 @@ const IMPACT = [
 
 const TRUST_BADGES = [
   { icon: Shield,       label: 'Secure payment via Stripe' },
-  { icon: CheckCircle, label: '100% goes to platform operations' },
+  { icon: CheckCircle, label: 'Directly funds platform operations' },
   { icon: Zap,         label: 'No ads. Ever.' },
 ]
 

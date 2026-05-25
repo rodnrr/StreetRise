@@ -3,7 +3,14 @@ set -euo pipefail
 
 PROJECT_NAME="${CLOUDFLARE_PAGES_PROJECT_NAME:-streetrise}"
 ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-${CF_ACCOUNT_ID:-}}"
+API_TOKEN="${CLOUDFLARE_API_TOKEN:-${CF_API_TOKEN:-}}"
 DIST_DIR="${1:-dist}"
+
+if [[ -z "$API_TOKEN" ]]; then
+  echo "Error: CLOUDFLARE_API_TOKEN is required for Pages deploys."
+  echo "Set CLOUDFLARE_API_TOKEN (or CF_API_TOKEN) in your shell or CI secrets, then retry."
+  exit 1
+fi
 
 if [[ -z "$ACCOUNT_ID" ]]; then
   echo "Error: CLOUDFLARE_ACCOUNT_ID is required for Pages deploys."
