@@ -53,10 +53,19 @@ export interface Database {
           bio: string | null
           created_at: string
           updated_at: string
+          // Trust fields (migration 010)
+          identity_confirmed: boolean
+          re_verification_due_at: string | null
+          suspension_reason: string | null
+          verification_notes: string | null
+          suspended_at: string | null
         }
         Insert: Optional<
           Omit<Database['public']['Tables']['providers']['Row'], 'id' | 'created_at' | 'updated_at'>,
-          'user_id' | 'contact_phone' | 'website' | 'ein' | 'logo_url' | 'verification_status' | 'role' | 'bio'
+          | 'user_id' | 'contact_phone' | 'website' | 'ein' | 'logo_url'
+          | 'verification_status' | 'role' | 'bio'
+          | 'identity_confirmed' | 're_verification_due_at' | 'suspension_reason'
+          | 'verification_notes' | 'suspended_at'
         >
         Update: Partial<Database['public']['Tables']['providers']['Insert']>
         Relationships: []
@@ -97,6 +106,25 @@ export interface Database {
           photos: string[]
           created_at: string
           updated_at: string
+          // Trust fields (migration 010)
+          confidence_score: number
+          stale_after_days: number
+          last_provider_update_at: string | null
+          last_verified_at: string | null
+          verification_notes: string | null
+          // Taxonomy & facility fields (migration 011)
+          resource_type: string | null
+          gender_policy: string
+          population_focus: string[]
+          overnight_allowed: boolean | null
+          phone_required_before_arrival: boolean
+          has_showers: boolean
+          has_restrooms: boolean
+          serves_meals: boolean
+          has_laundry: boolean
+          pet_friendly: boolean
+          wheelchair_accessible: boolean
+          public_transit_accessible: boolean
         }
         Insert: Optional<
           Omit<Database['public']['Tables']['resources']['Row'], 'id' | 'created_at' | 'updated_at'>,
@@ -126,6 +154,23 @@ export interface Database {
           | 'languages_spoken'
           | 'tags'
           | 'photos'
+          | 'confidence_score'
+          | 'stale_after_days'
+          | 'last_provider_update_at'
+          | 'last_verified_at'
+          | 'verification_notes'
+          | 'resource_type'
+          | 'gender_policy'
+          | 'population_focus'
+          | 'overnight_allowed'
+          | 'phone_required_before_arrival'
+          | 'has_showers'
+          | 'has_restrooms'
+          | 'serves_meals'
+          | 'has_laundry'
+          | 'pet_friendly'
+          | 'wheelchair_accessible'
+          | 'public_transit_accessible'
         >
         Update: Partial<Database['public']['Tables']['resources']['Insert']>
         Relationships: []

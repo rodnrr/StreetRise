@@ -1,45 +1,30 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import { useQuery } from '@tanstack/react-query'
-import { Search, SlidersHorizontal, X, LocateFixed, ChevronUp } from 'lucide-react'
+import { Search, SlidersHorizontal, X, LocateFixed, List, Map } from 'lucide-react'
 import clsx from 'clsx'
-import { useMapStore } from '@/lib/store'
-import { db, subscribeToBedUpdates } from '@/lib/supabase'
-import type { Resource, ResourceCategory } from '@/types'
+import { useMapStore, useToast } from '@/lib/store'
+import { subscribeToBedUpdates } from '@/lib/supabase'
+import {
+  fetchMapResources,
+  countActiveFilters,
+  activeFilterSummary,
+  QUICK_FILTER_DEFS,
+  QUICK_FILTER_ORDER,
+  CATEGORY_SLUG_MAP,
+} from '@/lib/mapFilters'
+import type { QuickFilterKey } from '@/types'
 
 import ResourceMarker from '@/components/map/ResourceMarker'
 import ResourceCard from '@/components/map/ResourceCard'
 import FilterDrawer from '@/components/map/FilterDrawer'
 import 'leaflet/dist/leaflet.css'
 
-// Maps URL slugs (incl. homepage-generated ones) → canonical ResourceCategory values.
-// 'legal_help' is what the homepage generates; the DB type uses 'legal'.
-const DEFAULT_MAP_RADIUS_KM = 120
-
-const CATEGORY_SLUG_MAP: Record<string, ResourceCategory> = {
-  shelter:        'shelter',
-  food:           'food',
-  work_exchange:  'work_exchange',
-  mental_health:  'mental_health',
-  medical:        'medical',
-  legal:          'legal',
-  legal_help:     'legal',   // homepage generates this slug
-  hygiene:        'hygiene',
-  clothing:       'clothing',
-  childcare:      'childcare',
-  transportation:  'transportation',
-  outdoor_space:   'outdoor_space',
-  parks:           'outdoor_space',
-  outdoors:        'outdoor_space',
-  other:           'other',
-}
-
-// ── Map sync component ──
+// ── Map sync — keeps the Leaflet instance in step with the Zustand store ──
 function MapSync() {
   const { mapCenter, mapZoom, setMapCenter, setMapZoom } = useMapStore()
   const map = useMap()
-  // Prevent feedback loop: ignore moveend/zoomend triggered by our own setView calls
   const isProgrammatic = useRef(false)
 
   useEffect(() => {
@@ -47,7 +32,7 @@ function MapSync() {
     map.setView([mapCenter.lat, mapCenter.lng], mapZoom, { animate: true })
     const timer = setTimeout(() => { isProgrammatic.current = false }, 600)
     return () => clearTimeout(timer)
-  }, [map, mapCenter.lat, mapCenter.lng, mapZoom]) // re-runs on any store-driven center/zoom change
+  }, [map, mapCenter.lat, mapCenter.lng, mapZoom])
 
   useMapEvents({
     moveend: () => {
@@ -63,146 +48,209 @@ function MapSync() {
   return null
 }
 
-// ── Fetch resources near current center (no hard cap) ──
-async function fetchResources(lat: number, lng: number, radiusKm = DEFAULT_MAP_RADIUS_KM, category?: ResourceCategory) {
-  const latDelta = radiusKm / 111
-  const lngDelta = radiusKm / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2))
-
-  let query = db.resources()
-    .select('*')
-    .eq('is_active', true)
-    .in('verification_status', ['verified', 'pending'])
-    .eq('is_map_ready', true)
-    .not('lat', 'is', null)
-    .not('lng', 'is', null)
-    // Bounding box filter; longitude degrees shrink as latitude increases
-    .gte('lat', lat - latDelta)
-    .lte('lat', lat + latDelta)
-    .gte('lng', lng - lngDelta)
-    .lte('lng', lng + lngDelta)
-    .order('availability_status', { ascending: true }) // alphabetical status ordering
-
-  if (category) query = query.eq('category', category)
-
-  const { data, error } = await query
-  if (error) throw error
-  return (data ?? []) as unknown as Resource[]
+// ── Quick filter chip ──
+function QuickChip({
+  filterKey,
+  active,
+  onClick,
+}: {
+  filterKey: QuickFilterKey
+  active: boolean
+  onClick: () => void
+}) {
+  const { label, icon } = QUICK_FILTER_DEFS[filterKey]
+  return (
+    <button
+      onClick={onClick}
+      className={clsx(
+        'shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium',
+        'border transition-colors shadow-sm whitespace-nowrap',
+        active
+          ? 'bg-primary-600 text-white border-primary-600'
+          : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400',
+      )}
+    >
+      <span className="text-base leading-none">{icon}</span>
+      {label}
+    </button>
+  )
 }
 
 // ── Main MapPage ──
 export default function MapPage() {
-  const {
-    mapCenter, mapZoom, filters, selectedId,
-    setSelectedId, setUserLocation, setMapZoom, setFilters,
-  } = useMapStore()
-
+  const { mapCenter, mapZoom, filters, selectedId, setSelectedId, setUserLocation, setMapZoom, setFilters } =
+    useMapStore()
+  const toast = useToast()
   const [searchParams] = useSearchParams()
 
   const [searchQuery, setSearchQuery]   = useState('')
   const [showFilters, setShowFilters]   = useState(false)
-  const [showListView, setShowListView] = useState(true)
-  const [locating, setLocating]         = useState(false)
+  const [showList,    setShowList]      = useState(false)
+  const [locating,    setLocating]      = useState(false)
   const channelRef = useRef<ReturnType<typeof subscribeToBedUpdates> | null>(null)
 
-  // Sync ?category= query param into the store filter on mount.
-  // When the param is present (even empty), always write to the store so that
-  // navigating to /map?category= from "All Resources" clears a stale filter.
-  // When the param is absent entirely, leave the store untouched (preserves
-  // any category chosen via the filter drawer).
+  // Sync ?category= query param into the store filter on mount
   useEffect(() => {
     if (!searchParams.has('category')) return
     const resolved = CATEGORY_SLUG_MAP[searchParams.get('category') ?? '']
-    setFilters({ category: resolved })
+    setFilters({ category: resolved, quickFilter: undefined })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced map center — only re-query after 400ms of stillness
+  const [stableCenter, setStableCenter] = useState(mapCenter)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => setStableCenter(mapCenter), 400)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [mapCenter.lat, mapCenter.lng]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch resources
   const { data: resources = [], refetch } = useQuery({
-    queryKey: ['resources', mapCenter, filters],
-    queryFn: () => fetchResources(mapCenter.lat, mapCenter.lng, filters.radius ?? DEFAULT_MAP_RADIUS_KM, filters.category),
-    staleTime: 1000 * 60, // 1 min
+    queryKey: ['resources', stableCenter, filters],
+    queryFn:  () => fetchMapResources(stableCenter.lat, stableCenter.lng, filters, searchQuery),
+    staleTime: 1000 * 60,
+  })
+
+  // Re-run when search query changes (client-side filter, but refetch keeps it fresh)
+  const { data: filtered = resources } = useQuery({
+    queryKey: ['resources-filtered', resources, searchQuery],
+    queryFn: async () => {
+      if (!searchQuery.trim()) return resources
+      const q = searchQuery.toLowerCase().trim()
+      return resources.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          r.category.toLowerCase().includes(q) ||
+          (r.resource_type?.toLowerCase() ?? '').includes(q) ||
+          (r.address.city?.toLowerCase() ?? '').includes(q),
+      )
+    },
+    staleTime: 0,
   })
 
   // Subscribe to realtime bed updates
-  // Use string ID join as dependency to avoid array recreation on every render.
-  // This keeps the subscription stable even when resource array reference changes.
   useEffect(() => {
     if (!resources.length) return
     channelRef.current?.unsubscribe()
     channelRef.current = subscribeToBedUpdates(
       resources.map((r) => r.id),
-      () => { refetch() }
+      () => { refetch() },
     )
     return () => { channelRef.current?.unsubscribe() }
   }, [resources.map((r) => r.id).join(','), refetch]) // eslint-disable-line
 
-  // Filter by search query
-  const filtered = resources.filter((r) => {
-    if (!searchQuery) return true
-    const q = searchQuery.toLowerCase()
-    return r.name.toLowerCase().includes(q) ||
-           r.category.toLowerCase().includes(q) ||
-           (r.address.city?.toLowerCase() ?? '').includes(q)
-  })
-
-  // Geolocation — updates store center+zoom, MapSync picks it up and pans the map
-  function locateUser() {
+  // Geolocation
+  const locateUser = useCallback(() => {
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-        setMapZoom(15) // zoom in when located
+        setMapZoom(15)
         setLocating(false)
       },
       () => {
-        alert('Unable to get your location. Please enable location access.')
+        toast.error('Location unavailable', 'Enable location access and try again.')
         setLocating(false)
       },
-      { timeout: 10000 }
+      { timeout: 10_000 },
     )
-  }
+  }, [setUserLocation, setMapZoom, toast])
+
+  const toggleQuickFilter = useCallback(
+    (key: QuickFilterKey) => {
+      if (filters.quickFilter === key) {
+        setFilters({ quickFilter: undefined })
+      } else {
+        // Clear category/resourceType when activating a quick filter
+        setFilters({ quickFilter: key, category: undefined, resourceType: undefined })
+      }
+    },
+    [filters.quickFilter, setFilters],
+  )
 
   const selectedResource = filtered.find((r) => r.id === selectedId)
+  const activeFilterCount = countActiveFilters(filters)
+  const filterSummary     = activeFilterSummary(filters)
 
   return (
-    <div className="relative h-[100dvh] flex flex-col">
-      {/* ── Search bar overlay ── */}
-      <div className="absolute top-3 inset-x-3 z-[30] flex gap-2">
-        <div className="flex-1 flex items-center gap-2 bg-white rounded-2xl shadow-map px-3 py-2.5">
-          <Search size={17} className="text-gray-400 shrink-0" />
-          <input
-            type="text"
-            placeholder="Search shelters, food, services…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600">
-              <X size={15} />
-            </button>
-          )}
+    <div className="relative h-[100dvh] flex flex-col overflow-hidden">
+
+      {/* ── Top controls overlay ── */}
+      <div className="absolute top-0 inset-x-0 z-[30] pointer-events-none">
+        {/* Search row */}
+        <div className="flex gap-2 px-3 pt-3 pb-1.5 pointer-events-auto">
+          <div className="flex-1 flex items-center gap-2 bg-white rounded-2xl shadow-map px-3 py-2.5">
+            <Search size={16} className="text-gray-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Search shelters, food, services…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <button
+            onClick={() => setShowFilters(true)}
+            className={clsx(
+              'btn-icon bg-white shadow-map relative',
+              activeFilterCount > 0 && 'ring-2 ring-primary-600',
+            )}
+            aria-label="Open filters"
+          >
+            <SlidersHorizontal
+              size={18}
+              className={activeFilterCount > 0 ? 'text-primary-600' : 'text-gray-600'}
+            />
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={locateUser}
+            disabled={locating}
+            className={clsx('btn-icon bg-white shadow-map', locating && 'opacity-60')}
+            aria-label="Find my location"
+          >
+            <LocateFixed
+              size={18}
+              className={clsx('transition-colors', locating ? 'text-primary-600 animate-pulse' : 'text-gray-600')}
+            />
+          </button>
         </div>
-        <button
-          onClick={() => setShowFilters(true)}
-          className={clsx(
-            'btn-icon bg-white shadow-map',
-            Object.keys(filters).length > 0 && 'ring-2 ring-primary-600'
-          )}
-          aria-label="Filters"
+
+        {/* Quick filter chips — horizontal scroll */}
+        <div
+          className="flex gap-2 px-3 pb-2 overflow-x-auto pointer-events-auto"
+          style={{ scrollbarWidth: 'none' }}
         >
-          <SlidersHorizontal size={18} className={Object.keys(filters).length > 0 ? 'text-primary-600' : 'text-gray-600'} />
-        </button>
-        <button
-          onClick={locateUser}
-          disabled={locating}
-          className={clsx('btn-icon bg-white shadow-map', locating && 'opacity-60')}
-          aria-label="Locate me"
-        >
-          <LocateFixed
-            size={18}
-            className={clsx('transition-colors', locating ? 'text-primary-600 animate-pulse' : 'text-gray-600')}
-          />
-        </button>
+          {QUICK_FILTER_ORDER.map((key) => (
+            <QuickChip
+              key={key}
+              filterKey={key}
+              active={filters.quickFilter === key}
+              onClick={() => toggleQuickFilter(key)}
+            />
+          ))}
+        </div>
+
+        {/* Active filter summary pill */}
+        {filterSummary && (
+          <div className="flex justify-center pb-1 pointer-events-none">
+            <span className="bg-primary-600/90 text-white text-xs font-medium rounded-full px-3 py-1 shadow-sm backdrop-blur-sm">
+              {filterSummary}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ── Leaflet map ── */}
@@ -222,48 +270,39 @@ export default function MapPage() {
             key={resource.id}
             resource={resource}
             isSelected={resource.id === selectedId}
-            onClick={() => setSelectedId(resource.id === selectedId ? null : resource.id)}
+            onClick={() => {
+              if (resource.id === selectedId) {
+                setSelectedId(null)
+              } else {
+                setSelectedId(resource.id)
+                setShowList(false)
+              }
+            }}
           />
         ))}
       </MapContainer>
 
-      {/* ── Resource count pill ── */}
-      <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[30]
-                      bg-white/90 backdrop-blur-sm rounded-full px-3 py-1
-                      text-xs font-medium text-gray-600 shadow-sm pointer-events-none">
-        {filtered.length} resource{filtered.length !== 1 ? 's' : ''} nearby
-      </div>
-
       {/* ── Selected resource card ── */}
-      {selectedResource && !showListView && (
-        <div className="absolute bottom-4 inset-x-4 z-[30] animate-slide-up">
+      {selectedResource && (
+        <div className="absolute bottom-20 inset-x-4 z-[30] animate-slide-up">
           <ResourceCard
             resource={selectedResource}
-            onClose={() => setSelectedId(null)}
+            onClose={() => {
+              setSelectedId(null)
+              setShowList(true)
+            }}
           />
         </div>
       )}
 
-      {/* ── List view toggle (mobile) ── */}
-      {!selectedResource && (
-        <button
-          onClick={() => setShowListView(!showListView)}
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[30]
-                     flex items-center gap-1.5 bg-gray-900 text-white
-                     rounded-full px-4 py-2 text-sm font-medium shadow-lg"
-        >
-          <ChevronUp size={16} className={clsx('transition-transform', showListView && 'rotate-180')} />
-          {showListView ? 'Map View' : 'List View'}
-        </button>
-      )}
-
       {/* ── List view bottom sheet ── */}
-      {showListView && (
-        <div className="bottom-sheet h-[60vh] overflow-y-auto z-[35]">
+      {showList && !selectedResource && (
+        <div className="bottom-sheet h-[60vh] overflow-y-auto z-[25]">
           <div className="bottom-sheet-handle" />
-          <div className="p-4 space-y-3 pb-8">
-            <h2 className="font-semibold text-gray-900">
-              {filtered.length} resources nearby
+          <div className="p-4 space-y-3 pb-20">
+            <h2 className="font-semibold text-gray-900 text-sm">
+              {filtered.length} resource{filtered.length !== 1 ? 's' : ''} nearby
+              {filterSummary && <span className="text-gray-400 font-normal"> · {filterSummary}</span>}
             </h2>
             {filtered.map((r) => (
               <ResourceCard
@@ -272,17 +311,53 @@ export default function MapPage() {
                 compact
                 onClick={() => {
                   setSelectedId(r.id)
-                  setShowListView(false)
+                  setShowList(false)
                 }}
               />
             ))}
             {filtered.length === 0 && (
-              <p className="text-gray-500 text-sm text-center py-8">
-                No resources found. Try adjusting your filters or zooming out.
-              </p>
+              <div className="text-center py-10">
+                <p className="text-gray-500 text-sm mb-3">No resources found.</p>
+                <p className="text-gray-400 text-xs">Try adjusting your filters, zooming out, or searching a different area.</p>
+                {activeFilterCount > 0 && (
+                  <button
+                    onClick={() => { useMapStore.getState().clearFilters(); setSearchQuery('') }}
+                    className="mt-4 text-sm text-primary-600 font-medium"
+                  >
+                    Clear all filters
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
+      )}
+
+      {/* ── List / Map toggle button ── */}
+      {!selectedResource && (
+        <button
+          onClick={() => setShowList(!showList)}
+          className={clsx(
+            'absolute bottom-4 left-1/2 -translate-x-1/2 z-[30]',
+            'flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium shadow-lg',
+            'transition-colors',
+            showList
+              ? 'bg-gray-900 text-white'
+              : 'bg-gray-900 text-white',
+          )}
+        >
+          {showList ? (
+            <>
+              <Map size={15} />
+              Map
+            </>
+          ) : (
+            <>
+              <List size={15} />
+              List{filtered.length > 0 && ` (${filtered.length})`}
+            </>
+          )}
+        </button>
       )}
 
       {/* ── Filter drawer ── */}
