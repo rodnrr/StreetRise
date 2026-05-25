@@ -85,7 +85,7 @@ export default function ProviderLayout() {
 
   // Block providers waiting for review / rejected / suspended
   if (role === 'provider' && verificationStatus !== 'verified') {
-    return <PendingScreen status={verificationStatus} onLogout={handleLogout} />
+    return <PendingScreen status={verificationStatus!} onLogout={handleLogout} />
   }
 
   return (
