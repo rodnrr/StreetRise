@@ -96,7 +96,8 @@ Use `day_use_space` for parks, libraries, cooling/warming centers, drop-in cente
 ## Cloudflare Pages deploy
 
 ```bash
-# Manual deploy (requires a valid 32-char CLOUDFLARE_ACCOUNT_ID)
+# Manual deploy (requires CLOUDFLARE_API_TOKEN + 32-char CLOUDFLARE_ACCOUNT_ID)
+export CLOUDFLARE_API_TOKEN=your_cloudflare_api_token
 export CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
 npm run build
 npm run deploy
