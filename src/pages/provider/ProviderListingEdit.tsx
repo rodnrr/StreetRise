@@ -11,7 +11,7 @@ import type { Resource } from '@/types'
 
 const CATEGORIES = [
   'shelter','food','work_exchange','mental_health','medical',
-  'legal','hygiene','clothing','childcare','transportation','other'
+  'legal','hygiene','clothing','childcare','transportation','outdoor_space','other',
 ]
 
 const schema = z.object({

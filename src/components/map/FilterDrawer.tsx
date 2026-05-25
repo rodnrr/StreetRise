@@ -12,7 +12,8 @@ const CATEGORIES: { value: ResourceCategory; label: string; emoji: string }[] = 
   { value: 'hygiene',       label: 'Hygiene',        emoji: '🚿' },
   { value: 'clothing',      label: 'Clothing',       emoji: '👕' },
   { value: 'childcare',     label: 'Childcare',      emoji: '👶' },
-  { value: 'transportation',label: 'Transportation', emoji: '🚌' },
+  { value: 'transportation', label: 'Transportation', emoji: '🚌' },
+  { value: 'outdoor_space',  label: 'Parks & Outdoors', emoji: '🌳' },
 ]
 
 const STATUSES: { value: AvailabilityStatus; label: string }[] = [
@@ -20,6 +21,15 @@ const STATUSES: { value: AvailabilityStatus; label: string }[] = [
   { value: 'limited',   label: 'Limited' },
   { value: 'full',      label: 'Full' },
 ]
+
+
+function formatImperialDistance(km: number) {
+  const miles = km * 0.621371
+  if (miles < 0.2) {
+    return `${Math.round(miles * 5280)} ft`
+  }
+  return `${miles.toFixed(1)} mi`
+}
 
 interface Props {
   open:    boolean
@@ -126,18 +136,18 @@ export default function FilterDrawer({ open, onClose }: Props) {
 
           {/* Radius */}
           <section className="mb-6">
-            <h3 className="label mb-2">Search radius: {filters.radius ?? 20} km</h3>
+            <h3 className="label mb-2">Search radius: {formatImperialDistance(filters.radius ?? 120)}</h3>
             <input
               type="range"
               min={1}
-              max={50}
+              max={120}
               step={1}
-              value={filters.radius ?? 20}
+              value={filters.radius ?? 120}
               onChange={(e) => setFilters({ radius: parseInt(e.target.value) })}
               className="w-full accent-primary-600"
             />
             <div className="flex justify-between text-xs text-gray-400 mt-1">
-              <span>1 km</span><span>50 km</span>
+              <span>{formatImperialDistance(1)}</span><span>{formatImperialDistance(120)}</span>
             </div>
           </section>
 

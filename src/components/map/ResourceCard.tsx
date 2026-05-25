@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Phone, Globe, MapPin, Users, X, ChevronRight, CheckCircle, Clock } from 'lucide-react'
+import { Phone, Globe, MapPin, Users, X, ChevronRight, CheckCircle, Clock, Navigation } from 'lucide-react'
 import clsx from 'clsx'
 import type { Resource } from '@/types'
 
@@ -53,6 +53,26 @@ function getAvailabilityLabel(resource: Resource) {
   return serviceLabels[resource.availability_status] ?? 'Availability Unknown'
 }
 
+function buildDirectionsUrl(resource: Resource) {
+  if (resource.lat != null && resource.lng != null) {
+    // Prefer listing coordinates so directions always match map marker placement.
+    return `https://www.google.com/maps/dir/?api=1&destination=${resource.lat},${resource.lng}`
+  }
+
+  const destinationAddress = [
+    resource.address.street,
+    resource.address.city,
+    resource.address.state,
+    resource.address.zip,
+  ].filter(Boolean).join(', ')
+
+  if (destinationAddress) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destinationAddress)}`
+  }
+
+  return null
+}
+
 interface Props {
   resource:  Resource
   compact?:  boolean
@@ -64,6 +84,7 @@ export default function ResourceCard({ resource, compact, onClose, onClick }: Pr
   const r = resource
   const availabilityLabel = getAvailabilityLabel(r)
   const showBedCount = r.category === 'shelter' && r.beds_total != null
+  const directionsUrl = buildDirectionsUrl(r)
 
   if (compact) {
     return (
@@ -164,17 +185,23 @@ export default function ResourceCard({ resource, compact, onClose, onClick }: Pr
       {/* CTA */}
       <div className="mt-3 flex gap-2">
         <Link
-          to={`/book/${r.id}`}
+          to={`/resources/${r.id}`}
           className="btn-primary flex-1 text-sm py-2.5"
         >
-          Request a Spot
+          View Details
         </Link>
-        <Link
-          to={`/resources/${r.id}`}
-          className="btn-secondary text-sm py-2.5 px-4"
-        >
-          Details
-        </Link>
+        {directionsUrl && (
+          <a
+            href={directionsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary text-sm py-2.5 px-4 flex items-center gap-1.5"
+            aria-label="Get directions"
+          >
+            <Navigation size={14} />
+            Directions
+          </a>
+        )}
       </div>
     </div>
   )

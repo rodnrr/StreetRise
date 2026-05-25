@@ -1,15 +1,39 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Bell, Heart, Home, MapPin, ShieldCheck, UtensilsCrossed } from 'lucide-react'
+import { ArrowRight, Heart, MapPin } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { db } from '@/lib/supabase'
 
-const NEARBY_COUNTS = [
-  { label: 'Shelters', count: 8, open: '2 open now', icon: Home, color: 'text-primary-600 bg-primary-100' },
-  { label: 'Food Pantries', count: 5, open: '3 open now', icon: UtensilsCrossed, color: 'text-warning-600 bg-warning-100' },
-  { label: 'Other Resources', count: 7, open: 'Open now', icon: ShieldCheck, color: 'text-info-600 bg-info-100' },
+const CATEGORIES = [
+  { label: 'Shelter',        emoji: '🏠', cat: 'shelter' },
+  { label: 'Food',           emoji: '🍽', cat: 'food' },
+  { label: 'Parks & Day Use', emoji: '🌳', cat: 'outdoor_space' },
+  { label: 'Hygiene',        emoji: '🚿', cat: 'hygiene' },
+  { label: 'Mental Health',  emoji: '💙', cat: 'mental_health' },
+  { label: 'Medical',        emoji: '⚕️', cat: 'medical' },
+  { label: 'Legal Help',     emoji: '⚖️', cat: 'legal' },
+  { label: 'All Resources',  emoji: '📍', cat: '' },
 ]
 
 export default function HomePage() {
+  const { data: count, isError } = useQuery({
+    queryKey: ['resource-count'],
+    queryFn: async () => {
+      const { count: c, error } = await db.resources()
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true)
+        .in('verification_status', ['verified', 'pending'])
+        .eq('is_map_ready', true)
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+      if (error) throw error
+      return c ?? 0
+    },
+    staleTime: 1000 * 60 * 5,
+  })
+
   return (
     <div className="min-h-screen bg-slate-950 text-white">
+      {/* Hero */}
       <section className="relative overflow-hidden px-6 pt-16 pb-10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(113,231,197,0.25),transparent_45%)]" />
         <div className="relative mx-auto max-w-md">
@@ -18,67 +42,45 @@ export default function HomePage() {
             Street<span className="text-primary-300">Rise</span>
           </h1>
           <p className="text-slate-300 text-lg leading-relaxed mb-10">
-            Find nearby shelter, food, and essential resources when you need them most.
+            Find nearby shelter, meals, hygiene access, parks, and essential resources when you need them most.
           </p>
           <Link
             to="/map"
             className="inline-flex w-full items-center justify-between rounded-full bg-primary-300 px-6 py-4 text-lg font-semibold text-slate-900 shadow-lg shadow-primary-900/30"
           >
-            Get Started
+            Find Resources Near Me
             <ArrowRight size={22} />
           </Link>
         </div>
       </section>
 
+      {/* Resource directory */}
       <section className="rounded-t-[2rem] bg-slate-50 text-slate-900 px-5 py-6 min-h-[52vh]">
         <div className="mx-auto max-w-md">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-2xl font-bold">StreetRise</h2>
-              <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600">
-                <MapPin size={14} />
-                Current Location
-              </div>
-            </div>
-            <button className="rounded-full bg-white p-3 shadow-sm" aria-label="Notifications">
-              <Bell size={18} />
-            </button>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-semibold text-lg">Near You</h3>
-              <Link to="/map" className="text-sm font-medium text-slate-500">See all</Link>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {NEARBY_COUNTS.map(({ label, count, open, icon: Icon, color }) => (
-                <Link key={label} to="/map" className="rounded-2xl border border-slate-200 p-3 hover:border-primary-300">
-                  <span className={`inline-flex rounded-full p-2 ${color}`}>
-                    <Icon size={16} />
-                  </span>
-                  <p className="mt-2 text-2xl font-bold leading-none">{count}</p>
-                  <p className="text-sm font-medium text-slate-700">{label}</p>
-                  <p className="text-xs text-primary-600 mt-1">{open}</p>
-                </Link>
-              ))}
+          <div className="mb-5">
+            <h2 className="text-2xl font-bold">Tampa Bay Resources</h2>
+            <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600">
+              <MapPin size={14} />
+              {isError ? 'Listings unavailable' : count != null ? `${count} listings` : 'Loading…'}
             </div>
           </div>
 
-          <div className="mt-6 rounded-3xl bg-white border border-slate-200 p-4 shadow-sm">
-            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" /> OPEN NOW
-            </div>
-            <h3 className="mt-3 text-2xl font-bold">Hope Haven Shelter</h3>
-            <p className="mt-1 text-sm text-slate-600">123 Community Way, Atlanta, GA 30303 · 0.4 mi away</p>
-            <p className="mt-3 text-sm text-slate-700">Emergency shelter providing a safe place to sleep, hot meals, showers, and support services.</p>
-            <Link to="/map" className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-primary-800 px-4 py-3 text-white font-semibold">
-              Get Directions
-            </Link>
+          <div className="grid grid-cols-2 gap-3">
+            {CATEGORIES.map(({ label, emoji, cat }) => (
+              <Link
+                key={label}
+                to={cat ? `/map?category=${cat}` : '/map'}
+                className="rounded-2xl border border-slate-200 bg-white p-4 hover:border-primary-300 transition-colors flex items-center gap-3 shadow-sm"
+              >
+                <span className="text-2xl">{emoji}</span>
+                <span className="font-semibold text-sm text-slate-800">{label}</span>
+                <ArrowRight size={14} className="ml-auto text-slate-400" />
+              </Link>
+            ))}
           </div>
 
-          <div className="mt-5 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-            <Heart size={14} className="text-danger-500" /> Your journey matters. We&apos;re here to help.
+          <div className="mt-6 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+            <Heart size={14} className="text-red-500" /> Free for everyone. No sign-up required.
           </div>
         </div>
       </section>

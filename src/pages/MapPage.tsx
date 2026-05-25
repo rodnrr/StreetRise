@@ -15,6 +15,8 @@ import 'leaflet/dist/leaflet.css'
 
 // Maps URL slugs (incl. homepage-generated ones) → canonical ResourceCategory values.
 // 'legal_help' is what the homepage generates; the DB type uses 'legal'.
+const DEFAULT_MAP_RADIUS_KM = 120
+
 const CATEGORY_SLUG_MAP: Record<string, ResourceCategory> = {
   shelter:        'shelter',
   food:           'food',
@@ -26,8 +28,11 @@ const CATEGORY_SLUG_MAP: Record<string, ResourceCategory> = {
   hygiene:        'hygiene',
   clothing:       'clothing',
   childcare:      'childcare',
-  transportation: 'transportation',
-  other:          'other',
+  transportation:  'transportation',
+  outdoor_space:   'outdoor_space',
+  parks:           'outdoor_space',
+  outdoors:        'outdoor_space',
+  other:           'other',
 }
 
 // ── Map sync component ──
@@ -59,7 +64,10 @@ function MapSync() {
 }
 
 // ── Fetch resources near current center (no hard cap) ──
-async function fetchResources(lat: number, lng: number, radiusKm = 40, category?: ResourceCategory) {
+async function fetchResources(lat: number, lng: number, radiusKm = DEFAULT_MAP_RADIUS_KM, category?: ResourceCategory) {
+  const latDelta = radiusKm / 111
+  const lngDelta = radiusKm / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2))
+
   let query = db.resources()
     .select('*')
     .eq('is_active', true)
@@ -67,11 +75,11 @@ async function fetchResources(lat: number, lng: number, radiusKm = 40, category?
     .eq('is_map_ready', true)
     .not('lat', 'is', null)
     .not('lng', 'is', null)
-    // Bounding box filter (approx 1 deg lat ≈ 111 km)
-    .gte('lat', lat - radiusKm / 111)
-    .lte('lat', lat + radiusKm / 111)
-    .gte('lng', lng - radiusKm / 111)
-    .lte('lng', lng + radiusKm / 111)
+    // Bounding box filter; longitude degrees shrink as latitude increases
+    .gte('lat', lat - latDelta)
+    .lte('lat', lat + latDelta)
+    .gte('lng', lng - lngDelta)
+    .lte('lng', lng + lngDelta)
     .order('availability_status', { ascending: true }) // alphabetical status ordering
 
   if (category) query = query.eq('category', category)
@@ -92,27 +100,31 @@ export default function MapPage() {
 
   const [searchQuery, setSearchQuery]   = useState('')
   const [showFilters, setShowFilters]   = useState(false)
-  const [showListView, setShowListView] = useState(false)
+  const [showListView, setShowListView] = useState(true)
   const [locating, setLocating]         = useState(false)
   const channelRef = useRef<ReturnType<typeof subscribeToBedUpdates> | null>(null)
 
   // Sync ?category= query param into the store filter on mount.
-  // Unknown slugs are silently ignored — the map just shows unfiltered results.
+  // When the param is present (even empty), always write to the store so that
+  // navigating to /map?category= from "All Resources" clears a stale filter.
+  // When the param is absent entirely, leave the store untouched (preserves
+  // any category chosen via the filter drawer).
   useEffect(() => {
-    const raw = searchParams.get('category')
-    if (!raw) return
-    const resolved = CATEGORY_SLUG_MAP[raw]
-    if (resolved) setFilters({ category: resolved })
+    if (!searchParams.has('category')) return
+    const resolved = CATEGORY_SLUG_MAP[searchParams.get('category') ?? '']
+    setFilters({ category: resolved })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch resources
   const { data: resources = [], refetch } = useQuery({
     queryKey: ['resources', mapCenter, filters],
-    queryFn: () => fetchResources(mapCenter.lat, mapCenter.lng, filters.radius ?? 40, filters.category),
+    queryFn: () => fetchResources(mapCenter.lat, mapCenter.lng, filters.radius ?? DEFAULT_MAP_RADIUS_KM, filters.category),
     staleTime: 1000 * 60, // 1 min
   })
 
   // Subscribe to realtime bed updates
+  // Use string ID join as dependency to avoid array recreation on every render.
+  // This keeps the subscription stable even when resource array reference changes.
   useEffect(() => {
     if (!resources.length) return
     channelRef.current?.unsubscribe()
@@ -121,7 +133,7 @@ export default function MapPage() {
       () => { refetch() }
     )
     return () => { channelRef.current?.unsubscribe() }
-  }, [resources.map((r) => r.id).join(',')]) // eslint-disable-line
+  }, [resources.map((r) => r.id).join(','), refetch]) // eslint-disable-line
 
   // Filter by search query
   const filtered = resources.filter((r) => {

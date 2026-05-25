@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
-import { MapPin, Briefcase, Heart, HelpCircle, Menu, X } from 'lucide-react'
+import { MapPin, Heart, HelpCircle, Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import clsx from 'clsx'
 import ToastContainer from './ToastContainer'
@@ -7,7 +7,6 @@ import Footer from './Footer'
 
 const NAV_LINKS = [
   { to: '/map',    label: 'Find Resources', icon: MapPin },
-  { to: '/work',   label: 'Work Exchange',  icon: Briefcase },
   { to: '/donate', label: 'Donate',         icon: Heart },
   { to: '/faq',    label: 'FAQ',            icon: HelpCircle },
 ]
@@ -16,7 +15,7 @@ export default function RootLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
   const isMapPage = location.pathname === '/map'
-  const emergencyUrl = 'https://www.app.streetrise.org'
+  const emergencyUrl = 'https://app.streetrise.org'
   const isEmergencyUrlSafe = emergencyUrl.startsWith('https://')
 
   return (
@@ -121,7 +120,8 @@ export default function RootLayout() {
       {!isMapPage && <Footer />}
 
       {/* ── Persistent emergency help CTA ── */}
-      <a
+      {!isMapPage && (
+        <a
         href={isEmergencyUrlSafe ? emergencyUrl : '#'}
         target="_blank"
         rel="noopener noreferrer"
@@ -137,6 +137,7 @@ export default function RootLayout() {
       >
         Get Help Now
       </a>
+      )}
 
       {/* ── Bottom tab bar (mobile) ── */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200
