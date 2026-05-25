@@ -1,4 +1,4 @@
-import { Outlet, NavLink, Navigate } from 'react-router-dom'
+import { Outlet, NavLink, Navigate, useLocation } from 'react-router-dom'
 import { LayoutDashboard, ListChecks, CalendarDays, Briefcase, LogOut, Clock, XCircle, ShieldOff } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuthStore } from '@/lib/store'
@@ -58,6 +58,7 @@ function PendingScreen({ status, onLogout }: { status: string; onLogout: () => v
 
 export default function ProviderLayout() {
   const { role, verificationStatus, clearAuth } = useAuthStore()
+  const location = useLocation()
 
   // Redirect unauthenticated users
   if (role === 'guest') {
@@ -74,9 +75,17 @@ export default function ProviderLayout() {
     clearAuth()
   }
 
-  // Block unverified providers — show holding screen instead of portal
+  // No providers row yet — user signed up but hasn't completed onboarding.
+  // Allow /portal/onboarding to render; redirect everything else there.
+  if (role === 'provider' && verificationStatus === null) {
+    return location.pathname === '/portal/onboarding'
+      ? <><Outlet /><ToastContainer /></>
+      : <Navigate to="/portal/onboarding" replace />
+  }
+
+  // Block providers waiting for review / rejected / suspended
   if (role === 'provider' && verificationStatus !== 'verified') {
-    return <PendingScreen status={verificationStatus ?? 'pending'} onLogout={handleLogout} />
+    return <PendingScreen status={verificationStatus} onLogout={handleLogout} />
   }
 
   return (
