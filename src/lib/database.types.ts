@@ -51,6 +51,8 @@ export interface Database {
           verification_status: string
           role: string
           bio: string | null
+          claim_status: Database['public']['Enums']['provider_claim_status']
+          source_type: Database['public']['Enums']['provider_source_type']
           created_at: string
           updated_at: string
           // Trust fields (migration 010)
@@ -62,10 +64,25 @@ export interface Database {
         }
         Insert: Optional<
           Omit<Database['public']['Tables']['providers']['Row'], 'id' | 'created_at' | 'updated_at'>,
-          | 'user_id' | 'contact_phone' | 'website' | 'ein' | 'logo_url'
-          | 'verification_status' | 'role' | 'bio'
-          | 'identity_confirmed' | 're_verification_due_at' | 'suspension_reason'
-          | 'verification_notes' | 'suspended_at'
+    | 'user_id'
+    | 'contact_phone'
+    | 'website'
+
+    | 'ein'
+    | 'logo_url'
+    | 'verification_status'
+
+    | 'role'
+    | 'bio'
+    | 'identity_confirmed'
+
+    | 're_verification_due_at'
+    | 'suspension_reason'
+    | 'verification_notes'
+
+    | 'suspended_at'
+    | 'claim_status'
+    | 'source_type'
         >
         Update: Partial<Database['public']['Tables']['providers']['Insert']>
         Relationships: []
@@ -302,6 +319,14 @@ export interface Database {
         | 'web_intake'
         | 'confidential_address'
         | 'not_map_ready'
+      provider_claim_status:
+        | 'unclaimed'
+        | 'pending_claim'
+        | 'claimed'
+      provider_source_type:
+        | 'self_registered'
+        | 'seeded'
+        | 'imported'
     }
   }
 }
