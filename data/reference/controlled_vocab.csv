@@ -1,0 +1,313 @@
+Controlled Vocabulary — Streetrise Resources,,,
+"All values lowercase. Multi-value fields use comma-separated tokens (e.g., facility_features=showers,wifi). Use category for the primary service type, subcategory for finer detail within it, and the attribute columns for population, provider, features, and tags.",,,
+,,,
+Column Name,Allowed Values,Description,Example (Structured → Human-Readable)
+category (Primary Resource Type),see rows below,The primary service the resource provides. Single value. Use subcategory for finer detail.,category=shelter → Provides overnight shelter
+,shelter,"Overnight housing: emergency, transitional, family, DV, etc.",category=shelter → Provides overnight shelter
+,food,"Pantry, hot meals, mobile distribution, groceries.",category=food → Provides food assistance
+,hygiene,"Showers, laundry, restrooms, clothing, hygiene supplies as a primary offering.",category=hygiene → Offers hygiene services
+,medical,"Primary care, dental, vision, pharmacy, clinics, mobile health.",category=medical → Provides medical care
+,mental_health,"Counseling, psychiatry, peer support, group therapy.",category=mental_health → Offers mental-health services
+,substance_abuse,"Detox, rehab, MAT, harm reduction, recovery meetings.",category=substance_abuse → Substance-use treatment & recovery
+,legal,"Civil legal aid, ID help, expungement, tenant rights, immigration.",category=legal → Provides legal assistance
+,employment,"Job training, career centers, resume help, day labor.",category=employment → Employment & job services
+,education,"GED, adult ed, literacy, tutoring, vocational classes.",category=education → Educational programs
+,transportation,"Bus passes, gas vouchers, medical transport, bike programs.",category=transportation → Transportation assistance
+,financial_assistance,"Cash aid, emergency funds, bill payments not covered by housing_assistance.",category=financial_assistance → Direct financial aid
+,housing_assistance,"Rent/utility help, housing navigation, eviction prevention (not the shelter itself).",category=housing_assistance → Housing assistance
+,crisis_services,"Hotlines, walk-in crisis, mobile crisis, disaster response.",category=crisis_services → Crisis response services
+,community_center,"Multi-purpose drop-in space with mixed programs, classes, or resources.",category=community_center → Community center
+,day_use_space,"Day-only public/communal spaces — parks, libraries, drop-in centers, cooling/warming centers, safe rest areas. No overnight.",category=day_use_space → Day-use safe space
+subcategory — shelter,see rows below,Use when category=shelter.,subcategory=emergency → Emergency overnight shelter
+,emergency,"Short-stay crisis shelter, typically nightly intake.",subcategory=emergency → Emergency overnight shelter
+,transitional,"Time-limited housing (months) paired with case management.",subcategory=transitional → Transitional housing
+,rapid_rehousing,Short-term rental assistance + housing placement.,subcategory=rapid_rehousing → Rapid-rehousing program
+,permanent_supportive,Long-term subsidized housing with services.,subcategory=permanent_supportive → Permanent supportive housing
+,sober_living,Recovery residence requiring sobriety.,subcategory=sober_living → Sober-living residence
+,cold_weather,Seasonal shelter activated during cold weather.,subcategory=cold_weather → Cold-weather shelter
+,safe_parking,Designated safe overnight lot for people living in vehicles.,subcategory=safe_parking → Safe-parking site
+,hotel_voucher,Hotel/motel vouchers for short-term stays.,subcategory=hotel_voucher → Hotel-voucher program
+,,,
+subcategory — food,see rows below,Use when category=food.,subcategory=pantry → Food pantry
+,pantry,Food pantry / groceries.,subcategory=pantry → Food pantry
+,hot_meal,Prepared meals served onsite.,subcategory=hot_meal → Hot meal
+,mobile_meal,Mobile food distribution / meal route.,subcategory=mobile_meal → Mobile meal distribution
+,community_fridge,Free public/community refrigerator.,subcategory=community_fridge → Community fridge
+,food_delivery,Delivered food assistance.,subcategory=food_delivery → Food delivery
+,soup_kitchen,Meal service / soup kitchen.,subcategory=soup_kitchen → Soup kitchen
+,groceries,General grocery assistance.,subcategory=groceries → Grocery support
+,pet_food,Food for pets/companion animals.,subcategory=pet_food → Pet food support
+,,,
+subcategory — hygiene,see rows below,Use when category=hygiene.,subcategory=shower → Shower access
+,shower,Shower access as the primary service.,subcategory=shower → Shower access
+,laundry,Laundry access as the primary service.,subcategory=laundry → Laundry access
+,restroom,Public restroom access.,subcategory=restroom → Restroom access
+,clothing,Clothing closet / clothing distribution.,subcategory=clothing → Clothing assistance
+,haircut,Haircut / grooming service.,subcategory=haircut → Haircut service
+,hygiene_kits,Hygiene supply kits.,subcategory=hygiene_kits → Hygiene kits
+,diapers,Diaper distribution.,subcategory=diapers → Diapers
+,feminine_products,Menstrual/feminine hygiene products.,subcategory=feminine_products → Feminine products
+,,,
+subcategory — medical,see rows below,Use when category=medical.,subcategory=primary_care → Primary care
+,primary_care,Primary healthcare.,subcategory=primary_care → Primary care
+,urgent_care,Urgent non-emergency care.,subcategory=urgent_care → Urgent care
+,dental,Dental care.,subcategory=dental → Dental care
+,vision,Vision care / eye exams / glasses.,subcategory=vision → Vision care
+,pharmacy,Prescription/pharmacy assistance.,subcategory=pharmacy → Pharmacy support
+,vaccination,Vaccines / immunization clinics.,subcategory=vaccination → Vaccination
+,hiv_testing,HIV testing/prevention.,subcategory=hiv_testing → HIV testing
+,mobile_clinic,Mobile health clinic.,subcategory=mobile_clinic → Mobile clinic
+,,,
+subcategory — mental_health,see rows below,Use when category=mental_health.,subcategory=counseling → Counseling
+,counseling,Therapy/counseling.,subcategory=counseling → Counseling
+,psychiatry,Psychiatric care/medication management.,subcategory=psychiatry → Psychiatry
+,crisis_support,Immediate mental-health crisis support.,subcategory=crisis_support → Crisis support
+,suicide_prevention,Suicide prevention hotline/support.,subcategory=suicide_prevention → Suicide prevention
+,peer_support,Peer-led support.,subcategory=peer_support → Peer support
+,group_therapy,Group therapy/support groups.,subcategory=group_therapy → Group therapy
+,,,
+subcategory — substance_abuse,see rows below,Use when category=substance_abuse.,subcategory=detox → Detox
+,detox,Withdrawal management / detox.,subcategory=detox → Detox
+,rehab_inpatient,Residential/inpatient treatment.,subcategory=rehab_inpatient → Inpatient rehab
+,rehab_outpatient,Outpatient treatment.,subcategory=rehab_outpatient → Outpatient rehab
+,harm_reduction,"Narcan, safer-use supplies, overdose prevention.",subcategory=harm_reduction → Harm reduction
+,needle_exchange,Syringe exchange / safer-use supplies.,subcategory=needle_exchange → Needle exchange
+,recovery_meeting,AA/NA/SMART/etc. recovery meetings.,subcategory=recovery_meeting → Recovery meeting
+,medication_assisted_treatment,MAT / buprenorphine / methadone support.,subcategory=medication_assisted_treatment → MAT
+,,,
+subcategory — employment,see rows below,Use when category=employment.,subcategory=job_training → Job training
+,job_training,Workforce training.,subcategory=job_training → Job training
+,resume_help,Resume/application support.,subcategory=resume_help → Resume help
+,day_labor,Day labor connection.,subcategory=day_labor → Day labor
+,work_exchange,Work-for-stay or work-for-support opportunity.,subcategory=work_exchange → Work exchange
+,career_center,Career center services.,subcategory=career_center → Career center
+,interview_clothing,Interview/work clothing.,subcategory=interview_clothing → Interview clothing
+,felon_friendly,Friendly to people with records.,subcategory=felon_friendly → Felon-friendly employment
+,,,
+subcategory — transportation,see rows below,Use when category=transportation.,subcategory=bus_pass → Bus pass
+,bus_pass,Bus pass/transit fare assistance.,subcategory=bus_pass → Bus pass
+,gas_voucher,Gas/fuel assistance.,subcategory=gas_voucher → Gas voucher
+,bike_program,Bike donation/repair/transit support.,subcategory=bike_program → Bike program
+,medical_transport,Medical appointment transport.,subcategory=medical_transport → Medical transport
+,ride_share,Rideshare/taxi voucher.,subcategory=ride_share → Ride-share support
+,,,
+subcategory — housing_assistance,see rows below,Use when category=housing_assistance.,subcategory=rent_assistance → Rent assistance
+,rent_assistance,Rent payment assistance.,subcategory=rent_assistance → Rent assistance
+,utility_assistance,Utility payment assistance.,subcategory=utility_assistance → Utility assistance
+,eviction_prevention,Eviction prevention/legal-financial aid.,subcategory=eviction_prevention → Eviction prevention
+,housing_navigation,Help finding/applying for housing.,subcategory=housing_navigation → Housing navigation
+,housing_application,Help completing housing applications.,subcategory=housing_application → Housing application help
+,section_8,Housing Choice Voucher / Section 8 support.,subcategory=section_8 → Section 8 support
+,,,
+subcategory — legal,see rows below,Use when category=legal.,subcategory=id_assistance → ID assistance
+,id_assistance,"Birth certificate, state ID, Social Security card help.",subcategory=id_assistance → ID assistance
+,expungement,Expungement/record sealing.,subcategory=expungement → Expungement help
+,immigration,Immigration legal aid.,subcategory=immigration → Immigration legal help
+,tenant_rights,Tenant/housing legal aid.,subcategory=tenant_rights → Tenant rights
+,benefits_assistance,Help applying/appealing benefits.,subcategory=benefits_assistance → Benefits help
+,family_law,Family-law legal help.,subcategory=family_law → Family law
+,civil_legal_aid,General civil legal aid.,subcategory=civil_legal_aid → Civil legal aid
+,,,
+subcategory — crisis_services,see rows below,Use when category=crisis_services.,subcategory=hotline → Hotline
+,hotline,Crisis hotline / phone line.,subcategory=hotline → Hotline
+,walk_in_crisis,Walk-in crisis center.,subcategory=walk_in_crisis → Walk-in crisis center
+,mobile_response,Mobile crisis response team.,subcategory=mobile_response → Mobile crisis response
+,disaster_relief,Disaster/emergency relief.,subcategory=disaster_relief → Disaster relief
+,,,
+subcategory — day_use_space,see rows below,Use when category=day_use_space.,subcategory=park → Public park/day-use site
+,park,Public park or day-use recreation area.,subcategory=park → Park/day-use site
+,public_restroom,Public restroom access site.,subcategory=public_restroom → Public restroom
+,public_shower,Public shower site.,subcategory=public_shower → Public shower
+,cooling_center,Hot-weather cooling center.,subcategory=cooling_center → Cooling center
+,warming_center,Cold-weather warming center.,subcategory=warming_center → Warming center
+,library,Public library day-use/resource access.,subcategory=library → Library
+,drop_in_center,Drop-in/day center.,subcategory=drop_in_center → Drop-in center
+,public_charging,Public device charging site.,subcategory=public_charging → Public charging
+,safe_rest_area,Safe daylight rest area.,subcategory=safe_rest_area → Safe rest area
+,,,
+population_served,see rows below,"Who the resource is meant for. Multi-value allowed, comma-separated.",population_served=veterans,families → Veterans and families
+,general,Open to general public unless otherwise restricted.,population_served=general → General public
+,men,Men.,population_served=men → Men
+,women,Women.,population_served=women → Women
+,families,Families/households.,population_served=families → Families
+,children,Children.,population_served=children → Children
+,youth,Youth / young people.,population_served=youth → Youth
+,teens,Teenagers.,population_served=teens → Teens
+,seniors,Older adults/seniors.,population_served=seniors → Seniors
+,veterans,Veterans.,population_served=veterans → Veterans
+,lgbtq,LGBTQ+ community.,population_served=lgbtq → LGBTQ+ community
+,transgender,Transgender people.,population_served=transgender → Transgender people
+,pregnant,Pregnant people.,population_served=pregnant → Pregnant people
+,disabled,Disabled people.,population_served=disabled → Disabled people
+,wheelchair_accessible,Wheelchair-accessible population/service indicator.,population_served=wheelchair_accessible → Wheelchair accessible
+,uninsured,Uninsured people.,population_served=uninsured → Uninsured
+,low_income,Low-income households.,population_served=low_income → Low-income
+,spanish_speaking,Spanish-speaking support available/targeted.,population_served=spanish_speaking → Spanish-speaking support
+,hiv_positive,People living with HIV.,population_served=hiv_positive → HIV-positive clients
+,domestic_violence_survivors,DV/IPV survivors.,population_served=domestic_violence_survivors → DV survivors
+,substance_recovery,People in substance-use recovery.,population_served=substance_recovery → Recovery population
+,formerly_incarcerated,Reentry/formerly incarcerated people.,population_served=formerly_incarcerated → Reentry population
+,pets_allowed,People with pets/companion animals accepted.,population_served=pets_allowed → Pets allowed
+,,,
+provider_type,see rows below,Type of organization operating the resource. Single or multi-value if needed.,provider_type=faith_based → Faith-based provider
+,nonprofit,Registered nonprofit/community nonprofit.,provider_type=nonprofit → Nonprofit
+,government,Government agency/department.,provider_type=government → Government
+,faith_based,Religious/church-affiliated provider.,provider_type=faith_based → Faith-based
+,private,Private business/provider.,provider_type=private → Private provider
+,hospital,Hospital/health system.,provider_type=hospital → Hospital/health system
+,school,School/education institution.,provider_type=school → School
+,mutual_aid,Mutual aid group/network.,provider_type=mutual_aid → Mutual aid
+,community_group,Informal/local community group.,provider_type=community_group → Community group
+,mobile_service,Mobile provider/service.,provider_type=mobile_service → Mobile service
+,coalition,Coalition/network of organizations.,provider_type=coalition → Coalition
+,,,
+religious_requirement,see rows below,Whether participation in religious activity is required to receive service.,religious_requirement=none → No religious requirement
+,none,No religious requirement.,religious_requirement=none → No religious requirement
+,optional,Optional prayer/service/etc.,religious_requirement=optional → Optional religious activity
+,required,Religious participation required.,religious_requirement=required → Religious participation required
+,unknown,Not yet confirmed.,religious_requirement=unknown → Requirement unknown
+,,,
+verification_status,see rows below,Freshness/trust status of listing.,verification_status=verified → Verified listing
+,verified,Human/provider confirmed recently.,verification_status=verified → Verified
+,aging,Verified but beginning to age.,verification_status=aging → Aging verification
+,stale,Older than verification threshold.,verification_status=stale → Stale verification
+,unverified,Not yet confirmed.,verification_status=unverified → Unverified
+,provider_submitted,Submitted by provider but pending review.,verification_status=provider_submitted → Provider submitted
+,community_reported,Reported by community member.,verification_status=community_reported → Community reported
+,temporarily_closed,Temporarily closed.,verification_status=temporarily_closed → Temporarily closed
+,permanently_closed,Permanently closed; should not appear as active.,verification_status=permanently_closed → Permanently closed
+,,,
+verification_method,see rows below,How the listing was verified.,verification_method=phone → Verified by phone
+,phone,Verified by phone call.,verification_method=phone → Phone verification
+,website,Verified from official website.,verification_method=website → Website verification
+,email,Verified by email.,verification_method=email → Email verification
+,in_person,Verified in person.,verification_method=in_person → In-person verification
+,provider_portal,Verified/updated by provider portal.,verification_method=provider_portal → Provider portal update
+,government_dataset,Imported/confirmed from government source.,verification_method=government_dataset → Government dataset
+,community_submission,Submitted/reported by community.,verification_method=community_submission → Community submission
+,partner_organization,Confirmed by partner organization.,verification_method=partner_organization → Partner confirmed
+,,,
+resource_status,see rows below,Operational availability status.,resource_status=active → Active resource
+,active,Open/operating normally.,resource_status=active → Active
+,limited,Operating with limited access/capacity.,resource_status=limited → Limited
+,waitlist,Available by waitlist.,resource_status=waitlist → Waitlist
+,seasonal,Seasonal service.,resource_status=seasonal → Seasonal
+,appointment_only,Appointment required.,resource_status=appointment_only → Appointment only
+,temporarily_closed,Temporarily closed.,resource_status=temporarily_closed → Temporarily closed
+,permanently_closed,Permanently closed.,resource_status=permanently_closed → Permanently closed
+,emergency_only,Only during emergencies/disasters/weather events.,resource_status=emergency_only → Emergency only
+,,,
+service_area_type,see rows below,How/where services are delivered.,service_area_type=onsite → Onsite service
+,onsite,Must go to location.,service_area_type=onsite → Onsite
+,mobile,Mobile service/provider.,service_area_type=mobile → Mobile
+,virtual,Phone/online only.,service_area_type=virtual → Virtual
+,countywide,Serves full county.,service_area_type=countywide → Countywide
+,statewide,Serves statewide.,service_area_type=statewide → Statewide
+,national,National service/hotline/resource.,service_area_type=national → National
+,,,
+geocode_quality,see rows below,Confidence/precision of lat/lng.,geocode_quality=rooftop → Rooftop geocode
+,rooftop,Exact address/rooftop-level coordinates.,geocode_quality=rooftop → Rooftop
+,range_interpolated,Street segment approximation.,geocode_quality=range_interpolated → Range interpolated
+,approximate,Approximate location.,geocode_quality=approximate → Approximate
+,city_center,City centroid only; low precision.,geocode_quality=city_center → City center
+,manual_override,Human-corrected coordinates.,geocode_quality=manual_override → Manual override
+,unknown,Unknown geocode confidence.,geocode_quality=unknown → Unknown
+,,,
+access_requirements,see rows below,"Requirements before receiving help. Multi-value allowed, comma-separated.",access_requirements=id_required,appointment_required → ID and appointment required
+,id_required,ID required.,access_requirements=id_required → ID required
+,referral_required,Referral required.,access_requirements=referral_required → Referral required
+,appointment_required,Appointment required.,access_requirements=appointment_required → Appointment required
+,background_check,Background check required.,access_requirements=background_check → Background check required
+,sobriety_required,Sobriety required.,access_requirements=sobriety_required → Sobriety required
+,drug_test,Drug test required.,access_requirements=drug_test → Drug test required
+,children_required,Must have children to qualify.,access_requirements=children_required → Children required
+,resident_only,Only residents of area/facility/etc.,access_requirements=resident_only → Residents only
+,walk_in_allowed,Walk-ins accepted.,access_requirements=walk_in_allowed → Walk-ins allowed
+,phone_screening,Phone screening required.,access_requirements=phone_screening → Phone screening
+,,,
+languages,see rows below,"Languages supported. Multi-value allowed, comma-separated.",languages=english,spanish → English and Spanish
+,english,English.,languages=english → English
+,spanish,Spanish.,languages=spanish → Spanish
+,creole,Haitian Creole or Creole support.,languages=creole → Creole
+,asl,American Sign Language.,languages=asl → ASL
+,portuguese,Portuguese.,languages=portuguese → Portuguese
+,vietnamese,Vietnamese.,languages=vietnamese → Vietnamese
+,arabic,Arabic.,languages=arabic → Arabic
+,,,
+facility_features,see rows below,"Amenities/on-site features. Multi-value allowed, comma-separated.",facility_features=restrooms,showers,wifi → Restrooms/showers/Wi-Fi
+,restrooms,Restroom access.,facility_features=restrooms → Restrooms
+,showers,Shower access.,facility_features=showers → Showers
+,laundry,Laundry access.,facility_features=laundry → Laundry
+,wifi,Wi-Fi access.,facility_features=wifi → Wi-Fi
+,charging,Device charging.,facility_features=charging → Charging
+,computer_access,Computer access.,facility_features=computer_access → Computer access
+,printer_access,Printer access.,facility_features=printer_access → Printer access
+,phone_access,Phone access.,facility_features=phone_access → Phone access
+,mail_service,Mailing address/mail service.,facility_features=mail_service → Mail service
+,lockers,Lockers.,facility_features=lockers → Lockers
+,storage,Storage.,facility_features=storage → Storage
+,kitchen_access,Kitchen access.,facility_features=kitchen_access → Kitchen access
+,drinking_water,Drinking water.,facility_features=drinking_water → Drinking water
+,air_conditioning,Air-conditioned indoor space.,facility_features=air_conditioning → Air conditioning
+,heating,Heated indoor space.,facility_features=heating → Heating
+,indoor_waiting_area,Indoor waiting/rest area.,facility_features=indoor_waiting_area → Indoor waiting area
+,outdoor_space,Outdoor space/park area.,facility_features=outdoor_space → Outdoor space
+,parking,Vehicle parking.,facility_features=parking → Parking
+,bike_parking,Bike parking.,facility_features=bike_parking → Bike parking
+,ada_accessible,ADA accessible.,facility_features=ada_accessible → ADA accessible
+,wheelchair_accessible,Wheelchair accessible.,facility_features=wheelchair_accessible → Wheelchair accessible
+,pet_friendly,Pets/companion animals allowed.,facility_features=pet_friendly → Pet friendly
+,child_friendly,Child/family friendly site.,facility_features=child_friendly → Child friendly
+,private_rooms,Private rooms available.,facility_features=private_rooms → Private rooms
+,case_management_onsite,On-site case management.,facility_features=case_management_onsite → On-site case management
+,security_onsite,On-site security.,facility_features=security_onsite → On-site security
+,,,
+data_source,see rows below,Where the listing originally came from.,data_source=manual_entry → Manual entry
+,manual_entry,Entered manually by StreetRise/admin.,data_source=manual_entry → Manual entry
+,provider_submission,Submitted by provider.,data_source=provider_submission → Provider submission
+,government_import,Imported from government dataset.,data_source=government_import → Government import
+,partner_import,Imported from partner dataset.,data_source=partner_import → Partner import
+,web_research,Found/entered through web research.,data_source=web_research → Web research
+,community_submission,Submitted by community member.,data_source=community_submission → Community submission
+,bulk_seed_import,Bulk seeded from import file.,data_source=bulk_seed_import → Bulk seed import
+,,,
+intake_method,see rows below,How someone starts the process.,intake_method=walk_in → Walk-in intake
+,walk_in,Walk-in accepted.,intake_method=walk_in → Walk-in
+,phone,Phone intake.,intake_method=phone → Phone intake
+,online,Online intake/application.,intake_method=online → Online intake
+,referral_only,Referral-only intake.,intake_method=referral_only → Referral only
+,lottery,Lottery-based intake/selection.,intake_method=lottery → Lottery
+,scheduled_intake,Scheduled intake times.,intake_method=scheduled_intake → Scheduled intake
+,first_come_first_served,First-come first-served.,intake_method=first_come_first_served → First come first served
+,,,
+tags,see rows below,"Only use for cross-cutting attributes that do NOT already have a dedicated column. Multi-value allowed, comma-separated.",tags=low_barrier,after_hours → Low barrier and after-hours
+,low_barrier,Fewer requirements than typical providers.,tags=low_barrier → Low barrier
+,walk_in_friendly,Walk-ins are especially practical/welcomed.,tags=walk_in_friendly → Walk-in friendly
+,after_hours,Available outside standard business hours.,tags=after_hours → After-hours
+,spanish_available,Spanish available (use languages=spanish too if known).,tags=spanish_available → Spanish available
+,pet_support,Pet-related support.,tags=pet_support → Pet support
+,cooling_center,Heat/cooling resource.,tags=cooling_center → Cooling center
+,winter_weather,Cold-weather emergency resource.,tags=winter_weather → Winter weather
+,documents_help,Helps with documents/IDs/applications.,tags=documents_help → Documents help
+,no_id_required,No ID required.,tags=no_id_required → No ID required
+,free,Free service.,tags=free → Free
+,sliding_scale,Fees based on income.,tags=sliding_scale → Sliding-scale fee
+,seasonal,Operates only part of the year.,tags=seasonal → Seasonal program
+,24_7,Open or available 24 hours / 7 days.,tags=24_7 → 24/7 availability
+,weekends_only,Saturday/Sunday operation only.,tags=weekends_only → Weekends only
+,evenings,Evening hours available.,tags=evenings → Evening hours
+,outdoor_space,Resource is or includes a public outdoor space (park, preserve).,tags=outdoor_space → Outdoor space
+,day_use_space,Day-only safe space (no overnight). Libraries, cooling/warming centers, day-use parks.,tags=day_use_space → Day-use space
+,animal_services,"Pet/animal services (food, vet, fostering).",tags=animal_services → Pet/animal services
+,government_services,Benefits enrollment or government-office services.,tags=government_services → Government/benefits services
+,technology,"Public technology access as a core offering (Wi-Fi, computers, digital literacy).",tags=technology → Technology access
+,,,
+county,see rows below,Florida county the resource is located in.,county=pinellas → Located in Pinellas County FL
+,pinellas,"Pinellas County (St. Petersburg, Clearwater).",county=pinellas → Pinellas County
+,hillsborough,"Hillsborough County (Tampa, Brandon, Plant City).",county=hillsborough → Hillsborough County
+,pasco,"Pasco County (New Port Richey, Dade City).",county=pasco → Pasco County
+,hernando,"Hernando County (Brooksville, Spring Hill).",county=hernando → Hernando County
+,polk,"Polk County (Lakeland, Winter Haven).",county=polk → Polk County
+,manatee,"Manatee County (Bradenton, Palmetto).",county=manatee → Manatee County
+,sarasota,Sarasota County.,county=sarasota → Sarasota County
+,citrus,Citrus County.,county=citrus → Citrus County

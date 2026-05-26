@@ -40,7 +40,7 @@ export const useMapStore = create<MapState>()(
       setSelectedId:   (id)     => set({ selectedId: id }),
     }),
     {
-      name: 'streetrise-map-v2', // bumped version to bust cached LA coordinates
+      name: 'streetrise-map-v3', // v3: new MapFilters shape with quickFilter + taxonomy
       partialize: (s) => ({ mapCenter: s.mapCenter, mapZoom: s.mapZoom, filters: s.filters }),
     }
   )
