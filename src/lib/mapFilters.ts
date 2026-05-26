@@ -163,15 +163,25 @@ export const CATEGORY_SLUG_MAP: Record<string, ResourceCategory> = {
 
 // ── Query Builder ─────────────────────────────────────────────────
 
+// Returns true when the user has chosen a specific category / quick filter / search term.
+// In that case we fetch ALL matching resources region-wide rather than clipping to the
+// map viewport — the user asked for everything in a category, not just what's nearby.
+export function hasActiveSearchFilter(filters: MapFilters, searchQuery = ''): boolean {
+  return !!(filters.quickFilter || filters.category || searchQuery.trim())
+}
+
 export async function fetchMapResources(
   lat: number,
   lng: number,
   filters: MapFilters = {},
   searchQuery = '',
 ): Promise<Resource[]> {
-  const radiusKm = filters.radius ?? DEFAULT_RADIUS_KM
-  const latDelta = radiusKm / 111
-  const lngDelta = radiusKm / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2))
+  // Only apply a geographic bounding box when:
+  //   • the user explicitly set a radius in the filter drawer, OR
+  //   • no category / quick-filter / search is active (plain map browse)
+  // When a filter IS active the user wants every matching resource, not just
+  // those inside an arbitrary viewport radius.
+  const applyRadius = !hasActiveSearchFilter(filters, searchQuery) || filters.radius != null
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query: any = db.resources()
@@ -181,10 +191,17 @@ export async function fetchMapResources(
     .eq('is_map_ready', true)
     .not('lat', 'is', null)
     .not('lng', 'is', null)
-    .gte('lat', lat - latDelta)
-    .lte('lat', lat + latDelta)
-    .gte('lng', lng - lngDelta)
-    .lte('lng', lng + lngDelta)
+
+  if (applyRadius) {
+    const radiusKm = filters.radius ?? DEFAULT_RADIUS_KM
+    const latDelta = radiusKm / 111
+    const lngDelta = radiusKm / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2))
+    query = query
+      .gte('lat', lat - latDelta)
+      .lte('lat', lat + latDelta)
+      .gte('lng', lng - lngDelta)
+      .lte('lng', lng + lngDelta)
+  }
 
   // Exclude low-confidence resources unless user explicitly opts in
   if (!filters.showLowConfidence) {
@@ -289,10 +306,10 @@ function applyQuickFilter(query: any, key: QuickFilterKey): any {
       return query.or('has_showers.eq.true,has_restrooms.eq.true')
 
     case 'safe_daytime':
-      // Day-use outdoor/park spaces that are explicitly NOT overnight
-      return query
-        .in('category', ['day_space', 'outdoor_space'])
-        .or('overnight_allowed.is.null,overnight_allowed.eq.false')
+      // All outdoor / day-use spaces. Parks that also allow camping are
+      // still valid daytime spaces — don't filter on overnight_allowed here.
+      // Users who specifically want overnight options can use the filter drawer.
+      return query.in('category', ['day_space', 'outdoor_space'])
 
     case 'family_help':
       return query.or('gender_policy.eq.family_only,gender_policy.eq.gender_inclusive')
