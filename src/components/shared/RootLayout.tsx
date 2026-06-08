@@ -1,6 +1,6 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom'
-import { MapPin, Heart, HelpCircle, Menu, X } from 'lucide-react'
-import { useState } from 'react'
+import { Outlet, NavLink, Link, useLocation } from 'react-router-dom'
+import { MapPin, Heart, HelpCircle, Menu, X, UserPlus } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import clsx from 'clsx'
 import ToastContainer from './ToastContainer'
 import Footer from './Footer'
@@ -15,99 +15,79 @@ export default function RootLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
   const isMapPage = location.pathname === '/map'
-  const emergencyUrl = 'https://app.streetrise.org'
-  const isEmergencyUrlSafe = emergencyUrl.startsWith('https://')
+
+  // Collapse the menu whenever the route changes.
+  useEffect(() => { setMenuOpen(false) }, [location.pathname])
 
   return (
     <div className="flex flex-col min-h-screen">
       {/* ── Top nav (hidden on full-screen map) ── */}
       {!isMapPage && (
         <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
-          <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="relative max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
             {/* Logo */}
             <NavLink to="/" className="flex items-center gap-2 font-bold text-primary-600 text-lg">
               <span className="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center text-white text-xs font-black">SR</span>
               StreetRise
             </NavLink>
 
-            {/* Desktop nav */}
-            <nav className="hidden md:flex items-center gap-1">
-              {NAV_LINKS.map(({ to, label }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  className={({ isActive }) =>
-                    clsx('px-4 py-2 rounded-xl text-sm font-medium transition-colors', {
-                      'bg-primary-50 text-primary-700': isActive,
-                      'text-gray-600 hover:bg-gray-50': !isActive,
-                    })
-                  }
-                >
-                  {label}
-                </NavLink>
-              ))}
-              <NavLink
-                to="/provider/onboarding"
-                className={({ isActive }) =>
-                  clsx('px-4 py-2 rounded-xl text-sm font-medium transition-colors ml-1', {
-                    'bg-primary-50 text-primary-700': isActive,
-                    'text-gray-600 hover:bg-gray-50': !isActive,
-                  })
-                }
-              >
-                Become a Provider
-              </NavLink>
-              <NavLink to="/portal" className="btn-primary btn-sm ml-2">
-                Provider Login
-              </NavLink>
-            </nav>
-
-            {/* Mobile hamburger */}
+            {/* Hamburger trigger (all screen sizes) */}
             <button
-              className="md:hidden btn-icon"
+              type="button"
+              className="btn-icon"
               onClick={() => setMenuOpen(!menuOpen)}
               aria-label="Toggle menu"
+              aria-expanded={menuOpen}
             >
               {menuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-          </div>
 
-          {/* Mobile dropdown */}
-          {menuOpen && (
-            <div className="md:hidden border-t border-gray-100 bg-white px-4 pb-4 animate-fade-in">
-              {NAV_LINKS.map(({ to, label, icon: Icon }) => (
-                <NavLink
-                  key={to}
-                  to={to}
+            {/* Dropdown menu */}
+            {menuOpen && (
+              <>
+                {/* Click-away backdrop */}
+                <button
+                  type="button"
+                  aria-label="Close menu"
+                  className="fixed inset-0 z-30 cursor-default"
                   onClick={() => setMenuOpen(false)}
-                  className={({ isActive }) =>
-                    clsx('flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium my-1 transition-colors', {
-                      'bg-primary-50 text-primary-700': isActive,
-                      'text-gray-700 hover:bg-gray-50': !isActive,
-                    })
-                  }
-                >
-                  <Icon size={18} />
-                  {label}
-                </NavLink>
-              ))}
-              <NavLink
-                to="/provider/onboarding"
-                onClick={() => setMenuOpen(false)}
-                className={({ isActive }) =>
-                  clsx('flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium my-1 transition-colors', {
-                    'bg-primary-50 text-primary-700': isActive,
-                    'text-gray-700 hover:bg-gray-50': !isActive,
-                  })
-                }
-              >
-                Become a Provider
-              </NavLink>
-              <NavLink to="/portal" className="btn-primary w-full mt-2" onClick={() => setMenuOpen(false)}>
-                Provider Login
-              </NavLink>
-            </div>
-          )}
+                />
+                <div className="absolute right-4 top-full z-40 mt-2 w-64 rounded-2xl border border-gray-100 bg-white p-2 shadow-lg animate-fade-in">
+                  {NAV_LINKS.map(({ to, label, icon: Icon }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      className={({ isActive }) =>
+                        clsx('flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors', {
+                          'bg-primary-50 text-primary-700': isActive,
+                          'text-gray-700 hover:bg-gray-50': !isActive,
+                        })
+                      }
+                    >
+                      <Icon size={18} />
+                      {label}
+                    </NavLink>
+                  ))}
+                  <NavLink
+                    to="/provider/onboarding"
+                    className={({ isActive }) =>
+                      clsx('flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors', {
+                        'bg-primary-50 text-primary-700': isActive,
+                        'text-gray-700 hover:bg-gray-50': !isActive,
+                      })
+                    }
+                  >
+                    <UserPlus size={18} />
+                    Become a Provider
+                  </NavLink>
+                  <div className="my-1 border-t border-gray-100" />
+                  <NavLink to="/portal" className="btn-primary w-full">
+                    Provider Login
+                  </NavLink>
+                </div>
+              </>
+            )}
+          </div>
         </header>
       )}
 
@@ -119,24 +99,21 @@ export default function RootLayout() {
       {/* ── Footer (hidden on full-screen map) ── */}
       {!isMapPage && <Footer />}
 
-      {/* ── Persistent emergency help CTA ── */}
+      {/* ── Persistent "Get Help Now" CTA → resource map ── */}
       {!isMapPage && (
-        <a
-        href={isEmergencyUrlSafe ? emergencyUrl : '#'}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Get Help Now - Emergency Hotline"
-        className={clsx(
-          'fixed right-4 z-50 rounded-full px-5 py-3 text-sm font-bold uppercase tracking-wide shadow-lg',
-          'focus:outline-none focus:ring-4 focus:ring-offset-2',
-          'transition-transform hover:scale-[1.02] active:scale-[0.98]',
-          'bg-red-600 text-white focus:ring-red-300',
-          'bottom-20 md:bottom-4',
-          { 'pointer-events-none opacity-50': !isEmergencyUrlSafe },
-        )}
-      >
-        Get Help Now
-      </a>
+        <Link
+          to="/map"
+          aria-label="Get Help Now — find resources near you"
+          className={clsx(
+            'fixed right-4 z-50 rounded-full px-5 py-3 text-sm font-bold uppercase tracking-wide shadow-lg',
+            'focus:outline-none focus:ring-4 focus:ring-offset-2',
+            'transition-transform hover:scale-[1.02] active:scale-[0.98]',
+            'bg-red-600 text-white focus:ring-red-300',
+            'bottom-20 md:bottom-4',
+          )}
+        >
+          Get Help Now
+        </Link>
       )}
 
       {/* ── Bottom tab bar (mobile) ── */}
