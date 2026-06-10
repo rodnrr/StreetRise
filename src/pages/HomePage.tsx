@@ -58,7 +58,7 @@ export default function HomePage() {
       <section className="rounded-t-[2rem] bg-slate-50 text-slate-900 px-5 py-6 min-h-[52vh]">
         <div className="mx-auto max-w-md">
           <div className="mb-5">
-            <h2 className="text-2xl font-bold">Tampa Bay Resources</h2>
+            <h2 className="text-2xl font-bold">Resources Near You</h2>
             <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600">
               <MapPin size={14} />
               {isError ? 'Listings unavailable' : count != null ? `${count} listings` : 'Loading…'}
