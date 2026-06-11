@@ -13,7 +13,7 @@ export default function Footer() {
             StreetRise
           </div>
           <p className="text-xs text-gray-400 leading-relaxed">
-            Free for everyone in need. Connecting people with real local services in Tampa Bay.
+            Free for everyone in need. Connecting people with real local services across Central Florida.
           </p>
           <p className="text-xs text-gray-300">
             © {new Date().getFullYear()} StreetRise

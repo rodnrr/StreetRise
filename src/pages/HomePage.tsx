@@ -1,7 +1,8 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Heart, MapPin } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
-import { db } from '@/lib/supabase'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { db, supabase } from '@/lib/supabase'
 
 const CATEGORIES = [
   { label: 'Shelter',        emoji: '🏠', cat: 'shelter' },
@@ -15,6 +16,8 @@ const CATEGORIES = [
 ]
 
 export default function HomePage() {
+  const queryClient = useQueryClient()
+
   const { data: count, isError } = useQuery({
     queryKey: ['resource-count'],
     queryFn: async () => {
@@ -28,8 +31,19 @@ export default function HomePage() {
       if (error) throw error
       return c ?? 0
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
   })
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('resource-count-watch')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'resources' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['resource-count'] })
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [queryClient])
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -58,7 +72,7 @@ export default function HomePage() {
       <section className="rounded-t-[2rem] bg-slate-50 text-slate-900 px-5 py-6 min-h-[52vh]">
         <div className="mx-auto max-w-md">
           <div className="mb-5">
-            <h2 className="text-2xl font-bold">Tampa Bay Resources</h2>
+            <h2 className="text-2xl font-bold">Resources Near You</h2>
             <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600">
               <MapPin size={14} />
               {isError ? 'Listings unavailable' : count != null ? `${count} listings` : 'Loading…'}

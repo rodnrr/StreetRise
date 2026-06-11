@@ -63,7 +63,7 @@ export default function ProviderLandingPage() {
         </h1>
         <p className="text-gray-500 text-base max-w-md mx-auto">
           StreetRise connects shelters, food pantries, clinics, and community orgs
-          with people in Tampa Bay who need their services — in real time.
+          with people across Central Florida who need their services — in real time.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
           <Link to="/login?signup=1" className="btn-primary btn-lg gap-2">

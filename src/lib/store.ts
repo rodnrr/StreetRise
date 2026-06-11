@@ -21,11 +21,11 @@ export const useMapStore = create<MapState>()(
   persist(
     (set) => ({
       userLocation: null,
-      mapCenter:    { lat: 27.9506, lng: -82.4572 }, // Default: Tampa Bay, FL
-      mapZoom:      12,
+      mapCenter:    { lat: 28.2, lng: -81.9 }, // Default: Central Florida (Tampa–Orlando corridor)
+      mapZoom:      9,
       filters:      {},
       selectedId:   null,
-      setUserLocation: (loc)    => set({ userLocation: loc, mapCenter: loc ?? { lat: 27.9506, lng: -82.4572 } }),
+      setUserLocation: (loc)    => set({ userLocation: loc, mapCenter: loc ?? { lat: 28.2, lng: -81.9 } }),
       setMapCenter:    (center) => set({ mapCenter: center }),
       setMapZoom:      (zoom)   => set({ mapZoom: zoom }),
       setFilters: (f) => set((s) => {
