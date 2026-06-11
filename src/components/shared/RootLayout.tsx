@@ -15,6 +15,7 @@ export default function RootLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
   const isMapPage = location.pathname === '/map'
+  const isHomePage = location.pathname === '/'
 
   // Collapse the menu whenever the route changes.
   useEffect(() => { setMenuOpen(false) }, [location.pathname])
@@ -99,8 +100,10 @@ export default function RootLayout() {
       {/* ── Footer (hidden on full-screen map) ── */}
       {!isMapPage && <Footer />}
 
-      {/* ── Persistent "Get Help Now" CTA → resource map ── */}
-      {!isMapPage && (
+      {/* ── Persistent "Get Help Now" CTA → resource map ──
+           Hidden on home (the hero already leads with this action) and on
+           the map itself. */}
+      {!isMapPage && !isHomePage && (
         <Link
           to="/map"
           aria-label="Get Help Now — find resources near you"
