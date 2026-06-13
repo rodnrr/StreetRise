@@ -200,7 +200,12 @@ export async function fetchMapResources(
   if (filters.quickFilter) {
     query = applyQuickFilter(query, filters.quickFilter)
   } else {
-    if (filters.category) {
+    if (filters.category === 'hygiene') {
+      // "Hygiene" is a need, not a single category: surface anywhere someone can
+      // shower or use a restroom (e.g. parks tagged under outdoor_space) alongside
+      // any dedicated hygiene listings.
+      query = query.or('category.eq.hygiene,has_showers.eq.true,has_restrooms.eq.true')
+    } else if (filters.category) {
       query = query.eq('category', filters.category)
     }
     if (filters.resourceType) {
@@ -236,9 +241,10 @@ export async function fetchMapResources(
   if (filters.wheelchairAccessible) query = query.eq('wheelchair_accessible', true)
   if (filters.nearTransit)          query = query.eq('public_transit_accessible', true)
 
-  // Gender policy
+  // Gender policy — include 'unknown' so resources with unconfirmed eligibility
+  // stay visible rather than being filtered out alongside the explicit choices.
   if (filters.genderPolicy && filters.genderPolicy.length > 0) {
-    query = query.in('gender_policy', filters.genderPolicy)
+    query = query.in('gender_policy', [...filters.genderPolicy, 'unknown'])
   }
 
   // Population focus (array overlap — resource must contain ANY of the specified tags)
@@ -294,14 +300,17 @@ function applyQuickFilter(query: any, key: QuickFilterKey): any {
         .in('category', ['day_space', 'outdoor_space'])
         .or('overnight_allowed.is.null,overnight_allowed.eq.false')
 
+    // Gendered filters fail open: a resource whose eligibility is unconfirmed
+    // ('unknown') must still appear, so an untagged shelter isn't hidden from
+    // someone who needs it. Only resources tagged for a *different* group drop out.
     case 'family_help':
-      return query.or('gender_policy.eq.family_only,gender_policy.eq.gender_inclusive')
+      return query.in('gender_policy', ['family_only', 'gender_inclusive', 'unknown'])
 
     case 'mens_help':
-      return query.or('gender_policy.eq.men_only,gender_policy.eq.gender_inclusive')
+      return query.in('gender_policy', ['men_only', 'gender_inclusive', 'unknown'])
 
     case 'womens_help':
-      return query.or('gender_policy.eq.women_only,gender_policy.eq.gender_inclusive')
+      return query.in('gender_policy', ['women_only', 'gender_inclusive', 'unknown'])
 
     case 'veteran_support':
       return query.contains('population_focus', ['veterans'])
@@ -310,8 +319,7 @@ function applyQuickFilter(query: any, key: QuickFilterKey): any {
       return query.contains('population_focus', ['lgbtq'])
 
     case 'youth_support':
-      // youth_only gender_policy OR population_focus includes young_adults
-      return query.or('gender_policy.eq.youth_only,gender_policy.eq.gender_inclusive')
+      return query.in('gender_policy', ['youth_only', 'gender_inclusive', 'unknown'])
 
     case 'dv_support':
       return query.contains('population_focus', ['domestic_violence'])
