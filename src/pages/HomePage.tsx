@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, MapPin } from 'lucide-react'
 import clsx from 'clsx'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { db } from '@/lib/supabase'
+import { db, supabase } from '@/lib/supabase'
 
 const CATEGORIES = [
   { label: 'Shelter',         emoji: '🏠', cat: 'shelter' },
@@ -46,14 +46,14 @@ export default function HomePage() {
   })
 
   useEffect(() => {
-    const channel = db
+    const channel = supabase
       .channel('resource-count-watch')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'resources' }, () => {
         queryClient.invalidateQueries({ queryKey: ['resource-count'] })
       })
       .subscribe()
 
-    return () => { db.removeChannel(channel) }
+    return () => { supabase.removeChannel(channel) }
   }, [queryClient])
 
   return (
