@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, MapPin } from 'lucide-react'
 import clsx from 'clsx'
@@ -26,6 +27,8 @@ const CITIES = [
 ]
 
 export default function HomePage() {
+  const queryClient = useQueryClient()
+
   const { data: count, isError } = useQuery({
     queryKey: ['resource-count'],
     queryFn: async () => {
@@ -39,8 +42,19 @@ export default function HomePage() {
       if (error) throw error
       return c ?? 0
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
   })
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('resource-count-watch')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'resources' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['resource-count'] })
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [queryClient])
 
   return (
     <div className="bg-white text-slate-900">
