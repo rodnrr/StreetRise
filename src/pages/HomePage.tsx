@@ -20,7 +20,7 @@ const CATEGORIES = [
 // "Coming soon". (Verify with the public resources query before flipping.)
 const CITIES = [
   { name: 'Tampa Bay',    live: true },
-  { name: 'Orlando',      live: false },
+  { name: 'Orlando',      live: true },
   { name: 'Miami',        live: false },
   { name: 'Jacksonville', live: false },
 ]
