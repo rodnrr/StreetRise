@@ -1,92 +1,146 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { MapPin, Briefcase, Heart, ArrowRight, CheckCircle } from 'lucide-react'
+import { ArrowRight, MapPin } from 'lucide-react'
+import clsx from 'clsx'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { db, supabase } from '@/lib/supabase'
 
 const CATEGORIES = [
-  { label: 'Shelter',       color: 'bg-blue-100 text-blue-700',   emoji: '🏠' },
-  { label: 'Food',          color: 'bg-green-100 text-green-700',  emoji: '🍽' },
-  { label: 'Work Exchange', color: 'bg-purple-100 text-purple-700', emoji: '🤝' },
-  { label: 'Mental Health', color: 'bg-pink-100 text-pink-700',    emoji: '💙' },
-  { label: 'Medical',       color: 'bg-red-100 text-red-700',      emoji: '⚕️' },
-  { label: 'Legal Help',    color: 'bg-yellow-100 text-yellow-700', emoji: '⚖️' },
+  { label: 'Shelter',         emoji: '🏠', cat: 'shelter' },
+  { label: 'Food',            emoji: '🍽️', cat: 'food' },
+  { label: 'Hygiene',         emoji: '🚿', cat: 'hygiene' },
+  { label: 'Medical',         emoji: '⚕️', cat: 'medical' },
+  { label: 'Mental Health',   emoji: '💙', cat: 'mental_health' },
+  { label: 'Legal Help',      emoji: '⚖️', cat: 'legal' },
+  { label: 'Parks & Day Use', emoji: '🌳', cat: 'outdoor_space' },
+  { label: 'All Resources',   emoji: '📍', cat: '' },
 ]
 
-const TRUST_POINTS = [
-  'Verified providers are confirmed by StreetRise staff and clearly badged on every listing',
-  'Community Listed resources are publicly submitted — a wider net, clearly labeled so you know what you\'re looking at',
-  'Free to use — no account required to search',
-  'Anonymous booking option for privacy',
+// Metros StreetRise serves. Set `live: true` ONLY when a metro has real,
+// publicly visible listings seeded on the map — otherwise it reads as
+// "Coming soon". (Verify with the public resources query before flipping.)
+const CITIES = [
+  { name: 'Tampa Bay',    live: true },
+  { name: 'Orlando',      live: true },
+  { name: 'Miami',        live: false },
+  { name: 'Jacksonville', live: false },
 ]
 
 export default function HomePage() {
+  const queryClient = useQueryClient()
+
+  const { data: count, isError } = useQuery({
+    queryKey: ['resource-count'],
+    queryFn: async () => {
+      const { count: c, error } = await db.resources()
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true)
+        .in('verification_status', ['verified', 'pending'])
+        .eq('is_map_ready', true)
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+      if (error) throw error
+      return c ?? 0
+    },
+    staleTime: 0,
+  })
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('resource-count-watch')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'resources' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['resource-count'] })
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [queryClient])
+
   return (
-    <div className="pb-20 md:pb-0">
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-primary-600 to-primary-800 text-white px-4 py-16 md:py-24">
-        <div className="max-w-2xl mx-auto text-center">
-          <h1 className="text-3xl md:text-5xl font-bold mb-4 leading-tight">
-            Find shelter, food &amp; support — right now
-          </h1>
-          <p className="text-primary-100 text-lg md:text-xl mb-8 leading-relaxed">
-            StreetRise maps local shelters, food, and support services — verified
-            providers and community listings, clearly labeled. No sign-up required.
+    <div className="bg-white text-slate-900">
+      {/* ── Hero ── */}
+      <section className="px-5 pt-10 pb-8 text-center">
+        <div className="mx-auto max-w-md">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-primary-600">
+            Real-time local resources
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link to="/map" className="btn bg-white text-primary-700 hover:bg-primary-50 btn-lg font-bold shadow-lg">
-              <MapPin size={20} />
-              Find Resources Near Me
-            </Link>
-            <Link to="/work" className="btn border-2 border-white/40 text-white hover:bg-white/10 btn-lg">
-              <Briefcase size={18} />
-              Work Exchange
-            </Link>
+          <h1 className="mb-3 text-3xl font-bold leading-tight">
+            Find help near you, right now.
+          </h1>
+          <p className="mb-7 leading-relaxed text-slate-500">
+            Shelter, food, hygiene, medical care, and more — updated by the
+            organizations that provide them.
+          </p>
+          <Link
+            to="/map"
+            className="btn-primary btn-lg inline-flex w-full items-center justify-center gap-2"
+          >
+            Find Resources Near Me
+            <ArrowRight size={20} />
+          </Link>
+          <p className="mt-3 text-xs text-slate-400">Free. No sign-up required.</p>
+        </div>
+      </section>
+
+      {/* ── Live listings indicator ── */}
+      {!isError && (
+        <div className="px-5">
+          <div className="mx-auto flex max-w-md items-center justify-center gap-2 rounded-full border border-slate-100 bg-slate-50 px-4 py-2 text-sm text-slate-600">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+            </span>
+            {count != null ? `${count} live listings on the map` : 'Loading listings…'}
           </div>
         </div>
-      </section>
+      )}
 
-      {/* Category quick-links */}
-      <section className="max-w-3xl mx-auto px-4 py-10">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Browse by category</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {CATEGORIES.map(({ label, color, emoji }) => (
-            <Link
-              key={label}
-              to={`/map?category=${encodeURIComponent(label.toLowerCase().replace(/ /g, '_'))}`}
-              className={`card-hover flex items-center gap-3 ${color}`}
-            >
-              <span className="text-2xl">{emoji}</span>
-              <span className="font-semibold text-sm">{label}</span>
-              <ArrowRight size={14} className="ml-auto opacity-60" />
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* Trust indicators */}
-      <section className="bg-gray-50 px-4 py-10">
-        <div className="max-w-2xl mx-auto">
-          <h2 className="text-xl font-bold text-gray-900 mb-5 text-center">Why trust StreetRise?</h2>
-          <ul className="space-y-3">
-            {TRUST_POINTS.map((point) => (
-              <li key={point} className="flex items-start gap-3">
-                <CheckCircle size={18} className="text-success-600 mt-0.5 shrink-0" />
-                <span className="text-gray-700 text-sm">{point}</span>
+      {/* ── Where we're available ── */}
+      <section className="px-5 pt-9">
+        <div className="mx-auto max-w-md">
+          <h2 className="mb-3 text-lg font-bold">Where StreetRise is available</h2>
+          <ul className="space-y-2">
+            {CITIES.map(({ name, live }) => (
+              <li
+                key={name}
+                className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm"
+              >
+                <span className="flex items-center gap-2 font-medium">
+                  <MapPin size={16} className="text-slate-400" />
+                  {name}, FL
+                </span>
+                <span className={clsx('badge', live ? 'badge-available' : 'badge-unknown')}>
+                  {live ? 'Live' : 'Coming soon'}
+                </span>
               </li>
             ))}
           </ul>
+          <p className="mt-3 text-center text-xs text-slate-400">
+            Want StreetRise in your city?{' '}
+            <Link to="/provider/onboarding" className="font-medium text-primary-600 hover:underline">
+              Partner with us
+            </Link>
+          </p>
         </div>
       </section>
 
-      {/* CTA — donate */}
-      <section className="px-4 py-12 text-center">
-        <div className="max-w-md mx-auto">
-          <Heart size={32} className="text-danger-500 mx-auto mb-3" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Help us keep the lights on</h2>
-          <p className="text-gray-500 text-sm mb-5">
-            StreetRise is free for everyone. Your donation helps us verify more providers and keep listings current.
-          </p>
-          <Link to="/donate" className="btn-primary btn-lg">
-            Donate Now
-          </Link>
+      {/* ── Browse by need ── */}
+      <section className="px-5 py-9">
+        <div className="mx-auto max-w-md">
+          <h2 className="mb-3 text-lg font-bold">Browse by need</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {CATEGORIES.map(({ label, emoji, cat }) => (
+              <Link
+                key={label}
+                to={cat ? `/map?category=${cat}` : '/map'}
+                className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors hover:border-primary-300"
+              >
+                <span className="text-2xl">{emoji}</span>
+                <span className="text-sm font-semibold text-slate-800">{label}</span>
+                <ArrowRight size={14} className="ml-auto text-slate-300" />
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
     </div>

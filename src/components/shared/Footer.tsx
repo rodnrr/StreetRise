@@ -13,7 +13,7 @@ export default function Footer() {
             StreetRise
           </div>
           <p className="text-xs text-gray-400 leading-relaxed">
-            Free for everyone in need. Connecting people with real local services in Tampa Bay.
+            Free for everyone in need. Connecting people with real local services across Central Florida.
           </p>
           <p className="text-xs text-gray-300">
             © {new Date().getFullYear()} StreetRise
@@ -24,11 +24,11 @@ export default function Footer() {
         <div className="space-y-2">
           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Contact & Support</p>
           <a
-            href="mailto:support@streetrise.org"
+            href="mailto:info@streetrise.org"
             className="flex items-center gap-2 text-xs text-gray-500 hover:text-primary-600 transition-colors"
           >
             <Mail size={13} className="shrink-0" />
-            Support@StreetRise.Org
+            info@streetrise.org
           </a>
           <a
             href="tel:8135864066"

@@ -21,19 +21,26 @@ export const useMapStore = create<MapState>()(
   persist(
     (set) => ({
       userLocation: null,
-      mapCenter:    { lat: 27.9506, lng: -82.4572 }, // Default: Tampa Bay, FL
-      mapZoom:      12,
+      mapCenter:    { lat: 28.2, lng: -81.9 }, // Default: Central Florida (Tampa–Orlando corridor)
+      mapZoom:      9,
       filters:      {},
       selectedId:   null,
-      setUserLocation: (loc)    => set({ userLocation: loc, mapCenter: loc ?? { lat: 27.9506, lng: -82.4572 } }),
+      setUserLocation: (loc)    => set({ userLocation: loc, mapCenter: loc ?? { lat: 28.2, lng: -81.9 } }),
       setMapCenter:    (center) => set({ mapCenter: center }),
       setMapZoom:      (zoom)   => set({ mapZoom: zoom }),
-      setFilters:      (f)      => set((s) => ({ filters: { ...s.filters, ...f } })),
+      setFilters: (f) => set((s) => {
+        const next = { ...s.filters }
+        for (const key of Object.keys(f) as Array<keyof MapFilters>) {
+          if (f[key] === undefined) delete next[key]
+          else next[key] = f[key] as never
+        }
+        return { filters: next }
+      }),
       clearFilters:    ()       => set({ filters: {} }),
       setSelectedId:   (id)     => set({ selectedId: id }),
     }),
     {
-      name: 'streetrise-map-v2', // bumped version to bust cached LA coordinates
+      name: 'streetrise-map-v3', // v3: new MapFilters shape with quickFilter + taxonomy
       partialize: (s) => ({ mapCenter: s.mapCenter, mapZoom: s.mapZoom, filters: s.filters }),
     }
   )

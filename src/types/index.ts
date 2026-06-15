@@ -8,14 +8,84 @@ export type ResourceCategory =
   | 'shelter'
   | 'food'
   | 'work_exchange'
+  | 'employment'
   | 'mental_health'
+  | 'substance_recovery'
   | 'medical'
+  | 'healthcare'
   | 'legal'
+  | 'legal_aid'
   | 'hygiene'
   | 'clothing'
   | 'childcare'
   | 'transportation'
+  | 'outdoor_space'
+  | 'day_space'
+  | 'outreach'
+  | 'hotline'
   | 'other'
+
+export type ResourceType =
+  | 'emergency_shelter'
+  | 'transitional_housing'
+  | 'food_pantry'
+  | 'hot_meal'
+  | 'shower_facility'
+  | 'restroom_access'
+  | 'day_use_park'
+  | 'warming_cooling_center'
+  | 'domestic_violence_shelter'
+  | 'veteran_housing'
+  | 'youth_shelter'
+  | 'work_exchange'
+  | 'crisis_hotline'
+  | 'job_training'
+  | 'legal_services'
+  | 'medical_clinic'
+  | 'mental_health_clinic'
+  | 'substance_recovery_program'
+  | 'clothing_closet'
+  | 'hygiene_supplies'
+  | 'laundry_facility'
+  | 'childcare_services'
+  | 'transportation_assistance'
+  | 'outreach_program'
+  | 'other'
+
+export type GenderPolicy =
+  | 'gender_inclusive'
+  | 'men_only'
+  | 'women_only'
+  | 'family_only'
+  | 'couples_only'
+  | 'youth_only'
+  | 'unknown'
+
+export type PopulationFocus =
+  | 'veterans'
+  | 'lgbtq'
+  | 'domestic_violence'
+  | 'families'
+  | 'seniors'
+  | 'young_adults'
+  | 'pregnant_women'
+  | 'substance_recovery'
+  | 'mental_health'
+  | 'reentry'
+  | 'hiv_aids'
+
+export type QuickFilterKey =
+  | 'shelter_tonight'
+  | 'food_today'
+  | 'shower_restroom'
+  | 'safe_daytime'
+  | 'family_help'
+  | 'mens_help'
+  | 'womens_help'
+  | 'veteran_support'
+  | 'lgbtq_support'
+  | 'youth_support'
+  | 'dv_support'
 
 export type AvailabilityStatus = 'available' | 'limited' | 'full' | 'unknown' | 'closed'
 
@@ -49,7 +119,12 @@ export interface Resource {
   category: ResourceCategory
   subcategory?: string
 
-  // Location — lat/lng are nullable for intake-only and pending-geocode resources
+  // Taxonomy (migration 011)
+  resource_type?: ResourceType | string | null
+  gender_policy: GenderPolicy
+  population_focus: string[]
+
+  // Location — lat/lng nullable for intake-only and pending-geocode resources
   address: Address
   lat: number | null
   lng: number | null
@@ -67,16 +142,37 @@ export interface Resource {
   beds_available?: number
   beds_updated_at?: string
 
-  // Intake
+  // Intake / access conditions
   walk_ins_accepted: boolean
   requires_id: boolean
   requires_referral: boolean
+  phone_required_before_arrival: boolean
   age_min?: number
   age_max?: number
+  // gender_restriction kept for backwards compatibility; prefer gender_policy
   gender_restriction?: 'any' | 'male' | 'female' | 'nonbinary_inclusive'
+
+  // Overnight
+  overnight_allowed?: boolean | null
+
+  // Facility amenities
+  has_showers: boolean
+  has_restrooms: boolean
+  serves_meals: boolean
+  has_laundry: boolean
+  pet_friendly: boolean
+  wheelchair_accessible: boolean
+  public_transit_accessible: boolean
 
   // Hours
   hours_of_operation: HoursOfOperation
+
+  // Trust fields (migration 010)
+  confidence_score: number
+  stale_after_days: number
+  last_provider_update_at?: string | null
+  last_verified_at?: string | null
+  verification_notes?: string | null
 
   // Meta
   verification_status: VerificationStatus
@@ -118,11 +214,17 @@ export interface Provider {
   contact_email: string
   contact_phone?: string
   website?: string
-  ein?: string         // Tax ID for nonprofits
+  ein?: string
   logo_url?: string
   verification_status: VerificationStatus
   role: ProviderRole
   bio?: string
+  // Trust fields (migration 010)
+  identity_confirmed?: boolean
+  re_verification_due_at?: string | null
+  suspension_reason?: string | null
+  verification_notes?: string | null
+  suspended_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -141,7 +243,7 @@ export interface Booking {
   id: string
   resource_id: string
   resource?: Resource
-  user_id?: string       // null for anonymous requests
+  user_id?: string
   requester_name: string
   requester_phone?: string
   requester_email?: string
@@ -166,7 +268,7 @@ export interface WorkExchange {
   description: string
   exchange_type: WorkExchangeType
   hours_per_week?: number
-  compensation?: string  // "Meals + Housing", "$15/hr", "Skills trade"
+  compensation?: string
   skills_required: string[]
   skills_gained: string[]
   is_active: boolean
@@ -181,7 +283,7 @@ export interface WorkExchange {
 
 export interface DonationCampaign {
   id: string
-  provider_id?: string   // null = platform campaign
+  provider_id?: string
   title: string
   description: string
   goal_amount?: number
@@ -221,20 +323,49 @@ export interface FaqItem {
 // ------ Map / Search ------
 
 export interface MapFilters {
+  // Quick-select chip (overrides category/resourceType when set)
+  quickFilter?: QuickFilterKey
+
+  // Category / type (used when no quickFilter)
   category?: ResourceCategory
-  availabilityStatus?: AvailabilityStatus
+  resourceType?: string
+
+  // Eligibility
+  genderPolicy?: GenderPolicy[]
+  populationFocus?: string[]
+
+  // Access
+  overnightAllowed?: boolean
   walkInsOnly?: boolean
-  requiresId?: boolean
-  radius?: number        // km
+  noCallRequired?: boolean       // phone_required_before_arrival = false
+  noReferralRequired?: boolean   // requires_referral = false
+  noIdRequired?: boolean         // requires_id = false
+
+  // Facilities
+  hasShowers?: boolean
+  hasRestrooms?: boolean
+  servesMeals?: boolean
+  hasLaundry?: boolean
+  petFriendly?: boolean
+  wheelchairAccessible?: boolean
+  nearTransit?: boolean
+
+  // Trust / freshness
+  verifiedOnly?: boolean
+  hideStale?: boolean
+  showLowConfidence?: boolean    // opt-in to see confidence_score < 20
+
+  // Legacy / general
+  availabilityStatus?: AvailabilityStatus
+  radius?: number                // km
   languages?: string[]
-  genderRestriction?: string
 }
 
 export interface SearchResult {
   resources: Resource[]
   work_exchanges: WorkExchange[]
   total: number
-  bbox?: [number, number, number, number] // [minLat, minLng, maxLat, maxLng]
+  bbox?: [number, number, number, number]
 }
 
 // ------ UI State ------

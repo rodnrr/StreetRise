@@ -1,60 +1,71 @@
-import { Marker, Popup } from 'react-leaflet'
+import { Marker } from 'react-leaflet'
 import L from 'leaflet'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { CATEGORY_EMOJI } from '@/lib/mapFilters'
 import type { Resource } from '@/types'
 
-function MarkerIcon({ status, category }: { status: string; category: string }) {
-  const colors: Record<string, string> = {
-    available: '#22c55e',
-    limited:   '#f59e0b',
-    full:      '#ef4444',
-    unknown:   '#94a3b8',
-    closed:    '#6b7280',
-  }
+const STATUS_COLOR: Record<string, string> = {
+  available: '#22c55e',
+  limited:   '#f59e0b',
+  full:      '#ef4444',
+  unknown:   '#94a3b8',
+  closed:    '#6b7280',
+}
 
-  const emojis: Record<string, string> = {
-    shelter:       '🏠',
-    food:          '🍽',
-    work_exchange: '🤝',
-    mental_health: '💙',
-    medical:       '⚕',
-    legal:         '⚖',
-    hygiene:       '🚿',
-    clothing:      '👕',
-    childcare:     '👶',
-    transportation:'🚌',
-    other:         '📍',
-  }
-
-  const color  = colors[status]  ?? colors.unknown
-  const emoji  = emojis[category] ?? emojis.other
+function CircleIcon({
+  status,
+  category,
+  selected,
+}: {
+  status: string
+  category: string
+  selected: boolean
+}) {
+  const color = STATUS_COLOR[status] ?? STATUS_COLOR.unknown
+  const emoji = CATEGORY_EMOJI[category] ?? CATEGORY_EMOJI.other
+  const size  = selected ? 42 : 32
+  const fontSize = selected ? 16 : 13
 
   return (
-    <div style={{
-      width: 36, height: 36,
-      borderRadius: '50% 50% 50% 0',
-      transform: 'rotate(-45deg)',
-      backgroundColor: color,
-      border: '2px solid white',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      <span style={{ transform: 'rotate(45deg)', fontSize: 14 }}>{emoji}</span>
+    <div
+      style={{
+        width:        size,
+        height:       size,
+        borderRadius: '50%',
+        backgroundColor: color,
+        border:       selected ? '3px solid white' : '2px solid white',
+        boxShadow:    selected
+          ? '0 0 0 2px ' + color + ', 0 4px 12px rgba(0,0,0,0.35)'
+          : '0 2px 6px rgba(0,0,0,0.28)',
+        display:     'flex',
+        alignItems:  'center',
+        justifyContent: 'center',
+        fontSize,
+        lineHeight:  1,
+        userSelect:  'none',
+        transition:  'all 0.15s ease',
+      }}
+    >
+      {emoji}
     </div>
   )
 }
 
 function makeIcon(resource: Resource, selected: boolean) {
   const html = renderToStaticMarkup(
-    <MarkerIcon status={resource.availability_status} category={resource.category} />
+    <CircleIcon
+      status={resource.availability_status}
+      category={resource.category}
+      selected={selected}
+    />,
   )
-  const size = selected ? 44 : 36
+  const size = selected ? 42 : 32
   return L.divIcon({
     html,
-    className: '',
-    iconSize:     [size, size],
-    iconAnchor:   [size / 2, size],
-    popupAnchor:  [0, -size],
+    className:   '',
+    iconSize:    [size, size],
+    iconAnchor:  [size / 2, size / 2],
+    popupAnchor: [0, -(size / 2) - 4],
   })
 }
 
@@ -65,7 +76,6 @@ interface Props {
 }
 
 export default function ResourceMarker({ resource, isSelected, onClick }: Props) {
-  // Only render a marker if we have real coordinates (is_map_ready guard)
   if (resource.lat == null || resource.lng == null) return null
 
   return (
@@ -74,13 +84,6 @@ export default function ResourceMarker({ resource, isSelected, onClick }: Props)
       icon={makeIcon(resource, isSelected)}
       eventHandlers={{ click: onClick }}
       zIndexOffset={isSelected ? 1000 : 0}
-    >
-      {/* Minimal popup tooltip on hover only */}
-      <Popup>
-        <div className="p-2 text-xs font-medium text-gray-900 min-w-[120px]">
-          {resource.name}
-        </div>
-      </Popup>
-    </Marker>
+    />
   )
 }
