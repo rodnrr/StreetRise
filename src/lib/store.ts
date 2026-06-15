@@ -21,7 +21,7 @@ export const useMapStore = create<MapState>()(
   persist(
     (set) => ({
       userLocation: null,
-      mapCenter:    { lat: 28.2, lng: -81.9 }, // Default: Central Florida (Tampa–Orlando corridor)
+      mapCenter:    { lat: 28.2, lng: -81.9 }, // Default: Tampa Bay area
       mapZoom:      9,
       filters:      {},
       selectedId:   null,
