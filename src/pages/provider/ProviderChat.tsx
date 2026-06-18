@@ -241,7 +241,7 @@ export default function ProviderChat() {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto py-4 space-y-3">
+              <div className="flex-1 min-h-0 overflow-y-auto py-4 space-y-3">
                 {messagesLoading ? (
                   <div className="text-gray-500 text-sm">Loading messages…</div>
                 ) : messages?.length === 0 ? (
