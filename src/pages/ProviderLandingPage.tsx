@@ -121,6 +121,9 @@ export default function ProviderLandingPage() {
             <CheckCircle size={11} /> Staff Verified
           </span> badge on all their listings — a visible signal that a real person on our team has confirmed the listing.
         </p>
+        <p className="text-xs text-gray-500 leading-relaxed">
+          Community members can also list resources for free — those appear with a "Community Listed" badge so users can see the difference.
+        </p>
         <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">
           <Clock size={13} className="shrink-0" />
           Review typically takes 1–2 business days. You'll get an email when approved.
