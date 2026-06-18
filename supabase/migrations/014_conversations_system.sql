@@ -33,7 +33,7 @@ CREATE TRIGGER conversations_updated_at
 CREATE TABLE conversation_messages (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   conversation_id     UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-  sender_id           UUID NOT NULL REFERENCES providers(id) ON DELETE SET NULL,
+  sender_id           UUID REFERENCES providers(id) ON DELETE SET NULL,
   message             TEXT NOT NULL,
   is_admin            BOOLEAN NOT NULL,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -49,47 +49,69 @@ CREATE TRIGGER conversation_messages_updated_at
   BEFORE UPDATE ON conversation_messages
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+-- ── Trigger: bump parent conversation when a message is added ─────
+-- Keeps conversation list ordering accurate (sorts by updated_at DESC)
+-- and records last_message_at.
+
+CREATE OR REPLACE FUNCTION bump_conversation_on_message()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE conversations
+  SET last_message_at = NEW.created_at,
+      updated_at      = NEW.created_at
+  WHERE id = NEW.conversation_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER conversation_messages_bump_parent
+  AFTER INSERT ON conversation_messages
+  FOR EACH ROW EXECUTE FUNCTION bump_conversation_on_message();
+
 -- ── RLS Policies ─────────────────────────────────────────────────
 
--- Providers can see their own conversations and messages
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
-CREATE POLICY conversations_provider_read ON conversations
-  FOR SELECT USING (
-    my_provider_id() = provider_id OR
-    (is_admin() AND my_provider_id() = admin_id)
-  );
-
-CREATE POLICY conversations_provider_insert ON conversations
-  FOR INSERT WITH CHECK (provider_id = my_provider_id() OR is_admin());
-
-CREATE POLICY conversations_provider_update ON conversations
-  FOR UPDATE USING (
-    my_provider_id() = provider_id OR is_admin()
-  ) WITH CHECK (
-    my_provider_id() = provider_id OR is_admin()
-  );
-
--- Messages RLS: can read messages in conversations you're part of, can insert new messages
 ALTER TABLE conversation_messages ENABLE ROW LEVEL SECURITY;
+
+-- Conversations: a provider sees only their own; an admin sees all.
+CREATE POLICY conversations_read ON conversations
+  FOR SELECT USING (
+    provider_id = my_provider_id() OR is_admin()
+  );
+
+-- A provider can open a conversation for themselves; an admin can open
+-- a conversation with any provider.
+CREATE POLICY conversations_insert ON conversations
+  FOR INSERT WITH CHECK (
+    provider_id = my_provider_id() OR is_admin()
+  );
+
+-- A provider can update their own conversation; an admin can update any
+-- (e.g. claim it, mark resolved/closed).
+CREATE POLICY conversations_update ON conversations
+  FOR UPDATE USING (
+    provider_id = my_provider_id() OR is_admin()
+  ) WITH CHECK (
+    provider_id = my_provider_id() OR is_admin()
+  );
+
+-- Messages: readable by participants of the parent conversation.
 CREATE POLICY conversation_messages_read ON conversation_messages
   FOR SELECT USING (
     EXISTS (
-      SELECT 1 FROM conversations
-      WHERE id = conversation_id AND (
-        my_provider_id() = provider_id OR
-        (is_admin() AND my_provider_id() = admin_id)
-      )
+      SELECT 1 FROM conversations c
+      WHERE c.id = conversation_id
+        AND (c.provider_id = my_provider_id() OR is_admin())
     )
   );
 
+-- Messages: a participant may post, and only as themselves.
 CREATE POLICY conversation_messages_insert ON conversation_messages
   FOR INSERT WITH CHECK (
-    sender_id = my_provider_id() AND
-    EXISTS (
-      SELECT 1 FROM conversations
-      WHERE id = conversation_id AND (
-        my_provider_id() = provider_id OR
-        (is_admin() AND my_provider_id() = admin_id)
-      )
+    sender_id = my_provider_id()
+    AND EXISTS (
+      SELECT 1 FROM conversations c
+      WHERE c.id = conversation_id
+        AND (c.provider_id = my_provider_id() OR is_admin())
     )
   );

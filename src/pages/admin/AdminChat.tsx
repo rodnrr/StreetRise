@@ -4,6 +4,9 @@ import { db } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
 import { useToast } from '@/lib/store'
 import { MessageSquare, Plus, X } from 'lucide-react'
+import type { Conversation } from '@/types'
+
+type ConversationWithProvider = Conversation & { providers?: { organization_name: string } | null }
 
 export default function AdminChat() {
   const { providerId } = useAuthStore()
@@ -22,9 +25,9 @@ export default function AdminChat() {
     queryFn: async () => {
       const { data, error } = await db.conversations()
         .select('*')
-        .order('updated_at', { ascending: false }) as any
+        .order('updated_at', { ascending: false })
       if (error) throw error
-      return (data || []) as any[]
+      return data ?? []
     },
   })
 
@@ -36,9 +39,9 @@ export default function AdminChat() {
       const { data, error } = await db.messages()
         .select('*')
         .eq('conversation_id', selectedConversationId)
-        .order('created_at', { ascending: true }) as any
+        .order('created_at', { ascending: true })
       if (error) throw error
-      return (data || []) as any[]
+      return data ?? []
     },
     enabled: !!selectedConversationId,
   })
@@ -61,9 +64,9 @@ export default function AdminChat() {
       const { data, error } = await db.conversations()
         .select('*, providers(organization_name)')
         .eq('id', selectedConversationId)
-        .single() as any
+        .single()
       if (error) throw error
-      return data as any
+      return data as unknown as ConversationWithProvider
     },
     enabled: !!selectedConversationId,
   })
@@ -81,7 +84,7 @@ export default function AdminChat() {
         description: newDescription,
         created_by_admin: true,
         status: 'open',
-      } as any)
+      })
       if (error) throw error
     },
     onSuccess: () => {
@@ -106,8 +109,14 @@ export default function AdminChat() {
         sender_id: providerId,
         message: messageText.trim(),
         is_admin: true,
-      } as any)
+      })
       if (error) throw error
+      // Claim the thread so the provider can see who's responding
+      if (selectedConversation && !selectedConversation.admin_id) {
+        await db.conversations()
+          .update({ admin_id: providerId })
+          .eq('id', selectedConversationId)
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversation-messages', selectedConversationId] })

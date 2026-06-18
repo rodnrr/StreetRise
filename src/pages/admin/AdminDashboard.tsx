@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Building2, MapPin, CalendarDays, Clock, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Building2, MapPin, CalendarDays, Clock, CheckCircle, AlertTriangle, MessageSquare } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { db } from '@/lib/supabase'
 
@@ -43,15 +43,29 @@ export default function AdminDashboard() {
     },
   })
 
+  const { data: messageStats } = useQuery({
+    queryKey: ['admin-stats-messages'],
+    queryFn: async () => {
+      const { data } = await db.conversations().select('status') as { data: { status: string }[] | null }
+      if (!data) return { total: 0, open: 0 }
+      return {
+        total: data.length,
+        open:  data.filter(c => c.status === 'open').length,
+      }
+    },
+  })
+
   const cards = [
     { label: 'Total Providers', value: providerStats?.total ?? '…', sub: `${providerStats?.pending ?? 0} pending verification`, icon: Building2, color: 'bg-primary-600', href: '/admin/providers' },
     { label: 'Total Resources', value: resourceStats?.total ?? '…', sub: `${resourceStats?.pending ?? 0} pending review`, icon: MapPin, color: 'bg-purple-600', href: '/admin/resources' },
     { label: 'Total Bookings', value: bookingStats?.total ?? '…', sub: `${bookingStats?.pending ?? 0} pending`, icon: CalendarDays, color: 'bg-success-600', href: '/admin/bookings' },
     { label: 'Active Listings', value: resourceStats?.active ?? '…', sub: `${resourceStats?.available ?? 0} with beds available`, icon: CheckCircle, color: 'bg-warning-600', href: '/admin/resources' },
+    { label: 'Messages', value: messageStats?.total ?? '…', sub: `${messageStats?.open ?? 0} open conversation${messageStats?.open !== 1 ? 's' : ''}`, icon: MessageSquare, color: 'bg-sky-600', href: '/admin/messages' },
   ]
 
   const hasPendingProviders  = (providerStats?.pending  ?? 0) > 0
   const hasPendingResources  = (resourceStats?.pending  ?? 0) > 0
+  const hasOpenMessages      = (messageStats?.open       ?? 0) > 0
 
   return (
     <div className="space-y-6">
@@ -61,7 +75,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Alerts */}
-      {(hasPendingProviders || hasPendingResources) && (
+      {(hasPendingProviders || hasPendingResources || hasOpenMessages) && (
         <div className="space-y-2">
           {hasPendingProviders && (
             <Link to="/admin/providers" className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 rounded-xl px-4 py-3 text-sm hover:bg-yellow-500/20 transition-colors">
@@ -73,6 +87,12 @@ export default function AdminDashboard() {
             <Link to="/admin/resources" className="flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 text-blue-300 rounded-xl px-4 py-3 text-sm hover:bg-blue-500/20 transition-colors">
               <Clock size={16} className="shrink-0" />
               <span><strong>{resourceStats?.pending}</strong> resource{resourceStats?.pending !== 1 ? 's' : ''} pending review</span>
+            </Link>
+          )}
+          {hasOpenMessages && (
+            <Link to="/admin/messages" className="flex items-center gap-3 bg-sky-500/10 border border-sky-500/20 text-sky-300 rounded-xl px-4 py-3 text-sm hover:bg-sky-500/20 transition-colors">
+              <MessageSquare size={16} className="shrink-0" />
+              <span><strong>{messageStats?.open}</strong> open message thread{messageStats?.open !== 1 ? 's' : ''} from providers</span>
             </Link>
           )}
         </div>
@@ -99,7 +119,9 @@ export default function AdminDashboard() {
           {[
             { label: 'Review Providers', href: '/admin/providers', badge: providerStats?.pending },
             { label: 'Review Resources', href: '/admin/resources', badge: resourceStats?.pending },
+            { label: 'Add Resource',     href: '/admin/resources/new', badge: 0 },
             { label: 'View Bookings',    href: '/admin/bookings',  badge: bookingStats?.pending },
+            { label: 'Messages',         href: '/admin/messages',  badge: messageStats?.open },
             { label: 'Manage FAQ',       href: '/admin/faq',       badge: 0 },
           ].map(({ label, href, badge }) => (
             <Link

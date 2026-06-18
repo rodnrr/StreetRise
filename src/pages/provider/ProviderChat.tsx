@@ -15,19 +15,18 @@ export default function ProviderChat() {
   const [newDescription, setNewDescription] = useState('')
   const [messageText, setMessageText] = useState('')
 
-  if (!providerId) return <div className="text-gray-400">Not authenticated</div>
-
   // Fetch conversations for this provider
   const { data: conversations, isLoading: conversationsLoading } = useQuery({
     queryKey: ['provider-conversations', providerId],
     queryFn: async () => {
       const { data, error } = await db.conversations()
         .select('*')
-        .eq('provider_id', providerId)
-        .order('updated_at', { ascending: false }) as any
+        .eq('provider_id', providerId!)
+        .order('updated_at', { ascending: false })
       if (error) throw error
-      return (data || []) as any[]
+      return data ?? []
     },
+    enabled: !!providerId,
   })
 
   // Fetch messages for selected conversation
@@ -38,9 +37,9 @@ export default function ProviderChat() {
       const { data, error } = await db.messages()
         .select('*')
         .eq('conversation_id', selectedConversationId)
-        .order('created_at', { ascending: true }) as any
+        .order('created_at', { ascending: true })
       if (error) throw error
-      return (data || []) as any[]
+      return data ?? []
     },
     enabled: !!selectedConversationId,
   })
@@ -53,9 +52,9 @@ export default function ProviderChat() {
       const { data, error } = await db.conversations()
         .select('*')
         .eq('id', selectedConversationId)
-        .single() as any
+        .single()
       if (error) throw error
-      return data as any
+      return data
     },
     enabled: !!selectedConversationId,
   })
@@ -67,13 +66,13 @@ export default function ProviderChat() {
         throw new Error('Subject is required')
       }
       const { error } = await db.conversations().insert({
-        provider_id: providerId,
+        provider_id: providerId!,
         admin_id: null,
         subject: newSubject,
         description: newDescription,
         created_by_admin: false,
         status: 'open',
-      } as any)
+      })
       if (error) throw error
     },
     onSuccess: () => {
@@ -97,7 +96,7 @@ export default function ProviderChat() {
         sender_id: providerId,
         message: messageText.trim(),
         is_admin: false,
-      } as any)
+      })
       if (error) throw error
     },
     onSuccess: () => {
@@ -110,6 +109,8 @@ export default function ProviderChat() {
       toast.error('Failed to send message', err.message)
     },
   })
+
+  if (!providerId) return <div className="text-gray-400">Not authenticated</div>
 
   return (
     <div className="space-y-4">
