@@ -38,7 +38,10 @@ interface ResourceForm {
   name: string
   description: string
   category: ResourceCategory
-  address: string
+  street: string
+  city: string
+  state: string
+  zip: string
   lat: number
   lng: number
   phone: string
@@ -60,7 +63,10 @@ export default function AdminResourceCreate() {
     name: '',
     description: '',
     category: 'other',
-    address: '',
+    street: '',
+    city: '',
+    state: 'FL',
+    zip: '',
     lat: 27.9506,
     lng: -82.4572,
     phone: '',
@@ -89,24 +95,25 @@ export default function AdminResourceCreate() {
         throw new Error('Provider, name, and category are required')
       }
 
+      const hasCoords = Number.isFinite(form.lat) && Number.isFinite(form.lng)
       const { error } = await db.resources().insert({
         provider_id: form.provider_id,
         name: form.name,
         description: form.description,
         category: form.category,
-        address: { display: form.address },
-        lat: form.lat,
-        lng: form.lng,
+        address: { street: form.street, city: form.city, state: form.state, zip: form.zip },
+        lat: hasCoords ? form.lat : null,
+        lng: hasCoords ? form.lng : null,
         phone: form.phone || null,
         email: form.email || null,
         website: form.website || null,
         availability_status: form.availability_status,
-        beds_total: form.beds_total || null,
-        beds_available: form.beds_available || null,
+        beds_total: form.beds_total ?? null,
+        beds_available: form.beds_available ?? null,
         is_active: true,
         verification_status: 'verified',
-        is_map_ready: form.lat && form.lng ? true : false,
-      } as any)
+        is_map_ready: hasCoords,
+      })
 
       if (error) throw error
     },
@@ -115,13 +122,16 @@ export default function AdminResourceCreate() {
       queryClient.invalidateQueries({ queryKey: ['admin-stats-resources'] })
 
       if (showAddAnother) {
-        // Reset form for adding another
+        // Reset form for adding another (keep the same provider)
         setForm({
           provider_id: form.provider_id,
           name: '',
           description: '',
           category: 'other',
-          address: '',
+          street: '',
+          city: '',
+          state: 'FL',
+          zip: '',
           lat: 27.9506,
           lng: -82.4572,
           phone: '',
@@ -211,14 +221,47 @@ export default function AdminResourceCreate() {
 
         {/* Address */}
         <div className="mb-6">
-          <label className="label">Address</label>
+          <label className="label">Street Address</label>
           <input
             type="text"
-            placeholder="123 Main St, Tampa, FL 33602"
-            value={form.address}
-            onChange={e => setForm({ ...form, address: e.target.value })}
+            placeholder="123 Main St"
+            value={form.street}
+            onChange={e => setForm({ ...form, street: e.target.value })}
             className="input w-full"
           />
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          <div className="col-span-2">
+            <label className="label">City</label>
+            <input
+              type="text"
+              placeholder="Tampa"
+              value={form.city}
+              onChange={e => setForm({ ...form, city: e.target.value })}
+              className="input w-full"
+            />
+          </div>
+          <div>
+            <label className="label">State</label>
+            <input
+              type="text"
+              placeholder="FL"
+              value={form.state}
+              onChange={e => setForm({ ...form, state: e.target.value })}
+              className="input w-full"
+            />
+          </div>
+          <div>
+            <label className="label">ZIP</label>
+            <input
+              type="text"
+              placeholder="33602"
+              value={form.zip}
+              onChange={e => setForm({ ...form, zip: e.target.value })}
+              className="input w-full"
+            />
+          </div>
         </div>
 
         {/* Lat/Lng */}

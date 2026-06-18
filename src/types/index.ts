@@ -257,6 +257,33 @@ export interface Booking {
   updated_at: string
 }
 
+// ------ Conversations / Messaging ------
+
+export type ConversationStatus = 'open' | 'resolved' | 'closed'
+
+export interface Conversation {
+  id: string
+  provider_id: string
+  admin_id: string | null
+  subject: string
+  description: string | null
+  status: ConversationStatus
+  created_by_admin: boolean
+  created_at: string
+  updated_at: string
+  last_message_at: string | null
+}
+
+export interface ConversationMessage {
+  id: string
+  conversation_id: string
+  sender_id: string | null
+  message: string
+  is_admin: boolean
+  created_at: string
+  updated_at: string
+}
+
 // ------ Work Exchange ------
 
 export type WorkExchangeType = 'volunteering' | 'paid' | 'skills_trade' | 'internship'

@@ -308,6 +308,45 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['donation_campaigns']['Insert']>
         Relationships: []
       }
+
+      conversations: {
+        Row: {
+          id: string
+          provider_id: string
+          admin_id: string | null
+          subject: string
+          description: string | null
+          status: string
+          created_by_admin: boolean
+          created_at: string
+          updated_at: string
+          last_message_at: string | null
+        }
+        Insert: Optional<
+          Omit<Database['public']['Tables']['conversations']['Row'], 'id' | 'created_at' | 'updated_at'>,
+          'admin_id' | 'description' | 'status' | 'created_by_admin' | 'last_message_at'
+        >
+        Update: Partial<Database['public']['Tables']['conversations']['Insert']>
+        Relationships: []
+      }
+
+      conversation_messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          sender_id: string | null
+          message: string
+          is_admin: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: Optional<
+          Omit<Database['public']['Tables']['conversation_messages']['Row'], 'id' | 'created_at' | 'updated_at'>,
+          'sender_id'
+        >
+        Update: Partial<Database['public']['Tables']['conversation_messages']['Insert']>
+        Relationships: []
+      }
     }
 
     Views: Record<string, never>
