@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle, XCircle, MapPin, Search, Pencil } from 'lucide-react'
+import { CheckCircle, XCircle, MapPin, Search, Pencil, Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { db } from '@/lib/supabase'
 import { useAuthStore, useToast } from '@/lib/store'
@@ -59,9 +59,14 @@ export default function AdminResources() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Resources</h1>
-        <p className="text-sm text-gray-400 mt-0.5">Review and verify resource listings</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Resources</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Review and verify resource listings</p>
+        </div>
+        <Link to="/admin/resources/new" className="btn-primary flex items-center gap-2">
+          <Plus size={16} /> Add Resource
+        </Link>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">

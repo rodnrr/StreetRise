@@ -1,5 +1,5 @@
 import { Outlet, NavLink, Navigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, ListChecks, CalendarDays, Briefcase, LogOut, Clock, XCircle, ShieldOff } from 'lucide-react'
+import { LayoutDashboard, ListChecks, CalendarDays, Briefcase, LogOut, Clock, XCircle, ShieldOff, MessageSquare } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuthStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
@@ -9,6 +9,7 @@ const LINKS = [
   { to: '/portal/dashboard', label: 'Dashboard',    icon: LayoutDashboard },
   { to: '/portal/listings',  label: 'Listings',     icon: ListChecks },
   { to: '/portal/bookings',  label: 'Bookings',     icon: CalendarDays },
+  { to: '/portal/messages',  label: 'Messages',     icon: MessageSquare },
   { to: '/portal/work',      label: 'Work Exchange', icon: Briefcase },
 ]
 

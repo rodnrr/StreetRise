@@ -24,6 +24,7 @@ const ProviderDashboard    = lazy(() => import('@/pages/provider/ProviderDashboa
 const ProviderListings     = lazy(() => import('@/pages/provider/ProviderListings'))
 const ProviderListingEdit  = lazy(() => import('@/pages/provider/ProviderListingEdit'))
 const ProviderBookings     = lazy(() => import('@/pages/provider/ProviderBookings'))
+const ProviderChat         = lazy(() => import('@/pages/provider/ProviderChat'))
 const ProviderWorkExchange = lazy(() => import('@/pages/provider/ProviderWorkExchange'))
 const WorkExchangeEdit     = lazy(() => import('@/pages/provider/WorkExchangeEdit'))
 const ProviderOnboarding   = lazy(() => import('@/pages/provider/ProviderOnboarding'))
@@ -35,7 +36,9 @@ const AdminProviders       = lazy(() => import('@/pages/admin/AdminProviders'))
 const AdminProviderEdit    = lazy(() => import('@/pages/admin/AdminProviderEdit'))
 const AdminResources       = lazy(() => import('@/pages/admin/AdminResources'))
 const AdminResourceEdit    = lazy(() => import('@/pages/admin/AdminResourceEdit'))
+const AdminResourceCreate  = lazy(() => import('@/pages/admin/AdminResourceCreate'))
 const AdminBookings        = lazy(() => import('@/pages/admin/AdminBookings'))
+const AdminChat            = lazy(() => import('@/pages/admin/AdminChat'))
 const AdminFaq             = lazy(() => import('@/pages/admin/AdminFaq'))
 
 const Loading = () => (
@@ -75,6 +78,7 @@ export default function App() {
           <Route path="listings/new" element={<ProviderListingEdit />} />
           <Route path="listings/:id" element={<ProviderListingEdit />} />
           <Route path="bookings"     element={<ProviderBookings />} />
+          <Route path="messages"     element={<ProviderChat />} />
           <Route path="work"         element={<ProviderWorkExchange />} />
           <Route path="work/new"     element={<WorkExchangeEdit />} />
           <Route path="work/:id"     element={<WorkExchangeEdit />} />
@@ -87,8 +91,10 @@ export default function App() {
           <Route path="providers"        element={<AdminProviders />} />
           <Route path="providers/:id"    element={<AdminProviderEdit />} />
           <Route path="resources"        element={<AdminResources />} />
+          <Route path="resources/new"    element={<AdminResourceCreate />} />
           <Route path="resources/:id"    element={<AdminResourceEdit />} />
           <Route path="bookings"         element={<AdminBookings />} />
+          <Route path="messages"         element={<AdminChat />} />
           <Route path="faq"              element={<AdminFaq />} />
         </Route>
       </Routes>
