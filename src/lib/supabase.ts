@@ -26,13 +26,15 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
 // ---- Typed table helpers ----
 
 export const db = {
-  resources:       () => supabase.from('resources'),
-  providers:       () => supabase.from('providers'),
-  bookings:        () => supabase.from('bookings'),
-  work_exchanges:  () => supabase.from('work_exchanges'),
-  faq:             () => supabase.from('faq'),
-  moderation_logs: () => supabase.from('moderation_logs'),
-  donations:       () => supabase.from('donation_campaigns'),
+  resources:        () => supabase.from('resources'),
+  providers:        () => supabase.from('providers'),
+  bookings:         () => supabase.from('bookings'),
+  work_exchanges:   () => supabase.from('work_exchanges'),
+  faq:              () => supabase.from('faq'),
+  moderation_logs:  () => supabase.from('moderation_logs'),
+  donations:        () => supabase.from('donation_campaigns'),
+  conversations:    () => supabase.from('conversations'),
+  messages:         () => supabase.from('conversation_messages'),
 }
 
 // ---- Realtime channels ----
