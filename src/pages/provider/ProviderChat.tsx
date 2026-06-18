@@ -153,9 +153,9 @@ export default function ProviderChat() {
                 />
               </div>
               <div>
-                <label className="label">Message (optional)</label>
+                <label className="label">Context or background (optional)</label>
                 <textarea
-                  placeholder="Tell us what you need…"
+                  placeholder="Add any details or background that would help our team understand your request…"
                   value={newDescription}
                   onChange={e => setNewDescription(e.target.value)}
                   rows={3}

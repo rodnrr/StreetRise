@@ -182,9 +182,9 @@ export default function AdminChat() {
                 />
               </div>
               <div>
-                <label className="label">Description (optional)</label>
+                <label className="label">Context or background (optional)</label>
                 <textarea
-                  placeholder="Add context…"
+                  placeholder="Internal note for your team (not shown to provider until you message)…"
                   value={newDescription}
                   onChange={e => setNewDescription(e.target.value)}
                   rows={3}
@@ -246,11 +246,17 @@ export default function AdminChat() {
           {selectedConversationId ? (
             <>
               {/* Header */}
-              <div className="pb-4 border-b border-gray-700">
+              <div className="pb-4 border-b border-gray-700 space-y-2">
                 <h2 className="font-semibold text-white">{selectedConversation?.subject}</h2>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-400">
                   {selectedConversation?.providers?.organization_name}
                 </p>
+                {selectedConversation?.description && (
+                  <div className="bg-gray-700/50 rounded p-3 text-xs text-gray-300 border-l-2 border-gray-600">
+                    <p className="text-gray-400 font-medium mb-1">Context provided by provider:</p>
+                    <p>{selectedConversation.description}</p>
+                  </div>
+                )}
               </div>
 
               {/* Messages */}
