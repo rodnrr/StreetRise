@@ -153,9 +153,9 @@ export default function ProviderChat() {
                 />
               </div>
               <div>
-                <label className="label">Message (optional)</label>
+                <label className="label">Context or background (optional)</label>
                 <textarea
-                  placeholder="Tell us what you need…"
+                  placeholder="Add any details or background that would help our team understand your request…"
                   value={newDescription}
                   onChange={e => setNewDescription(e.target.value)}
                   rows={3}
@@ -182,7 +182,7 @@ export default function ProviderChat() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)] md:pb-0 pb-24">
         {/* Conversations List */}
         <div className="lg:col-span-1 card border border-gray-200 p-4 overflow-y-auto">
           <h2 className="font-semibold text-gray-900 mb-3">Your Conversations</h2>
@@ -241,7 +241,7 @@ export default function ProviderChat() {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto py-4 space-y-3">
+              <div className="flex-1 min-h-0 overflow-y-auto py-4 space-y-3">
                 {messagesLoading ? (
                   <div className="text-gray-500 text-sm">Loading messages…</div>
                 ) : messages?.length === 0 ? (

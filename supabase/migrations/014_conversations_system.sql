@@ -49,50 +49,29 @@ CREATE TRIGGER conversation_messages_updated_at
   BEFORE UPDATE ON conversation_messages
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
--- ── Trigger: bump parent conversation when a message is added ─────
--- Keeps conversation list ordering accurate (sorts by updated_at DESC)
--- and records last_message_at.
-
-CREATE OR REPLACE FUNCTION bump_conversation_on_message()
-RETURNS TRIGGER AS $$
-BEGIN
-  UPDATE conversations
-  SET last_message_at = NEW.created_at,
-      updated_at      = NEW.created_at
-  WHERE id = NEW.conversation_id;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE TRIGGER conversation_messages_bump_parent
-  AFTER INSERT ON conversation_messages
-  FOR EACH ROW EXECUTE FUNCTION bump_conversation_on_message();
-
 -- ── RLS Policies ─────────────────────────────────────────────────
 
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conversation_messages ENABLE ROW LEVEL SECURITY;
 
--- Conversations: a provider sees only their own; an admin sees all.
+-- NOTE: These policies were later corrected in migration 015.
+-- Providers can see only their own conversations; admins can see all.
 CREATE POLICY conversations_read ON conversations
   FOR SELECT USING (
-    provider_id = my_provider_id() OR is_admin()
+    my_provider_id() = provider_id OR
+    (is_admin() AND my_provider_id() = admin_id)
   );
 
--- A provider can open a conversation for themselves; an admin can open
--- a conversation with any provider.
 CREATE POLICY conversations_insert ON conversations
   FOR INSERT WITH CHECK (
     provider_id = my_provider_id() OR is_admin()
   );
 
--- A provider can update their own conversation; an admin can update any
--- (e.g. claim it, mark resolved/closed).
 CREATE POLICY conversations_update ON conversations
   FOR UPDATE USING (
-    provider_id = my_provider_id() OR is_admin()
+    my_provider_id() = provider_id OR is_admin()
   ) WITH CHECK (
-    provider_id = my_provider_id() OR is_admin()
+    my_provider_id() = provider_id OR is_admin()
   );
 
 -- Messages: readable by participants of the parent conversation.

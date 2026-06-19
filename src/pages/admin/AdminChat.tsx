@@ -182,9 +182,9 @@ export default function AdminChat() {
                 />
               </div>
               <div>
-                <label className="label">Description (optional)</label>
+                <label className="label">Context or background (optional)</label>
                 <textarea
-                  placeholder="Add context…"
+                  placeholder="Internal note for your team (not shown to provider until you message)…"
                   value={newDescription}
                   onChange={e => setNewDescription(e.target.value)}
                   rows={3}
@@ -211,7 +211,7 @@ export default function AdminChat() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)] md:pb-0 pb-24">
         {/* Conversations List */}
         <div className="lg:col-span-1 bg-gray-800 rounded-2xl p-4 overflow-y-auto border border-gray-700">
           <h2 className="font-semibold text-white mb-3">Conversations</h2>
@@ -246,15 +246,21 @@ export default function AdminChat() {
           {selectedConversationId ? (
             <>
               {/* Header */}
-              <div className="pb-4 border-b border-gray-700">
+              <div className="pb-4 border-b border-gray-700 space-y-2">
                 <h2 className="font-semibold text-white">{selectedConversation?.subject}</h2>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-400">
                   {selectedConversation?.providers?.organization_name}
                 </p>
+                {selectedConversation?.description && (
+                  <div className="bg-gray-700/50 rounded p-3 text-xs text-gray-300 border-l-2 border-gray-600">
+                    <p className="text-gray-400 font-medium mb-1">Context provided by provider:</p>
+                    <p>{selectedConversation.description}</p>
+                  </div>
+                )}
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto py-4 space-y-3">
+              <div className="flex-1 min-h-0 overflow-y-auto py-4 space-y-3">
                 {messagesLoading ? (
                   <div className="text-gray-400 text-sm">Loading messages…</div>
                 ) : messages?.length === 0 ? (
