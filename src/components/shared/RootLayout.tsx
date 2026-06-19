@@ -1,5 +1,5 @@
 import { Outlet, NavLink, Link, useLocation } from 'react-router-dom'
-import { MapPin, Heart, HelpCircle, Menu, X, UserPlus } from 'lucide-react'
+import { MapPin, Heart, Briefcase, HelpCircle, Menu, X, UserPlus } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import clsx from 'clsx'
 import ToastContainer from './ToastContainer'
@@ -7,6 +7,7 @@ import Footer from './Footer'
 
 const NAV_LINKS = [
   { to: '/map',    label: 'Find Resources', icon: MapPin },
+  { to: '/work',   label: 'Work Exchange',  icon: Briefcase },
   { to: '/donate', label: 'Donate',         icon: Heart },
   { to: '/faq',    label: 'FAQ',            icon: HelpCircle },
 ]
