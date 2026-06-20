@@ -4,7 +4,7 @@ import { db } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
 import { useToast } from '@/lib/store'
 import { MessageSquare, Plus, X } from 'lucide-react'
-import type { Conversation } from '@/types'
+import type { Conversation, ConversationAdminNote } from '@/types'
 
 type ConversationWithProvider = Conversation & { providers?: { organization_name: string } | null }
 
@@ -71,21 +71,47 @@ export default function AdminChat() {
     enabled: !!selectedConversationId,
   })
 
+  // Fetch admin notes for selected conversation (admin-only)
+  const { data: adminNotes } = useQuery({
+    queryKey: ['conversation-admin-notes', selectedConversationId],
+    queryFn: async () => {
+      if (!selectedConversationId) return []
+      const { data, error } = await db.adminNotes()
+        .select('*')
+        .eq('conversation_id', selectedConversationId)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data ?? []
+    },
+    enabled: !!selectedConversationId,
+  })
+
   // Create new conversation
   const createConversation = useMutation({
     mutationFn: async () => {
       if (!newSubject || !selectedProvider) {
         throw new Error('Subject and provider are required')
       }
-      const { error } = await db.conversations().insert({
+      const { data: conversationData, error: convError } = await db.conversations().insert({
         provider_id: selectedProvider,
         admin_id: providerId,
         subject: newSubject,
-        description: newDescription,
+        description: null,
         created_by_admin: true,
         status: 'open',
-      })
-      if (error) throw error
+      }).select()
+      if (convError) throw convError
+      if (!conversationData || conversationData.length === 0) throw new Error('Failed to create conversation')
+
+      // Create separate admin note if provided
+      if (newDescription && conversationData[0].id) {
+        const { error: noteError } = await db.adminNotes().insert({
+          conversation_id: conversationData[0].id,
+          admin_id: providerId,
+          notes: newDescription,
+        })
+        if (noteError) throw noteError
+      }
     },
     onSuccess: () => {
       toast.success('Conversation created', 'You can now send messages to this provider')
@@ -182,9 +208,9 @@ export default function AdminChat() {
                 />
               </div>
               <div>
-                <label className="label">Context or background (optional)</label>
+                <label className="label">Admin Notes (optional, protected)</label>
                 <textarea
-                  placeholder="Internal note for your team (not shown to provider until you message)…"
+                  placeholder="Internal triage notes. Only admins can view—never shared with provider."
                   value={newDescription}
                   onChange={e => setNewDescription(e.target.value)}
                   rows={3}
@@ -255,6 +281,14 @@ export default function AdminChat() {
                   <div className="bg-gray-700/50 rounded p-3 text-xs text-gray-300 border-l-2 border-gray-600">
                     <p className="text-gray-400 font-medium mb-1">Context provided by provider:</p>
                     <p>{selectedConversation.description}</p>
+                  </div>
+                )}
+                {adminNotes && adminNotes.length > 0 && (
+                  <div className="bg-blue-900/40 rounded p-3 text-xs text-blue-100 border-l-2 border-blue-600">
+                    <p className="text-blue-300 font-medium mb-1">📝 Admin Notes (Internal Only):</p>
+                    {adminNotes.map(note => (
+                      <p key={note.id} className="mb-1 last:mb-0">{note.notes}</p>
+                    ))}
                   </div>
                 )}
               </div>

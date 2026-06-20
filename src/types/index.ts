@@ -284,6 +284,15 @@ export interface ConversationMessage {
   updated_at: string
 }
 
+export interface ConversationAdminNote {
+  id: string
+  conversation_id: string
+  admin_id: string | null
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
 // ------ Work Exchange ------
 
 export type WorkExchangeType = 'volunteering' | 'paid' | 'skills_trade' | 'internship'

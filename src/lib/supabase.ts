@@ -35,6 +35,7 @@ export const db = {
   donations:        () => supabase.from('donation_campaigns'),
   conversations:    () => supabase.from('conversations'),
   messages:         () => supabase.from('conversation_messages'),
+  adminNotes:       () => supabase.from('conversation_admin_notes'),
 }
 
 // ---- Realtime channels ----
