@@ -12,7 +12,7 @@
 CREATE TABLE conversation_admin_notes (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   conversation_id     UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-  admin_id            UUID NOT NULL REFERENCES providers(id) ON DELETE SET NULL,
+  admin_id            UUID REFERENCES providers(id) ON DELETE SET NULL,
   notes               TEXT NOT NULL,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
