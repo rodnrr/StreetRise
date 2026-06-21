@@ -347,6 +347,23 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['conversation_messages']['Insert']>
         Relationships: []
       }
+
+      conversation_admin_notes: {
+        Row: {
+          id: string
+          conversation_id: string
+          admin_id: string | null
+          notes: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: Optional<
+          Omit<Database['public']['Tables']['conversation_admin_notes']['Row'], 'id' | 'created_at' | 'updated_at'>,
+          'admin_id'
+        >
+        Update: Partial<Database['public']['Tables']['conversation_admin_notes']['Insert']>
+        Relationships: []
+      }
     }
 
     Views: Record<string, never>

@@ -4,7 +4,7 @@ import { db } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
 import { useToast } from '@/lib/store'
 import { MessageSquare, Plus, X } from 'lucide-react'
-import type { Conversation, ConversationAdminNote } from '@/types'
+import type { Conversation } from '@/types'
 
 type ConversationWithProvider = Conversation & { providers?: { organization_name: string } | null }
 
