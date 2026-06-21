@@ -8,6 +8,7 @@ import { useMapStore, useToast } from '@/lib/store'
 import { subscribeToBedUpdates } from '@/lib/supabase'
 import {
   fetchMapResources,
+  hasActiveSearchFilter,
   countActiveFilters,
   activeFilterSummary,
   QUICK_FILTER_DEFS,
@@ -105,29 +106,23 @@ export default function MapPage() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [mapCenter.lat, mapCenter.lng]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // When a category/quick-filter/search is active the radius bounding box is
+  // skipped, so the map center no longer affects which rows come back.
+  // Use a stable 'global' key in that case to avoid refetching on every pan.
+  const filterIsActive = hasActiveSearchFilter(filters, searchQuery)
+  const locationKey    = filterIsActive ? 'global' : stableCenter
+
   // Fetch resources
   const { data: resources = [], refetch } = useQuery({
-    queryKey: ['resources', stableCenter, filters],
+    queryKey: ['resources', locationKey, filters, searchQuery],
     queryFn:  () => fetchMapResources(stableCenter.lat, stableCenter.lng, filters, searchQuery),
     staleTime: 1000 * 60,
   })
 
-  // Re-run when search query changes (client-side filter, but refetch keeps it fresh)
-  const { data: filtered = resources } = useQuery({
-    queryKey: ['resources-filtered', resources, searchQuery],
-    queryFn: async () => {
-      if (!searchQuery.trim()) return resources
-      const q = searchQuery.toLowerCase().trim()
-      return resources.filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          r.category.toLowerCase().includes(q) ||
-          (r.resource_type?.toLowerCase() ?? '').includes(q) ||
-          (r.address.city?.toLowerCase() ?? '').includes(q),
-      )
-    },
-    staleTime: 0,
-  })
+  // The server-side fetchMapResources already applies the text search when
+  // searchQuery is non-empty, so 'resources' is already filtered correctly.
+  // Keep this secondary query only for the client-side list view refresh.
+  const filtered = resources
 
   // Subscribe to realtime bed updates
   useEffect(() => {
