@@ -1,7 +1,9 @@
 -- ================================================================
--- StreetRise — Migration 021: Fix seeded provider claim state
+-- StreetRise — Migration 027: Fix seeded provider claim state
+-- (Originally numbered 021; renumbered to 027 so it runs after the
+--  renumbered claim-status migration 023 that adds these columns.)
 -- The three Central Florida providers added in migration 020 were
--- inserted AFTER migration 010, so they silently took the column
+-- inserted AFTER migration 023, so they silently took the column
 -- defaults claim_status='claimed' / source_type='self_registered',
 -- and were inserted as verification_status='verified'.
 --

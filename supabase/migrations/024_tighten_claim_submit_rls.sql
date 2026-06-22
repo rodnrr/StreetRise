@@ -1,5 +1,5 @@
 -- ================================================================
--- StreetRise — Migration 011: Tighten providers_claim_submit RLS
+-- StreetRise — Migration 024: Tighten providers_claim_submit RLS
 -- Prevents a claimant from modifying seeded org metadata during
 -- the claim UPDATE. Only user_id and claim_status may change.
 -- ================================================================

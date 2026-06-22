@@ -1,5 +1,8 @@
 -- ================================================================
--- StreetRise — Migration 010: Provider Claim Status + Source Type
+-- StreetRise — Migration 023: Provider Claim Status + Source Type
+-- (Originally numbered 010; renumbered to 023 to resolve a duplicate
+--  010/011 collision with the verification/taxonomy migrations that
+--  shipped on main. This claim feature is not yet applied to live.)
 -- Enables seeded org records to exist before a provider claims them.
 -- ================================================================
 

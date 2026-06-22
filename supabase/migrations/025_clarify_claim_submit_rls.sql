@@ -1,5 +1,5 @@
 -- ================================================================
--- StreetRise — Migration 012: Clarify providers_claim_submit RLS
+-- StreetRise — Migration 025: Clarify providers_claim_submit RLS
 -- Replaces 9 correlated subqueries with a single EXISTS that uses
 -- an explicit alias (cur) for the current-row read.
 -- In WITH CHECK, the unaliased table name refers to the NEW row;
