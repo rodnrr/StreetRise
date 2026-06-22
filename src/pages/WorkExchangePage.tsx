@@ -21,17 +21,22 @@ export default function WorkExchangePage() {
   const { mapCenter }       = useMapStore()
   const [search, setSearch] = useState('')
   const [type, setType]     = useState<string>('all')
+  const [scope, setScope]   = useState<'near' | 'all'>('all')
 
   const { data: listings = [], isLoading } = useQuery<WorkExchange[]>({
-    queryKey: ['work-exchanges', mapCenter],
+    queryKey: ['work-exchanges', scope, scope === 'near' ? mapCenter : null],
     queryFn: async () => {
-      const { data } = await db.work_exchanges()
+      let query = db.work_exchanges()
         .select('*, providers(organization_name, contact_email, website)')
         .eq('is_active', true)
-        .gte('lat', mapCenter.lat - 0.5)
-        .lte('lat', mapCenter.lat + 0.5)
-        .gte('lng', mapCenter.lng - 0.5)
-        .lte('lng', mapCenter.lng + 0.5)
+      if (scope === 'near') {
+        query = query
+          .gte('lat', mapCenter.lat - 0.5)
+          .lte('lat', mapCenter.lat + 0.5)
+          .gte('lng', mapCenter.lng - 0.5)
+          .lte('lng', mapCenter.lng + 0.5)
+      }
+      const { data } = await query
         .order('created_at', { ascending: false })
         .limit(50)
       return (data ?? []) as unknown as WorkExchange[]
@@ -49,11 +54,31 @@ export default function WorkExchangePage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 pb-24 md:pb-8">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-4">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <Briefcase size={24} className="text-primary-600" /> Work Exchange
         </h1>
-        <p className="text-gray-500 text-sm mt-1">Volunteer, paid, and skills-trade opportunities near you</p>
+        <p className="text-gray-500 text-sm mt-1">
+          {scope === 'all'
+            ? 'Volunteer, paid, and skills-trade opportunities across the region'
+            : 'Volunteer, paid, and skills-trade opportunities near you'}
+        </p>
+      </div>
+
+      {/* Scope toggle */}
+      <div className="flex gap-2 mb-4">
+        {([
+          ['all', 'All opportunities'],
+          ['near', 'Near me'],
+        ] as const).map(([value, label]) => (
+          <button key={value} onClick={() => setScope(value)}
+            className={clsx('badge py-1.5 px-3 cursor-pointer transition-colors text-xs', {
+              'bg-primary-600 text-white': scope === value,
+              'bg-gray-100 text-gray-600 hover:bg-gray-200': scope !== value,
+            })}>
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Search */}
@@ -82,8 +107,14 @@ export default function WorkExchangePage() {
       {!isLoading && filtered.length === 0 && (
         <div className="text-center py-16">
           <Briefcase size={32} className="text-gray-200 mx-auto mb-2" />
-          <p className="text-gray-400">No opportunities found near you.</p>
-          <p className="text-sm text-gray-300 mt-1">Try adjusting your location on the map.</p>
+          <p className="text-gray-400">
+            {scope === 'near' ? 'No opportunities found near you.' : 'No opportunities found.'}
+          </p>
+          <p className="text-sm text-gray-300 mt-1">
+            {scope === 'near'
+              ? 'Try “All opportunities” to see listings across the region.'
+              : 'Try adjusting your search or filters.'}
+          </p>
         </div>
       )}
 

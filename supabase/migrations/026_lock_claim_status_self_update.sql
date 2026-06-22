@@ -1,5 +1,5 @@
 -- ================================================================
--- StreetRise — Migration 013: Lock claim_status from self-update
+-- StreetRise — Migration 026: Lock claim_status from self-update
 -- Closes the self-approval gap in providers_update_self.
 --
 -- Without this fix:
