@@ -6,11 +6,11 @@ import RootLayout    from '@/components/shared/RootLayout'
 import ProviderLayout from '@/components/provider/ProviderLayout'
 import AdminLayout   from '@/components/admin/AdminLayout'
 
-// Public pages (eagerly loaded for LCP)
-import MapPage       from '@/pages/MapPage'
+// HomePage is the only eagerly loaded page (LCP critical path)
 import HomePage      from '@/pages/HomePage'
 
 // Lazy pages — split by route for smaller initial bundle
+const MapPage              = lazy(() => import('@/pages/MapPage'))
 const ResourceDetailPage   = lazy(() => import('@/pages/ResourceDetailPage'))
 const BookingPage          = lazy(() => import('@/pages/BookingPage'))
 const WorkExchangePage     = lazy(() => import('@/pages/WorkExchangePage'))
