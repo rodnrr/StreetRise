@@ -90,7 +90,13 @@ export default defineConfig({
           }
         ]
       }
-    })
+    }),
+    visualizer({
+      filename: 'dist/stats.html',
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+    }),
   ],
   resolve: {
     alias: {
@@ -107,14 +113,7 @@ export default defineConfig({
           query: ['@tanstack/react-query'],
           supabase: ['@supabase/supabase-js']
         }
-      },
-      plugins: [
-        visualizer({
-          filename: 'dist/stats.html',
-          gzipSize: true,
-          brotliSize: true,
-        })
-      ]
+      }
     }
   }
 })
