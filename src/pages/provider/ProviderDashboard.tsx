@@ -35,7 +35,7 @@ export default function ProviderDashboard() {
   })
 
   const { data: recentBookings = [] } = useQuery<Booking[]>({
-    queryKey: ['provider-bookings-recent', providerId],
+    queryKey: ['provider-bookings-recent', providerId, resources.map(r => r.id).join(',')],
     queryFn: async () => {
       const ids = resources.map(r => r.id)
       if (!ids.length) return []
@@ -46,7 +46,7 @@ export default function ProviderDashboard() {
         .limit(5)
       return (data ?? []) as unknown as Booking[]
     },
-    enabled: resources.length > 0,
+    enabled: !!providerId,
   })
 
   const pendingCount   = recentBookings.filter(b => b.status === 'pending').length
@@ -55,12 +55,17 @@ export default function ProviderDashboard() {
   const shelters       = resources.filter(r => r.category === 'shelter')
 
   const STATUS_STYLE: Record<string, string> = {
-    pending:    'badge-pending',
-    confirmed:  'badge-verified',
-    waitlisted: 'badge bg-orange-50 text-orange-700',
-    cancelled:  'badge bg-gray-100 text-gray-500',
-    completed:  'badge-available',
-    no_show:    'badge bg-red-50 text-red-700',
+    pending:     'badge-pending',
+    confirmed:   'badge-verified',
+    declined:    'badge-rejected',
+    needs_info:  'badge bg-yellow-50 text-yellow-700',
+    contacted:   'badge bg-blue-50 text-blue-700',
+    no_response: 'badge bg-orange-50 text-orange-700',
+    closed:      'badge bg-gray-100 text-gray-500',
+    waitlisted:  'badge bg-orange-50 text-orange-700',
+    cancelled:   'badge bg-gray-100 text-gray-500',
+    completed:   'badge-available',
+    no_show:     'badge bg-red-50 text-red-700',
   }
 
   return (
@@ -115,7 +120,7 @@ export default function ProviderDashboard() {
                     {b.children > 0 ? `, ${b.children} child${b.children !== 1 ? 'ren' : ''}` : ''}
                   </p>
                 </div>
-                <span className={STATUS_STYLE[b.status] ?? 'badge'}>{b.status}</span>
+                <span className={STATUS_STYLE[b.status] ?? 'badge'}>{b.status.replace('_', ' ')}</span>
                 <p className="text-xs text-gray-400 shrink-0">{new Date(b.created_at).toLocaleDateString()}</p>
               </div>
             ))}
