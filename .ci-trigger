@@ -1,0 +1,2 @@
+trigger: typecheck-fix-2026-06-29
+reason: run CI after AdminDashboard booking stat type fix
