@@ -10,14 +10,22 @@ import { useToast } from '@/lib/store'
 import type { Resource } from '@/types'
 
 const schema = z.object({
-  requester_name:  z.string().min(2, 'Name required'),
-  requester_phone: z.string().optional(),
-  requester_email: z.string().email().optional().or(z.literal('')),
+  requester_name:  z.string().trim().min(2, 'Name required'),
+  requester_phone: z.string().trim().optional(),
+  requester_email: z.string().trim().email('Enter a valid email').optional().or(z.literal('')),
+  contact_preference: z.enum(['phone', 'email', 'either']),
+  best_contact_time: z.string().trim().max(120).optional(),
+  contact_consent: z.boolean().refine(Boolean, 'Contact consent is required'),
   adults:          z.coerce.number().int().min(1, 'At least 1 adult'),
   children:        z.coerce.number().int().min(0).default(0),
   check_in_date:   z.string().optional(),
   check_out_date:  z.string().optional(),
   notes:           z.string().max(500).optional(),
+}).superRefine((data, ctx) => {
+  if (!data.requester_phone && !data.requester_email) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['requester_phone'], message: 'Phone or email required' })
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['requester_email'], message: 'Phone or email required' })
+  }
 })
 type FormData = z.infer<typeof schema>
 
@@ -57,21 +65,27 @@ export default function BookingPage() {
   })
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } =
-    useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { adults: 1, children: 0 } })
+    useForm<FormData>({
+      resolver: zodResolver(schema),
+      defaultValues: { adults: 1, children: 0, contact_preference: 'either', contact_consent: false },
+    })
 
   const submit = useMutation({
     mutationFn: async (data: FormData) => {
       const { error } = await db.bookings().insert({
-        resource_id:     resourceId!,
-        requester_name:  data.requester_name,
-        requester_phone: data.requester_phone || null,
-        requester_email: data.requester_email || null,
-        adults:          data.adults,
-        children:        data.children,
-        check_in_date:   data.check_in_date || null,
-        check_out_date:  data.check_out_date || null,
-        notes:           data.notes || null,
-        status:          'pending',
+        resource_id:          resourceId!,
+        requester_name:       data.requester_name,
+        requester_phone:      data.requester_phone || null,
+        requester_email:      data.requester_email || null,
+        contact_preference:   data.contact_preference,
+        best_contact_time:    data.best_contact_time || null,
+        contact_consent:      data.contact_consent,
+        adults:               data.adults,
+        children:             data.children,
+        check_in_date:        data.check_in_date || null,
+        check_out_date:       data.check_out_date || null,
+        notes:                data.notes || null,
+        status:               'pending',
       })
       if (error) throw error
     },
@@ -123,22 +137,38 @@ export default function BookingPage() {
         )}
       </div>
       <div className="card">
-        <h1 className="font-bold text-gray-900 text-lg mb-4">{getBookingLabel(resource, isFull)}</h1>
+        <h1 className="font-bold text-gray-900 text-lg mb-2">{getBookingLabel(resource, isFull)}</h1>
         <p className="text-sm text-warning-700 bg-warning-50 rounded-xl p-3 mb-4">This is a request, not a confirmed reservation.</p>
         <form onSubmit={handleSubmit(d => submit.mutate(d))} className="space-y-4">
           <div>
             <label className="label">Your name *</label>
-            <input {...register('requester_name')} className={errors.requester_name ? 'input-error' : 'input'} placeholder="First name is fine" />
+            <input {...register('requester_name')} className={errors.requester_name ? 'input-error' : 'input'} placeholder="First and last name" />
             {errors.requester_name && <p className="error-text">{errors.requester_name.message}</p>}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">Phone</label>
-              <input {...register('requester_phone')} type="tel" className="input" placeholder="Phone number" />
+              <input {...register('requester_phone')} type="tel" className={errors.requester_phone ? 'input-error' : 'input'} placeholder="Phone number" />
+              {errors.requester_phone && <p className="error-text">{errors.requester_phone.message}</p>}
             </div>
             <div>
               <label className="label">Email</label>
-              <input {...register('requester_email')} type="email" className="input" placeholder="Email address" />
+              <input {...register('requester_email')} type="email" className={errors.requester_email ? 'input-error' : 'input'} placeholder="Email address" />
+              {errors.requester_email && <p className="error-text">{errors.requester_email.message}</p>}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="label">Contact preference *</label>
+              <select {...register('contact_preference')} className="input">
+                <option value="either">Either</option>
+                <option value="phone">Phone</option>
+                <option value="email">Email</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Best contact time</label>
+              <input {...register('best_contact_time')} className="input" placeholder="Weekdays after 3 PM" />
             </div>
           </div>
           <div>
@@ -156,9 +186,16 @@ export default function BookingPage() {
             </div>
           </div>
           <div>
-            <label className="label flex items-center gap-1.5"><MessageSquare size={14} /> Notes</label>
+            <label className="label flex items-center gap-1.5"><MessageSquare size={14} /> Needs / details</label>
             <textarea {...register('notes')} className="input min-h-[70px] resize-none" />
           </div>
+          <label className="flex items-start gap-3 rounded-xl bg-gray-50 p-3 text-sm text-gray-700">
+            <input {...register('contact_consent')} type="checkbox" className="mt-1" />
+            <span>
+              I agree that StreetRise or the listed provider may contact me using the phone number or email I provide about this request.
+              {errors.contact_consent && <span className="error-text block mt-1">{errors.contact_consent.message}</span>}
+            </span>
+          </label>
           <button type="submit" disabled={isSubmitting || submit.isPending} className="btn-primary w-full btn-lg">
             {submit.isPending ? 'Sending request…' : getBookingLabel(resource, isFull)}
           </button>
