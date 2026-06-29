@@ -234,10 +234,17 @@ export interface Provider {
 export type BookingStatus =
   | 'pending'
   | 'confirmed'
+  | 'declined'
+  | 'needs_info'
+  | 'contacted'
+  | 'no_response'
+  | 'closed'
   | 'waitlisted'
   | 'cancelled'
   | 'completed'
   | 'no_show'
+
+export type ContactPreference = 'phone' | 'email' | 'either'
 
 export interface Booking {
   id: string
@@ -245,12 +252,20 @@ export interface Booking {
   resource?: Resource
   user_id?: string
   requester_name: string
-  requester_phone?: string
-  requester_email?: string
-  notes?: string
+  requester_phone?: string | null
+  requester_email?: string | null
+  contact_preference?: ContactPreference | null
+  best_contact_time?: string | null
+  contact_consent?: boolean | null
+  notes?: string | null
   status: BookingStatus
-  check_in_date?: string
-  check_out_date?: string
+  admin_notes?: string | null
+  provider_notes?: string | null
+  decision_note?: string | null
+  last_contacted_at?: string | null
+  decided_at?: string | null
+  check_in_date?: string | null
+  check_out_date?: string | null
   adults: number
   children: number
   created_at: string
