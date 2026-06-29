@@ -23,12 +23,10 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   },
 })
 
-// ---- Typed table helpers ----
-
 export const db = {
   resources:        () => supabase.from('resources'),
   providers:        () => supabase.from('providers'),
-  bookings:         () => supabase.from('bookings'),
+  bookings:         () => supabase.from('bookings') as any,
   work_exchanges:   () => supabase.from('work_exchanges'),
   faq:              () => supabase.from('faq'),
   moderation_logs:  () => supabase.from('moderation_logs'),
@@ -38,9 +36,6 @@ export const db = {
   adminNotes:       () => supabase.from('conversation_admin_notes'),
 }
 
-// ---- Realtime channels ----
-
-/** Subscribe to live bed availability updates for a list of resource IDs */
 export function subscribeToBedUpdates(
   resourceIds: string[],
   onUpdate: (resourceId: string, bedsAvailable: number, status: string) => void
@@ -63,7 +58,6 @@ export function subscribeToBedUpdates(
     .subscribe()
 }
 
-/** Subscribe to booking status changes for a specific user */
 export function subscribeToBookings(
   userId: string,
   onUpdate: (booking: Record<string, unknown>) => void
