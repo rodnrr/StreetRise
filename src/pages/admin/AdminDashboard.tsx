@@ -35,10 +35,10 @@ export default function AdminDashboard() {
     queryKey: ['admin-stats-bookings'],
     queryFn: async () => {
       const { data } = await db.bookings().select('status')
-      if (!data) return { total: 0, pending: 0 }
+      const rows = (data ?? []) as { status: string }[]
       return {
-        total:   data.length,
-        pending: data.filter(b => b.status === 'pending').length,
+        total:   rows.length,
+        pending: rows.filter((b: { status: string }) => b.status === 'pending').length,
       }
     },
   })
