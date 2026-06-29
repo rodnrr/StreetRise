@@ -37,7 +37,6 @@ const STATUS_LABEL: Record<string, string> = {
   closed:    'Closed',
 }
 
-// Shelter resources use bed/spot language; other service types use generic request language
 function getBookingLabel(resource: Resource, isFull: boolean): string {
   if (isFull) return 'Join the Waitlist'
   return resource.category === 'shelter' ? 'Request a Spot' : 'Request Help'
@@ -85,7 +84,7 @@ export default function BookingPage() {
       <CheckCircle size={60} className="text-success-600 mx-auto mb-4" />
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Request sent!</h1>
       <p className="text-gray-500 mb-2">Your request has been sent to <strong>{resource?.name}</strong>.</p>
-      <p className="text-gray-400 text-sm mb-8">The provider will review your request and reach out to confirm. Check your phone or email for a follow-up.</p>
+      <p className="text-gray-400 text-sm mb-8">This is a request, not a confirmed reservation.</p>
       <div className="flex flex-col gap-3">
         <Link to="/map" className="btn-primary">Find More Resources</Link>
         <Link to="/" className="btn-secondary">Return Home</Link>
@@ -106,8 +105,6 @@ export default function BookingPage() {
       <Link to={`/resources/${resourceId}`} className="flex items-center gap-2 text-sm text-gray-500 mb-5 hover:text-gray-700">
         <ArrowLeft size={16} /> Back to {resource.name}
       </Link>
-
-      {/* Resource summary */}
       <div className="card mb-5">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
@@ -124,78 +121,44 @@ export default function BookingPage() {
             <span><strong>{resource.beds_available ?? '?'}</strong> of <strong>{resource.beds_total}</strong> beds available</span>
           </div>
         )}
-        {isFull && (
-          <div className="mt-3 p-3 bg-warning-50 rounded-xl text-sm text-warning-600">
-            ⚠️ This resource is currently full. You can still submit a waitlist request.
-          </div>
-        )}
       </div>
-
-      {/* Booking form */}
       <div className="card">
-        <h1 className="font-bold text-gray-900 text-lg mb-4">
-          {getBookingLabel(resource, isFull)}
-        </h1>
-
+        <h1 className="font-bold text-gray-900 text-lg mb-4">{getBookingLabel(resource, isFull)}</h1>
+        <p className="text-sm text-warning-700 bg-warning-50 rounded-xl p-3 mb-4">This is a request, not a confirmed reservation.</p>
         <form onSubmit={handleSubmit(d => submit.mutate(d))} className="space-y-4">
-          {/* Identity */}
           <div>
             <label className="label">Your name *</label>
             <input {...register('requester_name')} className={errors.requester_name ? 'input-error' : 'input'} placeholder="First name is fine" />
             {errors.requester_name && <p className="error-text">{errors.requester_name.message}</p>}
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Phone <span className="text-gray-400 font-normal">(optional)</span></label>
-              <input {...register('requester_phone')} type="tel" className="input" placeholder="(213) 555-0100" />
+              <label className="label">Phone</label>
+              <input {...register('requester_phone')} type="tel" className="input" placeholder="Phone number" />
             </div>
             <div>
-              <label className="label">Email <span className="text-gray-400 font-normal">(optional)</span></label>
-              <input {...register('requester_email')} type="email" className="input" placeholder="you@email.com" />
+              <label className="label">Email</label>
+              <input {...register('requester_email')} type="email" className="input" placeholder="Email address" />
             </div>
           </div>
-
-          <p className="text-xs text-gray-400">📋 Contact info is only shared with this provider. You can submit anonymously.</p>
-
-          {/* Party size */}
           <div>
             <label className="label flex items-center gap-1.5"><Users size={14} /> Party size *</label>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Adults</label>
-                <input {...register('adults')} type="number" min={1} className={errors.adults ? 'input-error' : 'input'} />
-                {errors.adults && <p className="error-text">{errors.adults.message}</p>}
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Children</label>
-                <input {...register('children')} type="number" min={0} className="input" />
-              </div>
+              <input {...register('adults')} type="number" min={1} className={errors.adults ? 'input-error' : 'input'} />
+              <input {...register('children')} type="number" min={0} className="input" />
             </div>
           </div>
-
-          {/* Dates */}
           <div>
-            <label className="label flex items-center gap-1.5"><Calendar size={14} /> Dates <span className="text-gray-400 font-normal">(optional)</span></label>
+            <label className="label flex items-center gap-1.5"><Calendar size={14} /> Dates</label>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Check-in</label>
-                <input {...register('check_in_date')} type="date" className="input" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Check-out</label>
-                <input {...register('check_out_date')} type="date" className="input" />
-              </div>
+              <input {...register('check_in_date')} type="date" className="input" />
+              <input {...register('check_out_date')} type="date" className="input" />
             </div>
           </div>
-
-          {/* Notes */}
           <div>
-            <label className="label flex items-center gap-1.5"><MessageSquare size={14} /> Notes <span className="text-gray-400 font-normal">(optional)</span></label>
-            <textarea {...register('notes')} className="input min-h-[70px] resize-none"
-              placeholder="Any special needs, medical info, or questions for the provider…" />
+            <label className="label flex items-center gap-1.5"><MessageSquare size={14} /> Notes</label>
+            <textarea {...register('notes')} className="input min-h-[70px] resize-none" />
           </div>
-
           <button type="submit" disabled={isSubmitting || submit.isPending} className="btn-primary w-full btn-lg">
             {submit.isPending ? 'Sending request…' : getBookingLabel(resource, isFull)}
           </button>
