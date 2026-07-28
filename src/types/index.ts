@@ -380,6 +380,7 @@ export interface MapFilters {
   // Category / type (used when no quickFilter)
   category?: ResourceCategory
   resourceType?: string
+  subcategory?: string[]
 
   // Eligibility
   genderPolicy?: GenderPolicy[]
