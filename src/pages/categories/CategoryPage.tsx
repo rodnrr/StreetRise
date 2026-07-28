@@ -51,10 +51,10 @@ export default function CategoryPage({ slug }: Props) {
       </Section>
 
       {config.mode === 'live' ? (
-        <Section containerSize="prose" className="pt-0">
+        <Section containerSize="wide" className="pt-0">
           {isLoading && (
-            <div className="space-y-3">
-              {[0, 1, 2].map((i) => <div key={i} className="skeleton h-24" />)}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[0, 1, 2].map((i) => <div key={i} className="skeleton h-32" />)}
             </div>
           )}
 
@@ -69,7 +69,7 @@ export default function CategoryPage({ slug }: Props) {
 
           {!isLoading && resources && resources.length > 0 && (
             <>
-              <div className="space-y-3">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {resources.map((r) => (
                   <Card<typeof Link> key={r.id} as={Link} to={`/resources/${r.id}`} hoverable className="block">
                     <p className="font-bold text-slate-900 dark:text-white">{r.name}</p>

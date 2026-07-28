@@ -40,8 +40,8 @@ export default function AboutPage() {
         />
       </Section>
 
-      <Section tone="gray" containerSize="prose">
-        <div className="space-y-4">
+      <Section tone="gray" containerSize="wide">
+        <div className="grid gap-4 md:grid-cols-3">
           {VALUES.map(({ icon: Icon, title, description }) => (
             <Card key={title} className="flex items-start gap-4">
               <Icon size={22} className="mt-0.5 shrink-0 text-primary-600 dark:text-primary-400" />
