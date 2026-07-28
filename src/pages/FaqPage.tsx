@@ -107,7 +107,7 @@ export default function FaqPage() {
 
       {/* Crisis banner */}
       <div className="mt-8 p-4 bg-danger-50 border border-danger-500/20 rounded-2xl">
-        <p className="font-semibold text-danger-700 text-sm mb-1">🚨 In immediate danger?</p>
+        <p className="font-semibold text-danger-600 text-sm mb-1">🚨 In immediate danger?</p>
         <p className="text-sm text-danger-600">Call <strong>911</strong>. Mental health crisis: <strong>988</strong>. Domestic violence: <strong>1-800-799-7233</strong></p>
       </div>
     </div>

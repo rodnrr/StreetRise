@@ -79,7 +79,7 @@ function QuickChip({
 
 // ── Main MapPage ──
 export default function MapPage() {
-  const { mapCenter, mapZoom, filters, selectedId, setSelectedId, setUserLocation, setMapZoom, setFilters } =
+  const { mapCenter, mapZoom, filters, selectedId, setSelectedId, setUserLocation, setMapZoom, setFilters, clearFilters } =
     useMapStore()
   const toast = useToast()
   const [searchParams] = useSearchParams()
@@ -90,33 +90,33 @@ export default function MapPage() {
   const [locating,    setLocating]      = useState(false)
   const channelRef = useRef<ReturnType<typeof subscribeToBedUpdates> | null>(null)
 
-  // Sync ?category= / ?quickFilter= / ?subcategory= query params into the
-  // store filter on mount — used by the marketing category-page CTAs to
-  // deep-link into a pre-filtered map view.
+  // Sync ?category= / ?quickFilter= / ?subcategory= / ?hasShowers= query params
+  // into the store filter on mount — used by the marketing category-page CTAs
+  // to deep-link into a pre-filtered map view. Filters persist to localStorage
+  // (see store.ts), so a returning visitor may still have unrelated filters
+  // (hasShowers, genderPolicy, etc.) set from a previous session — clearFilters()
+  // first guarantees the deep-linked view isn't silently narrowed by stale state
+  // the marketing page has no way to know about.
   useEffect(() => {
     if (searchParams.has('category')) {
       const resolved = CATEGORY_SLUG_MAP[searchParams.get('category') ?? '']
-      setFilters({ category: resolved, quickFilter: undefined, subcategory: undefined })
+      clearFilters()
+      setFilters({ category: resolved })
       return
     }
     if (searchParams.has('quickFilter')) {
-      setFilters({
-        quickFilter: searchParams.get('quickFilter') as QuickFilterKey,
-        category: undefined,
-        subcategory: undefined,
-      })
+      clearFilters()
+      setFilters({ quickFilter: searchParams.get('quickFilter') as QuickFilterKey })
       return
     }
     if (searchParams.has('subcategory')) {
-      setFilters({
-        subcategory: searchParams.get('subcategory')!.split(','),
-        category: undefined,
-        quickFilter: undefined,
-      })
+      clearFilters()
+      setFilters({ subcategory: searchParams.get('subcategory')!.split(',') })
       return
     }
     if (searchParams.get('hasShowers') === 'true') {
-      setFilters({ hasShowers: true, category: undefined, quickFilter: undefined })
+      clearFilters()
+      setFilters({ hasShowers: true })
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
