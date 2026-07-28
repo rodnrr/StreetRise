@@ -139,11 +139,26 @@ export default function HomePage() {
             by the organizations that provide them.
           </p>
           <div className="flex flex-col gap-3">
-            <Button to="/map" size="lg" fullWidth className="gap-2">
+            <Button
+              to="/map"
+              size="lg"
+              fullWidth
+              className="gap-2"
+              onMouseEnter={() => import('@/pages/MapPage')}
+              onTouchStart={() => import('@/pages/MapPage')}
+            >
               Find Help
               <ArrowRight size={20} />
             </Button>
-            <Button to="/donate" variant="secondary" size="lg" fullWidth className="gap-2">
+            <Button
+              to="/donate"
+              variant="secondary"
+              size="lg"
+              fullWidth
+              className="gap-2"
+              onMouseEnter={() => import('@/pages/DonatePage')}
+              onTouchStart={() => import('@/pages/DonatePage')}
+            >
               <Heart size={18} />
               Give Hope (Donate)
             </Button>
