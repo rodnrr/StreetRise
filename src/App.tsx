@@ -19,6 +19,21 @@ const FaqPage              = lazy(() => import('@/pages/FaqPage'))
 const LoginPage            = lazy(() => import('@/pages/LoginPage'))
 const NotFoundPage         = lazy(() => import('@/pages/NotFoundPage'))
 
+// Marketing pages
+const AboutPage            = lazy(() => import('@/pages/marketing/AboutPage'))
+const ContactPage          = lazy(() => import('@/pages/marketing/ContactPage'))
+const PartnersPage         = lazy(() => import('@/pages/marketing/PartnersPage'))
+const PrivacyPage          = lazy(() => import('@/pages/marketing/PrivacyPage'))
+const TermsPage            = lazy(() => import('@/pages/marketing/TermsPage'))
+const AccessibilityPage    = lazy(() => import('@/pages/marketing/AccessibilityPage'))
+
+// Blog
+const BlogIndexPage        = lazy(() => import('@/pages/blog/BlogIndexPage'))
+const BlogPostPage         = lazy(() => import('@/pages/blog/BlogPostPage'))
+
+// Category pages — all share one component, parameterized via categories.ts
+const CategoryPage         = lazy(() => import('@/pages/categories/CategoryPage'))
+
 // Provider portal
 const ProviderDashboard    = lazy(() => import('@/pages/provider/ProviderDashboard'))
 const ProviderListings     = lazy(() => import('@/pages/provider/ProviderListings'))
@@ -65,6 +80,32 @@ export default function App() {
           <Route path="faq"        element={<FaqPage />} />
           <Route path="login"              element={<LoginPage />} />
           <Route path="provider/onboarding" element={<ProviderLandingPage />} />
+
+          {/* Marketing */}
+          <Route path="about"          element={<AboutPage />} />
+          <Route path="contact"        element={<ContactPage />} />
+          <Route path="partner-with-us" element={<PartnersPage />} />
+          <Route path="privacy"        element={<PrivacyPage />} />
+          <Route path="terms"          element={<TermsPage />} />
+          <Route path="accessibility"  element={<AccessibilityPage />} />
+
+          {/* Blog */}
+          <Route path="blog"           element={<BlogIndexPage />} />
+          <Route path="blog/:slug"     element={<BlogPostPage />} />
+
+          {/* Category pages — presentation-only aliases over existing /map filters,
+              see src/lib/categories.ts for the slug → filter mapping. */}
+          <Route path="food-pantries" element={<CategoryPage slug="food-pantries" />} />
+          <Route path="shelters"      element={<CategoryPage slug="shelters" />} />
+          <Route path="medical"       element={<CategoryPage slug="medical" />} />
+          <Route path="employment"    element={<CategoryPage slug="employment" />} />
+          <Route path="hygiene"       element={<CategoryPage slug="hygiene" />} />
+          <Route path="showers"       element={<CategoryPage slug="showers" />} />
+          <Route path="legal"         element={<CategoryPage slug="legal" />} />
+          <Route path="veterans"      element={<CategoryPage slug="veterans" />} />
+          <Route path="youth"         element={<CategoryPage slug="youth" />} />
+          <Route path="families"      element={<CategoryPage slug="families" />} />
+
           <Route path="404"        element={<NotFoundPage />} />
           <Route path="*"          element={<Navigate to="/404" replace />} />
         </Route>

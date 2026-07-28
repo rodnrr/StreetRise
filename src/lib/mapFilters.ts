@@ -228,6 +228,9 @@ export async function fetchMapResources(
     if (filters.resourceType) {
       query = query.eq('resource_type', filters.resourceType)
     }
+    if (filters.subcategory && filters.subcategory.length > 0) {
+      query = query.in('subcategory', filters.subcategory)
+    }
   }
 
   // Overnight
@@ -406,6 +409,7 @@ export function countActiveFilters(filters: MapFilters): number {
   if (filters.quickFilter)          n++
   else if (filters.category)        n++
   if (filters.resourceType)         n++
+  if (filters.subcategory?.length)  n++
   if (filters.genderPolicy?.length) n++
   if (filters.populationFocus?.length) n++
   if (filters.overnightAllowed)     n++
