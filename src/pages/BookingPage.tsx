@@ -138,7 +138,7 @@ export default function BookingPage() {
       </div>
       <div className="card">
         <h1 className="font-bold text-gray-900 text-lg mb-2">{getBookingLabel(resource, isFull)}</h1>
-        <p className="text-sm text-warning-700 bg-warning-50 rounded-xl p-3 mb-4">This is a request, not a confirmed reservation.</p>
+        <p className="text-sm text-warning-600 bg-warning-50 rounded-xl p-3 mb-4">This is a request, not a confirmed reservation.</p>
         <form onSubmit={handleSubmit(d => submit.mutate(d))} className="space-y-4">
           <div>
             <label className="label">Your name *</label>
