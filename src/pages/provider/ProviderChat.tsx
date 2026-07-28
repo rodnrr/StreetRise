@@ -1,9 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { db } from '@/lib/supabase'
+import { useEffect, useState } from 'react'
+import { db, supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
 import { useToast } from '@/lib/store'
+import { isConversationUnread, markConversationRead } from '@/lib/conversations'
 import { MessageSquare, Plus, X } from 'lucide-react'
+import clsx from 'clsx'
+import type { Conversation } from '@/types'
 
 export default function ProviderChat() {
   const { providerId } = useAuthStore()
@@ -24,7 +27,7 @@ export default function ProviderChat() {
         .eq('provider_id', providerId!)
         .order('updated_at', { ascending: false })
       if (error) throw error
-      return data ?? []
+      return (data ?? []) as unknown as Conversation[]
     },
     enabled: !!providerId,
   })
@@ -58,6 +61,34 @@ export default function ProviderChat() {
     },
     enabled: !!selectedConversationId,
   })
+
+  // ── Realtime: previously neither side saw incoming messages without
+  // navigating away and back.
+  useEffect(() => {
+    if (!providerId) return
+    const channel = supabase
+      .channel(`provider-chat-live-${providerId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `provider_id=eq.${providerId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['provider-conversations', providerId] })
+        queryClient.invalidateQueries({ queryKey: ['conversation-detail'] })
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversation_messages' }, (payload) => {
+        const convId = (payload.new as { conversation_id: string }).conversation_id
+        queryClient.invalidateQueries({ queryKey: ['conversation-messages', convId] })
+        queryClient.invalidateQueries({ queryKey: ['provider-conversations', providerId] })
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [providerId, queryClient])
+
+  // Mark the selected conversation read on open (best-effort).
+  useEffect(() => {
+    if (!selectedConversationId) return
+    markConversationRead(selectedConversationId, 'provider').then(() => {
+      queryClient.invalidateQueries({ queryKey: ['provider-conversations', providerId] })
+    })
+  }, [selectedConversationId, providerId, queryClient])
 
   // Create new conversation
   const createConversation = useMutation({
@@ -192,27 +223,32 @@ export default function ProviderChat() {
             <div className="text-gray-500 text-sm">No messages yet. Start one to reach our team.</div>
           ) : (
             <div className="space-y-2">
-              {conversations?.map(conv => (
-                <button
-                  key={conv.id}
-                  onClick={() => setSelectedConversationId(conv.id)}
-                  className={`w-full text-left p-3 rounded-lg transition-colors text-sm ${
-                    selectedConversationId === conv.id
-                      ? 'bg-primary-50 text-primary-900 border border-primary-200'
-                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                  }`}
-                >
-                  <div className="font-medium truncate">{conv.subject}</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {new Date(conv.updated_at).toLocaleDateString()}
-                  </div>
-                  {conv.status !== 'open' && (
-                    <div className="text-xs font-medium text-gray-400 mt-1 capitalize">
-                      {conv.status}
+              {conversations?.map(conv => {
+                const unread = isConversationUnread(conv, 'provider')
+                return (
+                  <button
+                    key={conv.id}
+                    onClick={() => setSelectedConversationId(conv.id)}
+                    className={clsx('w-full text-left p-3 rounded-lg transition-colors text-sm', {
+                      'bg-primary-50 text-primary-900 border border-primary-200': selectedConversationId === conv.id,
+                      'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200': selectedConversationId !== conv.id,
+                    })}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-primary-600" />}
+                      <div className="font-medium truncate flex-1">{conv.subject}</div>
                     </div>
-                  )}
-                </button>
-              ))}
+                    <div className="text-xs text-gray-500 mt-1">
+                      {new Date(conv.updated_at).toLocaleDateString()}
+                    </div>
+                    {conv.status !== 'open' && (
+                      <div className="text-xs font-medium text-gray-400 mt-1 capitalize">
+                        {conv.status}
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>

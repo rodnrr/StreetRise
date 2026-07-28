@@ -1,12 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { db } from '@/lib/supabase'
-import { useAuthStore } from '@/lib/store'
-import { useToast } from '@/lib/store'
-import { MessageSquare, Plus, X } from 'lucide-react'
-import type { Conversation } from '@/types'
+import { useEffect, useMemo, useState } from 'react'
+import { db, supabase } from '@/lib/supabase'
+import { useAuthStore, useToast } from '@/lib/store'
+import { isConversationUnread, markConversationRead } from '@/lib/conversations'
+import { MessageSquare, Plus, X, Search, CheckCircle2, XCircle, RotateCcw } from 'lucide-react'
+import clsx from 'clsx'
+import type { Conversation, ConversationStatus } from '@/types'
 
 type ConversationWithProvider = Conversation & { providers?: { organization_name: string } | null }
+
+const STATUS_FILTERS: Array<{ key: 'all' | ConversationStatus; label: string }> = [
+  { key: 'all',      label: 'All' },
+  { key: 'open',     label: 'Open' },
+  { key: 'resolved', label: 'Resolved' },
+  { key: 'closed',   label: 'Closed' },
+]
+
+const STATUS_BADGE: Record<ConversationStatus, string> = {
+  open:     'bg-blue-900/40 text-blue-300',
+  resolved: 'bg-green-900/40 text-green-300',
+  closed:   'bg-gray-700 text-gray-400',
+}
 
 export default function AdminChat() {
   const { providerId } = useAuthStore()
@@ -17,17 +31,22 @@ export default function AdminChat() {
   const [newSubject, setNewSubject] = useState('')
   const [newDescription, setNewDescription] = useState('')
   const [selectedProvider, setSelectedProvider] = useState<string>('')
+  const [providerSearch, setProviderSearch] = useState('')
   const [messageText, setMessageText] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | ConversationStatus>('all')
 
-  // Fetch all conversations for admin
+  // Fetch all conversations for admin, joined with provider name so the
+  // list is actually identifiable at a glance (previously only showed
+  // the subject line, with no indication of which provider it was).
   const { data: conversations, isLoading: conversationsLoading } = useQuery({
     queryKey: ['admin-conversations'],
     queryFn: async () => {
       const { data, error } = await db.conversations()
-        .select('*')
+        .select('*, providers(organization_name)')
         .order('updated_at', { ascending: false })
       if (error) throw error
-      return data ?? []
+      return (data ?? []) as unknown as ConversationWithProvider[]
     },
   })
 
@@ -86,6 +105,35 @@ export default function AdminChat() {
     enabled: !!selectedConversationId,
   })
 
+  // ── Realtime: neither side previously saw incoming messages/status
+  // changes without navigating away and back. Mirrors the pattern already
+  // used for bed availability (subscribeToBedUpdates in lib/supabase.ts).
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-chat-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['admin-conversations'] })
+        queryClient.invalidateQueries({ queryKey: ['conversation-detail'] })
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversation_messages' }, (payload) => {
+        const convId = (payload.new as { conversation_id: string }).conversation_id
+        queryClient.invalidateQueries({ queryKey: ['conversation-messages', convId] })
+        queryClient.invalidateQueries({ queryKey: ['admin-conversations'] })
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [queryClient])
+
+  // Mark the selected conversation read on open (best-effort — see
+  // markConversationRead's tolerance for migration 030 not being applied).
+  useEffect(() => {
+    if (!selectedConversationId) return
+    markConversationRead(selectedConversationId, 'admin').then(() => {
+      queryClient.invalidateQueries({ queryKey: ['admin-conversations'] })
+    })
+  }, [selectedConversationId, queryClient])
+
   // Create new conversation
   const createConversation = useMutation({
     mutationFn: async () => {
@@ -119,6 +167,7 @@ export default function AdminChat() {
       setNewSubject('')
       setNewDescription('')
       setSelectedProvider('')
+      setProviderSearch('')
       setShowNewConversation(false)
     },
     onError: (err: Error) => {
@@ -155,6 +204,43 @@ export default function AdminChat() {
     },
   })
 
+  // Change conversation status — the schema/RLS already supported this
+  // (see migration 015's comment: "mark resolved/closed"), there was just
+  // never any UI control for it.
+  const setStatus = useMutation({
+    mutationFn: async (status: ConversationStatus) => {
+      if (!selectedConversationId) return
+      const { error } = await db.conversations().update({ status }).eq('id', selectedConversationId)
+      if (error) throw error
+    },
+    onSuccess: (_data, status) => {
+      toast.success(`Conversation marked ${status}`)
+      queryClient.invalidateQueries({ queryKey: ['admin-conversations'] })
+      queryClient.invalidateQueries({ queryKey: ['conversation-detail', selectedConversationId] })
+    },
+    onError: (err: Error) => toast.error('Failed to update status', err.message),
+  })
+
+  const filteredConversations = useMemo(() => {
+    if (!conversations) return []
+    const q = searchQuery.trim().toLowerCase()
+    return conversations.filter((c) => {
+      if (statusFilter !== 'all' && c.status !== statusFilter) return false
+      if (!q) return true
+      return (
+        c.subject.toLowerCase().includes(q) ||
+        (c.providers?.organization_name ?? '').toLowerCase().includes(q)
+      )
+    })
+  }, [conversations, searchQuery, statusFilter])
+
+  const filteredProviders = useMemo(() => {
+    if (!providers) return []
+    const q = providerSearch.trim().toLowerCase()
+    if (!q) return providers
+    return providers.filter((p) => p.organization_name.toLowerCase().includes(q))
+  }, [providers, providerSearch])
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -186,16 +272,31 @@ export default function AdminChat() {
             <div className="space-y-4">
               <div>
                 <label className="label">Provider</label>
-                <select
-                  value={selectedProvider}
-                  onChange={e => setSelectedProvider(e.target.value)}
-                  className="input w-full"
-                >
-                  <option value="">Select a provider…</option>
-                  {providers?.map(p => (
-                    <option key={p.id} value={p.id}>{p.organization_name}</option>
-                  ))}
-                </select>
+                <input
+                  type="text"
+                  placeholder="Search providers…"
+                  value={selectedProvider ? providers?.find(p => p.id === selectedProvider)?.organization_name ?? '' : providerSearch}
+                  onChange={e => { setProviderSearch(e.target.value); setSelectedProvider('') }}
+                  className="input w-full mb-1.5"
+                />
+                {providerSearch && !selectedProvider && (
+                  <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-600 bg-gray-700">
+                    {filteredProviders.length === 0 ? (
+                      <p className="text-xs text-gray-400 p-2">No matching providers</p>
+                    ) : (
+                      filteredProviders.slice(0, 20).map(p => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => { setSelectedProvider(p.id); setProviderSearch('') }}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-600"
+                        >
+                          {p.organization_name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="label">Subject</label>
@@ -226,7 +327,7 @@ export default function AdminChat() {
                 </button>
                 <button
                   onClick={() => createConversation.mutate()}
-                  disabled={createConversation.isPending}
+                  disabled={createConversation.isPending || !selectedProvider}
                   className="btn-primary flex-1"
                 >
                   {createConversation.isPending ? 'Creating…' : 'Create'}
@@ -239,30 +340,70 @@ export default function AdminChat() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)] md:pb-0 pb-24">
         {/* Conversations List */}
-        <div className="lg:col-span-1 bg-gray-800 rounded-2xl p-4 overflow-y-auto border border-gray-700">
+        <div className="lg:col-span-1 bg-gray-800 rounded-2xl p-4 overflow-y-auto border border-gray-700 flex flex-col">
           <h2 className="font-semibold text-white mb-3">Conversations</h2>
+
+          <div className="relative mb-2">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Search subject or provider…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="input bg-gray-700 border-gray-600 text-white pl-8 text-sm"
+            />
+          </div>
+
+          <div className="flex gap-1 mb-3">
+            {STATUS_FILTERS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setStatusFilter(key)}
+                className={clsx('flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors', {
+                  'bg-primary-600 text-white': statusFilter === key,
+                  'bg-gray-700 text-gray-400 hover:bg-gray-600': statusFilter !== key,
+                })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           {conversationsLoading ? (
             <div className="text-gray-400 text-sm">Loading…</div>
-          ) : conversations?.length === 0 ? (
-            <div className="text-gray-400 text-sm">No conversations yet</div>
+          ) : filteredConversations.length === 0 ? (
+            <div className="text-gray-400 text-sm">No conversations match.</div>
           ) : (
-            <div className="space-y-2">
-              {conversations?.map(conv => (
-                <button
-                  key={conv.id}
-                  onClick={() => setSelectedConversationId(conv.id)}
-                  className={`w-full text-left p-3 rounded-lg transition-colors text-sm ${
-                    selectedConversationId === conv.id
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  <div className="font-medium truncate">{conv.subject}</div>
-                  <div className="text-xs opacity-75 mt-1">
-                    {new Date(conv.updated_at).toLocaleDateString()}
-                  </div>
-                </button>
-              ))}
+            <div className="space-y-2 overflow-y-auto flex-1">
+              {filteredConversations.map(conv => {
+                const unread = isConversationUnread(conv, 'admin')
+                return (
+                  <button
+                    key={conv.id}
+                    onClick={() => setSelectedConversationId(conv.id)}
+                    className={clsx('w-full text-left p-3 rounded-lg transition-colors text-sm', {
+                      'bg-primary-600 text-white': selectedConversationId === conv.id,
+                      'bg-gray-700 text-gray-300 hover:bg-gray-600': selectedConversationId !== conv.id,
+                    })}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-primary-400" />}
+                      <div className="font-medium truncate flex-1">{conv.subject}</div>
+                    </div>
+                    <div className="text-xs opacity-75 mt-1 truncate">
+                      {conv.providers?.organization_name ?? 'Unknown provider'}
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs opacity-60">
+                        {new Date(conv.updated_at).toLocaleDateString()}
+                      </span>
+                      <span className={clsx('text-[10px] px-1.5 py-0.5 rounded-full capitalize', STATUS_BADGE[conv.status])}>
+                        {conv.status}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
@@ -273,10 +414,46 @@ export default function AdminChat() {
             <>
               {/* Header */}
               <div className="pb-4 border-b border-gray-700 space-y-2">
-                <h2 className="font-semibold text-white">{selectedConversation?.subject}</h2>
-                <p className="text-xs text-gray-400">
-                  {selectedConversation?.providers?.organization_name}
-                </p>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h2 className="font-semibold text-white">{selectedConversation?.subject}</h2>
+                    <p className="text-xs text-gray-400">
+                      {selectedConversation?.providers?.organization_name}
+                    </p>
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    {selectedConversation?.status !== 'resolved' && (
+                      <button
+                        onClick={() => setStatus.mutate('resolved')}
+                        disabled={setStatus.isPending}
+                        title="Mark resolved"
+                        className="btn-icon bg-green-900/40 text-green-300 hover:bg-green-900/60"
+                      >
+                        <CheckCircle2 size={16} />
+                      </button>
+                    )}
+                    {selectedConversation?.status !== 'closed' && (
+                      <button
+                        onClick={() => setStatus.mutate('closed')}
+                        disabled={setStatus.isPending}
+                        title="Close"
+                        className="btn-icon bg-gray-700 text-gray-300 hover:bg-gray-600"
+                      >
+                        <XCircle size={16} />
+                      </button>
+                    )}
+                    {selectedConversation?.status !== 'open' && (
+                      <button
+                        onClick={() => setStatus.mutate('open')}
+                        disabled={setStatus.isPending}
+                        title="Reopen"
+                        className="btn-icon bg-blue-900/40 text-blue-300 hover:bg-blue-900/60"
+                      >
+                        <RotateCcw size={16} />
+                      </button>
+                    )}
+                  </div>
+                </div>
                 {selectedConversation?.description && (
                   <div className="bg-gray-700/50 rounded p-3 text-xs text-gray-300 border-l-2 border-gray-600">
                     <p className="text-gray-400 font-medium mb-1">Context provided by provider:</p>
