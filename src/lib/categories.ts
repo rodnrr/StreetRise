@@ -9,7 +9,8 @@
 // project mldatfcwnmvrmxumzxyb) for architecture reference only; re-check
 // against the `resources` table before relying on them for real content.
 
-import type { ResourceCategory, QuickFilterKey } from '@/types'
+import { db } from '@/lib/supabase'
+import type { ResourceCategory, QuickFilterKey, Resource } from '@/types'
 
 export type CategoryPageMode = 'live' | 'static'
 
@@ -141,4 +142,47 @@ export const CATEGORY_PAGES: CategoryPageConfig[] = [
 
 export function getCategoryPage(slug: string): CategoryPageConfig | undefined {
   return CATEGORY_PAGES.find((c) => c.slug === slug)
+}
+
+/**
+ * Fetches resources for a 'live' category page. Deliberately NOT reusing
+ * fetchMapResources()/MapFilters — that query builder assumes a viewport
+ * (lat/lng + radius), which has no meaning for a sitewide marketing browse
+ * page. This is a separate, simpler, unfiltered-by-location query so it
+ * can't accidentally clip results or change the live map's own behavior.
+ */
+export async function fetchCategoryResources(mapLink: CategoryMapLink): Promise<Resource[]> {
+  let query = db.resources()
+    .select('*')
+    .eq('is_active', true)
+    .eq('verification_status', 'verified')
+    .eq('is_map_ready', true)
+
+  if ('category' in mapLink) {
+    if (mapLink.category === 'hygiene') {
+      // Mirrors the special-case in mapFilters.ts's fetchMapResources.
+      query = query.or('category.eq.hygiene,has_showers.eq.true,has_restrooms.eq.true')
+    } else {
+      query = query.eq('category', mapLink.category)
+    }
+  } else if ('hasShowers' in mapLink) {
+    query = query.eq('has_showers', true)
+  } else if ('subcategory' in mapLink) {
+    query = query.in('subcategory', mapLink.subcategory)
+  } else if ('quickFilter' in mapLink && mapLink.quickFilter === 'veteran_support') {
+    query = query.contains('population_focus', ['veterans'])
+  }
+
+  const { data, error } = await query.order('updated_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as unknown as Resource[]
+}
+
+/** Builds the /map search-string equivalent of a CategoryMapLink, for CTA links. */
+export function categoryMapLinkToSearch(mapLink: CategoryMapLink): string {
+  if ('category' in mapLink) return `?category=${mapLink.category}`
+  if ('quickFilter' in mapLink) return `?quickFilter=${mapLink.quickFilter}`
+  if ('subcategory' in mapLink) return `?subcategory=${mapLink.subcategory.join(',')}`
+  if ('hasShowers' in mapLink) return '?hasShowers=true'
+  return ''
 }

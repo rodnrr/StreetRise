@@ -1,16 +1,25 @@
 import clsx from 'clsx'
-import type { ElementType, ReactNode } from 'react'
+import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react'
 
-interface Props {
+interface OwnProps {
   as?: ElementType
   hoverable?: boolean
   className?: string
   children: ReactNode
 }
 
-export default function Card({ as: As = 'div', hoverable, className, children }: Props) {
+type Props<T extends ElementType> = OwnProps & Omit<ComponentPropsWithoutRef<T>, keyof OwnProps>
+
+export default function Card<T extends ElementType = 'div'>({
+  as,
+  hoverable,
+  className,
+  children,
+  ...rest
+}: Props<T>) {
+  const As = as ?? 'div'
   return (
-    <As className={clsx(hoverable ? 'card-hover' : 'card', className)}>
+    <As className={clsx(hoverable ? 'card-hover' : 'card', className)} {...rest}>
       {children}
     </As>
   )

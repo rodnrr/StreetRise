@@ -1,6 +1,10 @@
 import type { Config } from 'tailwindcss'
 
 export default {
+  // 'class' strategy: dark mode activates only when a .dark class is present
+  // on <html>. No toggle exists yet, so this is structural readiness only —
+  // it changes nothing visible until a toggle mechanism is added later.
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {

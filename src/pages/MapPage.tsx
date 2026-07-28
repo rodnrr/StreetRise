@@ -90,11 +90,34 @@ export default function MapPage() {
   const [locating,    setLocating]      = useState(false)
   const channelRef = useRef<ReturnType<typeof subscribeToBedUpdates> | null>(null)
 
-  // Sync ?category= query param into the store filter on mount
+  // Sync ?category= / ?quickFilter= / ?subcategory= query params into the
+  // store filter on mount — used by the marketing category-page CTAs to
+  // deep-link into a pre-filtered map view.
   useEffect(() => {
-    if (!searchParams.has('category')) return
-    const resolved = CATEGORY_SLUG_MAP[searchParams.get('category') ?? '']
-    setFilters({ category: resolved, quickFilter: undefined })
+    if (searchParams.has('category')) {
+      const resolved = CATEGORY_SLUG_MAP[searchParams.get('category') ?? '']
+      setFilters({ category: resolved, quickFilter: undefined, subcategory: undefined })
+      return
+    }
+    if (searchParams.has('quickFilter')) {
+      setFilters({
+        quickFilter: searchParams.get('quickFilter') as QuickFilterKey,
+        category: undefined,
+        subcategory: undefined,
+      })
+      return
+    }
+    if (searchParams.has('subcategory')) {
+      setFilters({
+        subcategory: searchParams.get('subcategory')!.split(','),
+        category: undefined,
+        quickFilter: undefined,
+      })
+      return
+    }
+    if (searchParams.get('hasShowers') === 'true') {
+      setFilters({ hasShowers: true, category: undefined, quickFilter: undefined })
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced map center — only re-query after 400ms of stillness

@@ -3,9 +3,9 @@ import type { ReactNode } from 'react'
 import Container, { type ContainerSize } from './Container'
 
 const TONES = {
-  white:   'bg-white',
-  gray:    'bg-slate-50',
-  primary: 'bg-primary-50',
+  white:   'bg-white dark:bg-slate-900',
+  gray:    'bg-slate-50 dark:bg-slate-800',
+  primary: 'bg-primary-50 dark:bg-primary-500/10',
 } as const
 
 interface Props {
