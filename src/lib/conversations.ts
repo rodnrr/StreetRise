@@ -10,15 +10,17 @@ export function isConversationUnread(conv: Conversation, side: ConversationSide)
   return new Date(conv.last_message_at).getTime() > new Date(lastRead).getTime()
 }
 
-// Tolerates migration 030 not being applied yet (provider_last_read_at /
-// admin_last_read_at columns not existing in production) — logs and no-ops
-// instead of throwing, so opening a conversation never breaks chat.
+// Marking read is best-effort: a failure here should never break opening a
+// conversation, so we surface it as a warning rather than throwing.
 export async function markConversationRead(conversationId: string, side: ConversationSide) {
-  const column = side === 'provider' ? 'provider_last_read_at' : 'admin_last_read_at'
+  const now = new Date().toISOString()
+  const patch = side === 'provider'
+    ? { provider_last_read_at: now }
+    : { admin_last_read_at: now }
   const { error } = await db.conversations()
-    .update({ [column]: new Date().toISOString() } as never)
+    .update(patch)
     .eq('id', conversationId)
   if (error) {
-    console.warn(`Could not mark conversation read (migration 030 may not be applied yet): ${error.message}`)
+    console.warn(`Could not mark conversation read: ${error.message}`)
   }
 }
