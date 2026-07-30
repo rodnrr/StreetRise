@@ -269,6 +269,28 @@ export interface Database {
         Relationships: []
       }
 
+      blog_posts: {
+        Row: {
+          id: string
+          slug: string
+          title: string
+          excerpt: string
+          body_markdown: string
+          cover_image_url: string | null
+          author_name: string
+          is_published: boolean
+          published_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Optional<
+          Omit<Database['public']['Tables']['blog_posts']['Row'], 'id' | 'created_at' | 'updated_at'>,
+          'cover_image_url' | 'author_name' | 'is_published' | 'published_at'
+        >
+        Update: Partial<Database['public']['Tables']['blog_posts']['Insert']>
+        Relationships: []
+      }
+
       moderation_logs: {
         Row: {
           id: string
@@ -321,10 +343,13 @@ export interface Database {
           created_at: string
           updated_at: string
           last_message_at: string | null
+          provider_last_read_at: string | null
+          admin_last_read_at: string | null
         }
         Insert: Optional<
           Omit<Database['public']['Tables']['conversations']['Row'], 'id' | 'created_at' | 'updated_at'>,
           'admin_id' | 'description' | 'status' | 'created_by_admin' | 'last_message_at'
+          | 'provider_last_read_at' | 'admin_last_read_at'
         >
         Update: Partial<Database['public']['Tables']['conversations']['Insert']>
         Relationships: []
