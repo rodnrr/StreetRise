@@ -26,7 +26,9 @@ CREATE TABLE blog_posts (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_blog_posts_slug         ON blog_posts(slug);
+-- NOTE: no explicit index on `slug` — the UNIQUE constraint above already
+-- creates a unique btree index on that column. A second plain index would be
+-- redundant write overhead for no read benefit.
 CREATE INDEX idx_blog_posts_is_published ON blog_posts(is_published);
 CREATE INDEX idx_blog_posts_published_at ON blog_posts(published_at DESC);
 
