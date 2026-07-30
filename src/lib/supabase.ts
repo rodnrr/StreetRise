@@ -29,6 +29,7 @@ export const db = {
   bookings:         () => supabase.from('bookings') as any,
   work_exchanges:   () => supabase.from('work_exchanges'),
   faq:              () => supabase.from('faq'),
+  blog_posts:       () => supabase.from('blog_posts'),
   moderation_logs:  () => supabase.from('moderation_logs'),
   donations:        () => supabase.from('donation_campaigns'),
   conversations:    () => supabase.from('conversations'),
