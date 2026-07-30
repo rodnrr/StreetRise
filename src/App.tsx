@@ -55,6 +55,7 @@ const AdminResourceCreate  = lazy(() => import('@/pages/admin/AdminResourceCreat
 const AdminBookings        = lazy(() => import('@/pages/admin/AdminBookings'))
 const AdminChat            = lazy(() => import('@/pages/admin/AdminChat'))
 const AdminFaq             = lazy(() => import('@/pages/admin/AdminFaq'))
+const AdminBlog            = lazy(() => import('@/pages/admin/AdminBlog'))
 
 const Loading = () => (
   <div className="min-h-screen flex items-center justify-center bg-white">
@@ -137,6 +138,7 @@ export default function App() {
           <Route path="bookings"         element={<AdminBookings />} />
           <Route path="messages"         element={<AdminChat />} />
           <Route path="faq"              element={<AdminFaq />} />
+          <Route path="blog"             element={<AdminBlog />} />
         </Route>
       </Routes>
     </Suspense>

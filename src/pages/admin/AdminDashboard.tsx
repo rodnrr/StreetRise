@@ -122,6 +122,7 @@ export default function AdminDashboard() {
             { label: 'Add Resource',     href: '/admin/resources/new', badge: 0 },
             { label: 'View Bookings',    href: '/admin/bookings',  badge: bookingStats?.pending },
             { label: 'Messages',         href: '/admin/messages',  badge: messageStats?.open },
+            { label: 'Manage Blog',      href: '/admin/blog',      badge: 0 },
             { label: 'Manage FAQ',       href: '/admin/faq',       badge: 0 },
           ].map(({ label, href, badge }) => (
             <Link
