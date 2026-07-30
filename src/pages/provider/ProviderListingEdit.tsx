@@ -112,6 +112,9 @@ export default function ProviderListingEdit() {
         is_active:           true,
         verification_status: 'pending' as const,
         photos:              [],
+        // A full edit-and-save is itself a freshness signal — see
+        // getTrustInfo() in mapFilters.ts, which this field drives.
+        last_provider_update_at: new Date().toISOString(),
       }
       if (isNew) {
         const { error } = await db.resources().insert(payload)

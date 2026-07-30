@@ -287,6 +287,11 @@ export interface Conversation {
   created_at: string
   updated_at: string
   last_message_at: string | null
+  // Added in migration 030 (not yet applied to production — see file
+  // header). Optional so code compiles and degrades gracefully against
+  // the pre-migration schema.
+  provider_last_read_at?: string | null
+  admin_last_read_at?: string | null
 }
 
 export interface ConversationMessage {

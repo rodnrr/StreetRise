@@ -22,11 +22,17 @@ export default function BedCountUpdater({ resource }: { resource: Resource }) {
   async function save(newBeds: number) {
     setSaving(true)
     const status = deriveStatus(newBeds, total)
+    const now = new Date().toISOString()
     const { error } = await db.resources()
       .update({
         beds_available:     newBeds,
         availability_status: status,
-        beds_updated_at:    new Date().toISOString(),
+        beds_updated_at:    now,
+        // A provider actively updating bed counts is a real freshness signal —
+        // getTrustInfo() (mapFilters.ts) reads last_provider_update_at, not
+        // beds_updated_at, so without this the "May be outdated" label could
+        // never clear no matter how often a provider checks in.
+        last_provider_update_at: now,
       })
       .eq('id', resource.id)
     if (error) {

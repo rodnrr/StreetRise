@@ -4,9 +4,11 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, RefreshCw } from 'lucide-react'
+import clsx from 'clsx'
 import { db } from '@/lib/supabase'
 import { useToast } from '@/lib/store'
+import { getTrustInfo, TRUST_LEVEL_CLASSES } from '@/lib/mapFilters'
 import type { Resource } from '@/types'
 
 const CATEGORIES = [
@@ -159,6 +161,26 @@ export default function AdminResourceEdit() {
     onError: (e: Error) => toast.error('Save failed', e.message),
   })
 
+  // Explicit, separate from the general save above: admins editing an
+  // unrelated field (e.g. fixing a typo) shouldn't silently clear the
+  // "may be outdated" warning. This is a deliberate "I've confirmed this
+  // is current" action — the same freshness signal a provider gives by
+  // updating their bed count (see BedCountUpdater.tsx).
+  const renewTrust = useMutation({
+    mutationFn: async () => {
+      const { error } = await db.resources()
+        .update({ last_provider_update_at: new Date().toISOString() })
+        .eq('id', id!)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Marked as current', 'The "may be outdated" warning is cleared')
+      qc.invalidateQueries({ queryKey: ['admin-resources'] })
+      qc.invalidateQueries({ queryKey: ['resource', id] })
+    },
+    onError: (e: Error) => toast.error('Failed to update', e.message),
+  })
+
   if (isLoading) return <div className="skeleton h-96 w-full" />
   if (!resource) return <p className="text-gray-400">Resource not found.</p>
 
@@ -203,6 +225,33 @@ export default function AdminResourceEdit() {
             <input type="checkbox" {...register('is_active')} className="w-4 h-4 accent-primary-600" />
             <span className="text-sm text-gray-300">Listing is active (visible on map)</span>
           </label>
+
+          {/* Freshness / trust — last_provider_update_at drives the public
+              "may be outdated" label (getTrustInfo, mapFilters.ts). Nothing
+              else in the app writes this field, so without this control it
+              can only ever get more stale, never less. */}
+          {(() => {
+            const trust = getTrustInfo(resource)
+            return (
+              <div className="flex items-center justify-between rounded-xl bg-gray-700/50 p-3">
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">Freshness</p>
+                  <span className={clsx('inline-flex items-center text-xs rounded-full px-2 py-0.5', TRUST_LEVEL_CLASSES[trust.level])}>
+                    {trust.label}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => renewTrust.mutate()}
+                  disabled={renewTrust.isPending}
+                  className="btn-secondary btn-sm gap-1.5"
+                >
+                  <RefreshCw size={13} className={renewTrust.isPending ? 'animate-spin' : ''} />
+                  Mark as Current
+                </button>
+              </div>
+            )
+          })()}
         </div>
 
         {/* Basic info */}

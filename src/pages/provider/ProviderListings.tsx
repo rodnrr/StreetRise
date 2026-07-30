@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Plus, Pencil, Eye, EyeOff, MapPin, CheckCircle, Clock } from 'lucide-react'
+import { Plus, Pencil, Eye, EyeOff, MapPin, CheckCircle, Clock, RefreshCw } from 'lucide-react'
 import clsx from 'clsx'
 import { db } from '@/lib/supabase'
 import { useAuthStore, useToast } from '@/lib/store'
+import { getTrustInfo, TRUST_LEVEL_CLASSES } from '@/lib/mapFilters'
 import type { Resource } from '@/types'
 
 const STATUS_BADGE: Record<string, string> = {
@@ -41,6 +42,23 @@ export default function ProviderListings() {
     },
     onSuccess: (_, { is_active }) => {
       toast.success(is_active ? 'Listing activated' : 'Listing hidden')
+      qc.invalidateQueries({ queryKey: ['provider-resources'] })
+    },
+    onError: (e: Error) => toast.error('Failed to update', e.message),
+  })
+
+  // Providers previously had no way to see or fix the public "may be
+  // outdated" label — this is the only field that clears it besides
+  // updating bed counts (BedCountUpdater.tsx).
+  const renewTrust = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await db.resources()
+        .update({ last_provider_update_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Confirmed current', 'The "may be outdated" warning is cleared')
       qc.invalidateQueries({ queryKey: ['provider-resources'] })
     },
     onError: (e: Error) => toast.error('Failed to update', e.message),
@@ -98,6 +116,25 @@ export default function ProviderListings() {
                     {r.beds_available ?? '?'} / {r.beds_total} beds available
                   </p>
                 )}
+                {(() => {
+                  const trust = getTrustInfo(r)
+                  if (trust.level !== 'aging' && trust.level !== 'stale') return null
+                  return (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className={clsx('inline-flex items-center text-xs rounded-full px-2 py-0.5', TRUST_LEVEL_CLASSES[trust.level])}>
+                        {trust.label}
+                      </span>
+                      <button
+                        onClick={() => renewTrust.mutate(r.id)}
+                        disabled={renewTrust.isPending}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline disabled:opacity-50"
+                      >
+                        <RefreshCw size={11} className={renewTrust.isPending ? 'animate-spin' : ''} />
+                        Confirm still accurate
+                      </button>
+                    </div>
+                  )
+                })()}
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
