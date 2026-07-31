@@ -39,11 +39,14 @@ export default function AdminChat() {
   // Fetch all conversations for admin, joined with provider name so the
   // list is actually identifiable at a glance (previously only showed
   // the subject line, with no indication of which provider it was).
-  const { data: conversations, isLoading: conversationsLoading } = useQuery({
+  // The !provider_id hint is required: conversations has two FKs to
+  // providers (provider_id and admin_id), so a bare providers() embed is
+  // ambiguous and PostgREST rejects the whole query.
+  const { data: conversations, isLoading: conversationsLoading, isError: conversationsError } = useQuery({
     queryKey: ['admin-conversations'],
     queryFn: async () => {
       const { data, error } = await db.conversations()
-        .select('*, providers(organization_name)')
+        .select('*, providers!provider_id(organization_name)')
         .order('updated_at', { ascending: false })
       if (error) throw error
       return (data ?? []) as unknown as ConversationWithProvider[]
@@ -81,7 +84,7 @@ export default function AdminChat() {
     queryFn: async () => {
       if (!selectedConversationId) return null
       const { data, error } = await db.conversations()
-        .select('*, providers(organization_name)')
+        .select('*, providers!provider_id(organization_name)')
         .eq('id', selectedConversationId)
         .single()
       if (error) throw error
@@ -371,6 +374,8 @@ export default function AdminChat() {
 
           {conversationsLoading ? (
             <div className="text-gray-400 text-sm">Loading…</div>
+          ) : conversationsError ? (
+            <div className="text-red-400 text-sm">Couldn't load conversations. Refresh to try again.</div>
           ) : filteredConversations.length === 0 ? (
             <div className="text-gray-400 text-sm">No conversations match.</div>
           ) : (
