@@ -1,6 +1,8 @@
 # StreetRise
 
-Real-time resource discovery for people in need — shelter, food, work exchange, and community support.
+Real-time resource discovery for people in need — shelter, food, medical care, work exchange, and community support across Tampa Bay and Central Florida.
+
+Live app: **app.streetrise.org** (this repo). The marketing/org site at **streetrise.org** is separate and not in this repo.
 
 ## Stack
 
@@ -13,7 +15,7 @@ Real-time resource discovery for people in need — shelter, food, work exchange
 | Database   | Supabase (Postgres + Realtime + Auth)  |
 | Hosting    | Cloudflare Pages → app.streetrise.org  |
 | Payments   | Stripe (donations)                     |
-| CI/CD      | GitHub Actions → Cloudflare Pages      |
+| CI         | GitHub Actions (typecheck + build)     |
 
 ## Quick start
 
@@ -33,17 +35,15 @@ cp .env.example .env.local
 npm run dev
 ```
 
+Other commands: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run preview`, `npm run deploy`, `npm run import:seed`.
+
 ## Supabase setup
 
-```bash
-# Apply migrations (run in order in Supabase SQL editor, or use supabase CLI)
-# supabase/migrations/001_initial_schema.sql
-# supabase/migrations/002_rls_policies.sql
-# supabase/migrations/003_seed_data.sql  (FAQ + demo data)
+Migrations live in `supabase/migrations/`, numbered **001–030 with gaps — 012, 013, and 021 intentionally do not exist** (renumbering resolved earlier collisions; see the headers of 023 and 027).
 
-# Generate fresh types after schema changes:
-npx supabase gen types typescript --project-id YOUR_REF > src/lib/database.types.ts
-```
+**Migrations are applied to the live project by hand in the Supabase SQL editor**, in numeric order — not by the deploy pipeline. The filenames have no timestamp prefixes, so the repo list and the live migration history drift; treat live as its own source of truth and check actual columns before assuming a migration has run. Hand-apply runbooks for the newest migrations are in `docs/apply-migration-029.md` and `docs/apply-migration-030.md`.
+
+> ⚠️ Do **not** regenerate `src/lib/database.types.ts` (`npx supabase gen types ...`) unless live has every migration the code depends on. Parts of that file (the `blog_posts` block and the conversation read columns) are hand-written to match intended state — a regen against a lagging DB deletes them.
 
 ## Data governance
 
@@ -52,46 +52,14 @@ StreetRise keeps the controlled resource vocabulary in version control so catego
 | File | Purpose |
 |---|---|
 | `data/reference/controlled_vocab.csv` | Official controlled vocabulary exported from the working spreadsheet. |
+| `data/seed/streetrise_batch1_live_export.csv` | Export of the Batch 1 live data. |
 | `data/seed/streetrise_seed_candidates_batch_2_normalized.csv` | Normalized Batch 2 seed candidates with generated `external_id`, normalized category fields, app-compatible category fields, map-readiness flags, and import status. |
 | `docs/data-dictionary.md` | Human-readable explanation of how to use the controlled values. |
+| `docs/import-seed-candidates.md` | How to run the seed import (`npm run import:seed`, needs `SUPABASE_SERVICE_ROLE_KEY`). |
 
-### Batch 2 seed candidate summary
+Later seed batches were applied as SQL migrations rather than CSVs: 017 (batch 4 — Hernando/Pasco/Manatee), 020 + 028 (work exchanges), 022 (Central Florida map listings).
 
-The Batch 2 candidate file contains 95 rows:
-
-| Import status | Count | Meaning |
-|---|---:|---|
-| `ready_for_import` | 77 | Has coordinates or a usable public/service location and can be reviewed for import. |
-| `needs_review` | 18 | Confidential, intake-only, missing coordinates, likely duplicate, or otherwise unsafe to map without human review. |
-
-The normalized file includes both:
-
-- `category` — preferred future controlled category, such as `day_use_space` or `employment`
-- `current_app_category` — compatibility value for the current frontend/Supabase enum, such as `outdoor_space`, `work_exchange`, or `other`
-
-Preferred top-level `category` values for new resource imports:
-
-```text
-shelter
-food
-hygiene
-medical
-mental_health
-substance_abuse
-legal
-employment
-education
-transportation
-financial_assistance
-housing_assistance
-crisis_services
-community_center
-day_use_space
-```
-
-Use `day_use_space` for parks, libraries, cooling/warming centers, drop-in centers, safe rest areas, and other non-overnight public/communal spaces. Use `facility_features` for amenities such as `restrooms`, `showers`, `wifi`, `charging`, `outdoor_space`, and `parking`.
-
-> Current app compatibility note: the existing frontend/database still uses `outdoor_space` for the parks/outdoors filter. Migrate live records and TypeScript/database types to `day_use_space` in a dedicated schema migration before changing the map filter slug.
+> Current app compatibility note: the frontend/database still uses `outdoor_space` for the parks/outdoors filter. A future move to `day_use_space` needs a dedicated schema migration before any filter-slug change.
 
 ## Cloudflare Pages deploy
 
@@ -104,19 +72,17 @@ npm run deploy
 
 # Optional: override project name
 # export CLOUDFLARE_PAGES_PROJECT_NAME=streetrise
-
-# Or push to main — GitHub Actions handles it automatically
 ```
+
+The GitHub Actions workflow (`.github/workflows/deploy.yml`, named "CI") runs typecheck + build on every push/PR to `main`. **Treat merging to `main` as a production deploy** — never merge with red CI.
 
 ### Required GitHub Secrets
 
-| Secret                      | Where to get it                          |
-|-----------------------------|------------------------------------------|
-| `VITE_SUPABASE_URL`         | supabase.com → Project Settings → API   |
-| `VITE_SUPABASE_ANON_KEY`    | supabase.com → Project Settings → API   |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | stripe.com → Developers → API Keys    |
-| `CLOUDFLARE_API_TOKEN`      | dash.cloudflare.com → My Profile → Tokens |
-| `CLOUDFLARE_ACCOUNT_ID`     | dash.cloudflare.com → right sidebar     |
+| Secret                        | Where to get it                          |
+|-------------------------------|------------------------------------------|
+| `VITE_SUPABASE_URL`           | supabase.com → Project Settings → API    |
+| `VITE_SUPABASE_ANON_KEY`      | supabase.com → Project Settings → API    |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | stripe.com → Developers → API Keys       |
 
 ## Project structure
 
@@ -124,47 +90,61 @@ npm run deploy
 src/
 ├── components/
 │   ├── map/          # ResourceMarker, ResourceCard, FilterDrawer
-│   ├── provider/     # ProviderLayout + portal components
-│   ├── admin/        # AdminLayout + moderation components
-│   └── shared/       # RootLayout, ToastContainer, etc.
+│   ├── provider/     # ProviderLayout, BedCountUpdater
+│   ├── admin/        # AdminLayout (badges, mobile nav)
+│   └── shared/       # RootLayout, Footer, ToastContainer
 ├── pages/
-│   ├── provider/     # Portal pages
-│   └── admin/        # Admin pages
+│   ├── marketing/    # About, Contact, Partners, Privacy, Terms, Accessibility
+│   ├── blog/         # Blog index + post pages
+│   ├── categories/   # CategoryPage (one component, config-driven)
+│   ├── provider/     # Portal pages (dashboard, listings, bookings, chat, work)
+│   └── admin/        # Admin pages (moderation, chat, FAQ, blog)
 ├── lib/
-│   ├── supabase.ts   # Client + realtime helpers
+│   ├── supabase.ts   # Client + db.*() helpers + realtime
 │   ├── store.ts      # Zustand stores (map, auth, toasts)
+│   ├── mapFilters.ts # Map filter logic + category labels
+│   ├── categories.ts # Public category-page → map-filter config
+│   ├── conversations.ts, blog.ts, adminCounts.ts
+│   ├── seo/          # SeoHead + structured data
 │   └── database.types.ts
 ├── types/
 │   └── index.ts      # All shared TypeScript types
 └── styles/
     └── globals.css   # Tailwind + component layer
 
-data/
-├── reference/
-│   └── controlled_vocab.csv
-└── seed/
-    └── streetrise_seed_candidates_batch_2_normalized.csv
-
-docs/
-└── data-dictionary.md
-
-supabase/migrations/
-├── 001_initial_schema.sql   # 7 tables, enums, indexes
-├── 002_rls_policies.sql     # Row-level security for all tables
-└── 003_seed_data.sql        # FAQ seed (10 entries)
-
-.github/workflows/
-└── deploy.yml               # Build + deploy on push to main
+data/                 # Controlled vocab + seed CSVs
+docs/                 # Data dictionary, import guide, migration runbooks, open items
+scripts/              # deploy-pages.sh, import-seed-candidates.ts
+supabase/migrations/  # 001–030 (no 012/013/021) — applied to live BY HAND
+.github/workflows/    # deploy.yml — typecheck + build CI on main
 ```
 
-## Feature modules (build order)
+## Status
 
-- [x] Repo scaffold, configs, types, Supabase client, store
-- [x] Map page — real-time resource discovery
-- [x] Supabase migrations — schema + RLS
-- [ ] Provider portal — listings, bed count updates, bookings
-- [ ] Bookings flow — request form, status tracking
-- [ ] Admin panel — verification, moderation, analytics
-- [ ] Donations — Stripe integration
-- [ ] FAQ widget
-- [ ] SEO / sitemap
+Shipped and live:
+
+- [x] Repo scaffold, configs, types, Supabase client, stores
+- [x] Map page — real-time resource discovery with quick filters and taxonomy
+- [x] Supabase schema + RLS (migrations 001–011)
+- [x] Provider portal — listings, bed counts, bookings, work exchange, messages
+- [x] Bookings flow — anonymous-allowed request form + provider/admin triage
+- [x] Admin panel — provider/resource verification, bookings, chat, FAQ, blog CRUD
+- [x] Donations — Stripe checkout via Supabase Edge Function
+- [x] FAQ (DB-backed)
+- [x] SEO — sitemap, robots.txt, SeoHead/structured data, public category pages
+- [x] Marketing pages (about, contact, partners, privacy, terms, accessibility) + footer
+- [x] Admin↔provider messaging (migrations 014/015/018)
+- [x] Provider claim flow for seeded orgs (migrations 023–027)
+- [x] Seed data: Tampa Bay + Central Florida providers, resources, work exchanges
+
+## To do
+
+Tracked in detail in `docs/OPEN_ITEMS.md`; the short list:
+
+- [ ] **Apply migration 030 to live** (conversation read tracking) — until then chat unread indicators can never clear. Runbook: `docs/apply-migration-030.md`.
+- [ ] **Render blog markdown** — `BlogPostPage` currently shows raw `body_markdown`; `cover_image_url` is stored but never displayed publicly.
+- [ ] **Filter internal tags from public pages** — `subcategory:`/`service_area:`/`import:`/`access_src:` tags render as public badges on `ResourceDetailPage`.
+- [ ] **Fix the one known lint error** — `supabase.from('bookings') as any` at `src/lib/supabase.ts:29`.
+- [ ] **Tighten `conversations` UPDATE RLS** — currently column-agnostic (low severity).
+- [ ] **Reconcile `booking_status`** — live enum has values (`declined`, `needs_info`, `contacted`, `no_response`, `closed`) that no repo migration adds.
+- [ ] **Branch cleanup** — run the runbook in `BRANCH_FRESHNESS_AUDIT.md` to retire stale AI session branches.
