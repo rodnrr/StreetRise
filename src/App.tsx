@@ -26,6 +26,7 @@ const PartnersPage         = lazy(() => import('@/pages/marketing/PartnersPage')
 const PrivacyPage          = lazy(() => import('@/pages/marketing/PrivacyPage'))
 const TermsPage            = lazy(() => import('@/pages/marketing/TermsPage'))
 const AccessibilityPage    = lazy(() => import('@/pages/marketing/AccessibilityPage'))
+const CommunityVoicesPage  = lazy(() => import('@/pages/marketing/CommunityVoicesPage'))
 
 // Blog
 const BlogIndexPage        = lazy(() => import('@/pages/blog/BlogIndexPage'))
@@ -89,6 +90,7 @@ export default function App() {
           <Route path="privacy"        element={<PrivacyPage />} />
           <Route path="terms"          element={<TermsPage />} />
           <Route path="accessibility"  element={<AccessibilityPage />} />
+          <Route path="community-voices" element={<CommunityVoicesPage />} />
 
           {/* Blog */}
           <Route path="blog"           element={<BlogIndexPage />} />
