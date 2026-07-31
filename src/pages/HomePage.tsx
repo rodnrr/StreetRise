@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, MapPin, Search, ClipboardCheck, HeartHandshake, MessagesSquare, Heart } from 'lucide-react'
+import { ArrowRight, MapPin, Search, ClipboardCheck, HeartHandshake, Newspaper, Heart } from 'lucide-react'
 import clsx from 'clsx'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, supabase } from '@/lib/supabase'
@@ -12,6 +12,7 @@ import Card from '@/components/ui/Card'
 import EmptyState from '@/components/ui/EmptyState'
 import SeoHead from '@/lib/seo/SeoHead'
 import { organizationSchema } from '@/lib/seo/structuredData'
+import { fetchPublishedPosts } from '@/lib/blog'
 import type { Resource } from '@/types'
 
 // "Browse by need" — categories with a dedicated marketing page link into it
@@ -112,9 +113,20 @@ function useFeaturedResources() {
   })
 }
 
+// Shares the ['blog-posts'] cache with BlogIndexPage.
+function useLatestPosts() {
+  return useQuery({
+    queryKey: ['blog-posts'],
+    queryFn: fetchPublishedPosts,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
 export default function HomePage() {
   const { data: count } = useResourceCount()
   const { data: featured } = useFeaturedResources()
+  const { data: posts } = useLatestPosts()
+  const latestPosts = (posts ?? []).slice(0, 3)
 
   return (
     <div className="bg-white dark:bg-slate-900">
@@ -299,14 +311,35 @@ export default function HomePage() {
         </div>
       </Section>
 
-      {/* ── Community voices (no fabricated testimonials — honest empty state) ── */}
+      {/* ── From the blog (honest empty state until posts are published) ── */}
       <Section containerSize="prose">
-        <SectionHeading title="Community Voices" align="left" />
-        <EmptyState
-          icon={MessagesSquare}
-          title="Stories are on the way"
-          description="We're collecting real stories from the people and providers StreetRise has helped. Check back soon."
-        />
+        <SectionHeading title="From the Blog" align="left" />
+        {latestPosts.length === 0 ? (
+          <EmptyState
+            icon={Newspaper}
+            title="No posts yet"
+            description="We're just getting started on the blog. Check back for updates on new cities, partners, and impact stories."
+          />
+        ) : (
+          <>
+            <div className="space-y-3">
+              {latestPosts.map((post) => (
+                <Card<typeof Link> key={post.id} as={Link} to={`/blog/${post.slug}`} hoverable className="block">
+                  <p className="font-bold text-slate-900 dark:text-white">{post.title}</p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{post.excerpt}</p>
+                  {post.published_at && (
+                    <p className="mt-2 text-xs text-slate-400">
+                      {new Date(post.published_at).toLocaleDateString()}
+                    </p>
+                  )}
+                </Card>
+              ))}
+            </div>
+            <div className="mt-6 text-center">
+              <Button to="/blog" variant="secondary">Read the Blog</Button>
+            </div>
+          </>
+        )}
       </Section>
 
       {/* ── Donate CTA ── */}

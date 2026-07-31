@@ -53,7 +53,7 @@ export default function Footer() {
           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide dark:text-slate-300">Company</p>
           <nav className="flex flex-col gap-1.5">
             <Link to="/about" className="text-xs text-gray-500 hover:text-primary-600 transition-colors dark:text-slate-400">About</Link>
-            <Link to="/blog" className="text-xs text-gray-500 hover:text-primary-600 transition-colors dark:text-slate-400">Blog</Link>
+            <Link to="/community-voices" className="text-xs text-gray-500 hover:text-primary-600 transition-colors dark:text-slate-400">Community Voices</Link>
             <Link to="/partner-with-us" className="text-xs text-gray-500 hover:text-primary-600 transition-colors dark:text-slate-400">Partner With Us</Link>
           </nav>
         </div>

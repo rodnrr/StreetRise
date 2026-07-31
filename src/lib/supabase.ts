@@ -26,6 +26,9 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
 export const db = {
   resources:        () => supabase.from('resources'),
   providers:        () => supabase.from('providers'),
+  // Generated types lag the bookings columns (see docs/OPEN_ITEMS.md);
+  // remove the cast once database.types.ts is regenerated.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   bookings:         () => supabase.from('bookings') as any,
   work_exchanges:   () => supabase.from('work_exchanges'),
   faq:              () => supabase.from('faq'),
