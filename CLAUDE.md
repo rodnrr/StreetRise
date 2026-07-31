@@ -2,35 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Active Task
+## Current Status
 
-Assess the code and public experience against the true StreetRise mission:
-**connect people in need with real local resources updated in real time.**
+The pre-debut launch review described in earlier versions of this file is **done** — its findings and applied fixes are recorded in `LAUNCH_REVIEW.md` (footer, contact info, sitemap corrections, honest copy, "Become a Provider" nav entry all shipped). Open work is tracked in:
 
-1. Identify where the current product drifts from that goal.
-2. Focus on shortcomings that would hurt a first live debut:
-   - provider onboarding not clearly reachable
-   - "resource" vs "provider" terminology confusion
-   - broken or misleading public links
-   - sitemap including routes that should not be indexed
-   - partner CTA leading to 404
-   - missing support/contact info
-   - misleading trust/verification language
-   - work exchange CTA not being real
-   - booking copy overpromising
-   - public UX feeling fragmented between marketing and app
-   - anything that weakens the real-time accuracy/trust story
-3. Do not overengineer. Do not redesign architecture.
-4. Recommend only safe, launch-focused fixes.
-5. Make sure sitemap.xml only includes intended public app routes.
-6. Prefer honest copy over hype. Preserve what is already working.
+- `docs/OPEN_ITEMS.md` — session log of open items (migration 030 status, blog gaps, internal-tag leak on `ResourceDetailPage`, lint debt)
+- `BRANCH_FRESHNESS_AUDIT.md` — runbook for cleaning up stale AI session branches
+- `LAUNCH_REVIEW.md` — the completed launch assessment, kept for reference
 
-**Output format:**
-- Brief assessment of how close StreetRise is to first live debut
-- List of shortcomings that must be fixed before commit
-- Safest patch plan
-- Exact code edits or a patch
-- Flag anything that should live on streetrise.org vs app.streetrise.org
+Known open items (verified 2026-07-31):
+
+- **Migration 030 was not yet applied to live** as of 2026-07-29 (`docs/apply-migration-030.md`). Until it is, chat unread indicators can never clear — `markConversationRead()` writes to columns that don't exist and silently no-ops.
+- **`npm run lint` has exactly one known error**: `supabase.from('bookings') as any` at `src/lib/supabase.ts:29` (`@typescript-eslint/no-explicit-any`). Pre-existing; `npm run typecheck` is clean.
+- **`BlogPostPage` does not render markdown** — `body_markdown` is shown in a `whitespace-pre-wrap` div; `cover_image_url` is stored but displayed nowhere public.
+- **Internal tags leak on `ResourceDetailPage`** — tags with `subcategory:`, `service_area:`, `import:`, `access_src:` prefixes render as public badges. Recommended fix (a `publicTags()` filter) is written up in `docs/OPEN_ITEMS.md`.
 
 ---
 
@@ -39,7 +24,7 @@ Assess the code and public experience against the true StreetRise mission:
 - **app.streetrise.org** — this React SPA (the resource-finder app)
 - **streetrise.org** — separate marketing/org site (not in this repo)
 
-StreetRise connects people in need with verified local service providers (shelters, food pantries, clinics, legal aid, etc.) in Tampa Bay, FL. Providers manage listings; the public searches the map; no sign-up required to find resources.
+StreetRise connects people in need with local service providers (shelters, food pantries, clinics, legal aid, etc.). Original coverage was Tampa Bay, FL; seed migrations 017/020/022 expanded to Central Florida (Orlando, Hernando, Pasco, Manatee/Bradenton). Public copy says "Tampa Bay and Orlando." Providers manage listings; the public searches the map; no sign-up required to find resources.
 
 ---
 
@@ -49,10 +34,10 @@ StreetRise connects people in need with verified local service providers (shelte
 npm run dev          # Vite dev server (requires .env.local)
 npm run build        # tsc + vite build (typecheck is mandatory)
 npm run typecheck    # Type-only check without building
-npm run lint         # ESLint — zero warnings enforced
+npm run lint         # ESLint, zero warnings — currently fails with 1 known error (see Current Status)
 npm run preview      # Preview production build locally
-npm run deploy       # Deploy dist/ to Cloudflare Pages via wrangler
-npm run import:seed  # Run scripts/importSeedCandidates.ts via tsx
+npm run deploy       # scripts/deploy-pages.sh → wrangler pages deploy dist
+npm run import:seed  # Run scripts/import-seed-candidates.ts via tsx
 ```
 
 **Setup:**
@@ -61,9 +46,10 @@ cp .env.example .env.local
 # Fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (minimum required)
 ```
 
-Required env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`  
-Optional: `VITE_STRIPE_PUBLISHABLE_KEY`, `VITE_GOOGLE_MAPS_API_KEY` (falls back to Nominatim), `VITE_APP_URL`, `VITE_APP_ENV`  
-Admin scripts only: `SUPABASE_SERVICE_ROLE_KEY`
+Required env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+Optional: `VITE_STRIPE_PUBLISHABLE_KEY`, `VITE_GOOGLE_MAPS_API_KEY` (falls back to Nominatim), `VITE_APP_URL`, `VITE_APP_ENV`
+Admin scripts only: `SUPABASE_SERVICE_ROLE_KEY` (never `VITE_`-prefixed)
+Deploy only: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (32-char hex; validated by `scripts/deploy-pages.sh`)
 
 ---
 
@@ -78,6 +64,7 @@ Admin scripts only: `SUPABASE_SERVICE_ROLE_KEY`
 | State | Zustand (map, auth, toasts) |
 | Data fetching | TanStack Query v5 (React Query) |
 | Forms | react-hook-form + Zod |
+| SEO | react-helmet-async (`SeoHead` + structured data in `src/lib/seo/`) |
 | Backend | Supabase (PostgreSQL + Auth + Realtime) |
 | Maps | Leaflet + react-leaflet + OpenStreetMap tiles |
 | Deploy | Cloudflare Pages (`wrangler.jsonc`) |
@@ -90,77 +77,84 @@ Admin scripts only: `SUPABASE_SERVICE_ROLE_KEY`
 ```
 src/
   App.tsx                   # Route tree (public / portal / admin)
-  main.tsx                  # React root, QueryClientProvider, BrowserRouter
+  main.tsx                  # React root, QueryClientProvider, HelmetProvider, BrowserRouter
   styles/globals.css        # Tailwind + reusable component classes
   types/index.ts            # All shared TypeScript types
   vite-env.d.ts             # Vite env type declarations
 
   lib/
-    supabase.ts             # Supabase client, db helpers, realtime helpers
+    supabase.ts             # Supabase client, db.*() helpers, realtime helpers
     store.ts                # Zustand stores (map, auth, toast)
-    database.types.ts       # Auto-generated Supabase DB type definitions
+    database.types.ts       # Supabase DB types — partially HAND-EDITED, see Migrations
     mapFilters.ts           # Filter logic, category labels, emoji map, QuickFilterKey helpers
+    categories.ts           # Public category-page config (/food-pantries etc. → map filters)
+    conversations.ts        # Unread logic + markConversationRead for admin/provider chat
+    blog.ts                 # Blog post queries
+    adminCounts.ts          # Shared pending-count queries for admin nav badges
+    seo/                    # SeoHead.tsx, structuredData.ts
 
   pages/
-    HomePage.tsx            # Landing / category grid
+    HomePage.tsx            # Landing / category grid (only eagerly loaded page)
     MapPage.tsx             # Full-screen Leaflet map with search/filter
     ResourceDetailPage.tsx  # Single resource detail
     BookingPage.tsx         # Booking/request form (anonymous allowed)
     WorkExchangePage.tsx    # Work exchange listing page
     DonatePage.tsx          # Stripe donation checkout
     FaqPage.tsx             # FAQ (loaded from DB)
-    LoginPage.tsx           # Supabase Auth UI
+    LoginPage.tsx           # Custom email/password form using supabase.auth directly
     NotFoundPage.tsx        # 404 fallback
     ProviderLandingPage.tsx # Public provider onboarding pitch (/provider/onboarding)
 
+    marketing/              # AboutPage, ContactPage, PartnersPage, PrivacyPage,
+                            # TermsPage, AccessibilityPage
+    blog/                   # BlogIndexPage, BlogPostPage (markdown NOT yet rendered)
+    categories/             # CategoryPage — one component, parameterized by lib/categories.ts
+
     provider/               # Auth-gated provider portal (/portal/*)
-      ProviderOnboarding.tsx
+      ProviderOnboarding.tsx  # 3-step form; creates the providers row
       ProviderDashboard.tsx
       ProviderListings.tsx / ProviderListingEdit.tsx
       ProviderBookings.tsx
+      ProviderChat.tsx        # /portal/messages
       ProviderWorkExchange.tsx / WorkExchangeEdit.tsx
 
     admin/                  # Auth-gated admin portal (/admin/*)
       AdminDashboard.tsx
       AdminProviders.tsx / AdminProviderEdit.tsx
-      AdminResources.tsx / AdminResourceEdit.tsx
+      AdminResources.tsx / AdminResourceEdit.tsx / AdminResourceCreate.tsx
       AdminBookings.tsx
+      AdminChat.tsx           # /admin/messages
       AdminFaq.tsx
+      AdminBlog.tsx           # Blog CRUD
 
   components/
-    shared/RootLayout.tsx   # Public layout wrapper (nav, footer)
-    provider/ProviderLayout.tsx
-    admin/AdminLayout.tsx
+    shared/                 # RootLayout (nav, footer, Get Help Now CTA, mobile tab bar),
+                            # Footer, ToastContainer
+    provider/               # ProviderLayout, BedCountUpdater
+    admin/                  # AdminLayout (mobile nav, pending-count badges)
     map/                    # ResourceMarker, ResourceCard, FilterDrawer
 
-data/                       # Controlled vocabulary CSV + seed candidate CSV
-scripts/                    # Data import scripts (run via tsx / import:seed)
+data/
+  reference/controlled_vocab.csv
+  seed/streetrise_batch1_live_export.csv
+  seed/streetrise_seed_candidates_batch_2_normalized.csv
 
-supabase/migrations/
-  001_initial_schema.sql    # All tables, enums, indexes, triggers
-  002_rls_policies.sql      # Row Level Security (RLS) for all tables
-  003_seed_data.sql         # Seed FAQ entries (10 items)
-  004_public_pending_resources_and_access_types.sql
-                            # access_type enum; lat/lng nullable; is_map_ready flag
-  005_nullable_work_exchange_coords.sql
-  006_security_verified_provider_gate.sql
-  007_outdoor_space_and_nullable_user_id.sql
-                            # outdoor_space category; nullable bookings.user_id
-  008_seed_tampa_bay_providers_resources.sql
-                            # Demo data for Tampa Bay region
-  009_import_tracking_fields.sql
-                            # external_id, import_batch, import_source on resources
-  010_verification_trust_system.sql
-                            # confidence_score, stale_after_days, last_verified_at on resources;
-                            # identity_confirmed, re_verification_due_at, suspension_reason on providers
-  011_map_taxonomy.sql      # Extended categories, resource_type, gender_policy, population_focus,
-                            # facility booleans (has_showers, has_restrooms, serves_meals,
-                            # has_laundry, pet_friendly, wheelchair_accessible,
-                            # public_transit_accessible), phone_required_before_arrival,
-                            # overnight_allowed; includes backfill logic
+docs/
+  OPEN_ITEMS.md             # Open items from 2026-07-29 session
+  apply-migration-029.md    # Hand-apply runbook (029 = blog_posts)
+  apply-migration-030.md    # Hand-apply runbook (030 = conversation read tracking)
+  data-dictionary.md
+  import-seed-candidates.md
+
+scripts/
+  deploy-pages.sh           # Cloudflare Pages deploy (validates env vars)
+  import-seed-candidates.ts # Seed import (needs SUPABASE_SERVICE_ROLE_KEY)
+
+supabase/migrations/        # 001–030 with gaps: NO 012, 013, or 021 exist.
+                            # See Migrations section — applied to live BY HAND.
 
 public/
-  sitemap.xml               # Only public app routes (NO /portal, /admin, /login)
+  sitemap.xml               # Public routes only (NO /portal, /admin, /login)
   robots.txt                # Disallows /portal/ and /admin/
   _redirects                # Cloudflare Pages SPA fallback
 ```
@@ -169,22 +163,27 @@ public/
 
 ## Route Map
 
+All public routes render inside `RootLayout` (header + footer hidden on `/map`).
+
 | Path | Component | Notes |
 |---|---|---|
 | `/` | `HomePage` | Eagerly loaded (LCP) |
-| `/map` | `MapPage` | Eagerly loaded; full-screen Leaflet |
+| `/map` | `MapPage` | Lazy; full-screen Leaflet |
 | `/resources/:id` | `ResourceDetailPage` | Lazy |
 | `/book/:resourceId` | `BookingPage` | Lazy; anonymous allowed |
 | `/work` | `WorkExchangePage` | Lazy |
 | `/donate` | `DonatePage` | Lazy; Stripe checkout |
 | `/faq` | `FaqPage` | Lazy; data from DB |
-| `/login` | `LoginPage` | Lazy; `?signup=1` opens signup tab |
-| `/provider/onboarding` | `ProviderLandingPage` | Public pitch page; links to `/login?signup=1` |
+| `/login` | `LoginPage` | Lazy; `?signup=1` opens signup tab; `?next=` redirect |
+| `/provider/onboarding` | `ProviderLandingPage` | Public pitch page |
+| `/about`, `/contact`, `/partner-with-us`, `/privacy`, `/terms`, `/accessibility` | marketing pages | Lazy |
+| `/blog`, `/blog/:slug` | blog pages | Lazy; backed by `blog_posts` |
+| `/food-pantries`, `/shelters`, `/medical`, `/employment`, `/hygiene`, `/showers`, `/legal`, `/veterans`, `/youth`, `/families` | `CategoryPage` | Presentation-only aliases over existing `/map` filters via `lib/categories.ts` — never introduce new category values here |
 | `/404` | `NotFoundPage` | Wildcard `*` redirects here |
-| `/portal/*` | Provider portal | Auth-gated; `ProviderLayout` |
-| `/admin/*` | Admin portal | Auth-gated; `AdminLayout` |
+| `/portal/*` | Provider portal | Auth-gated; dashboard, onboarding, listings, bookings, messages, work |
+| `/admin/*` | Admin portal | Auth-gated; dashboard, providers, resources (+new), bookings, messages, faq, blog |
 
-**Sitemap includes only:** `/`, `/map`, `/provider/onboarding`, `/donate`, `/faq`  
+**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/work`, `/donate`, `/faq`, the 10 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/portal/*`, or `/admin/*`.
 **robots.txt disallows:** `/portal/`, `/admin/`
 
 ---
@@ -198,6 +197,7 @@ Organizations that list resources. **The `providers` row is not created at signu
 - `verification_status`: `'pending' | 'verified' | 'rejected' | 'suspended'`
 - `ein`: optional Tax ID for nonprofits
 - Trust fields (migration 010): `identity_confirmed`, `re_verification_due_at`, `suspension_reason`, `verification_notes`, `suspended_at`
+- Claim fields (migrations 023–027): `claim_status`, `source_type` — seeded org records can exist before a provider claims them; RLS locks `claim_status` against self-approval
 
 ### `resources`
 Individual service listings owned by a provider.
@@ -210,16 +210,23 @@ Individual service listings owned by a provider.
 - `is_map_ready`: `false` when lat/lng are null or address is incomplete
 - `availability_status`: `available | limited | full | unknown | closed`
 - `beds_available` / `beds_total`: populated for `shelter` resources; drives realtime UI
+- `tags`: mixes public tags with internal `key:value` tags (`subcategory:`, `service_area:`, `import:`, `access_src:`) — currently all rendered publicly on `ResourceDetailPage` (open item)
 - Facility booleans (migration 011): `has_showers`, `has_restrooms`, `serves_meals`, `has_laundry`, `pet_friendly`, `wheelchair_accessible`, `public_transit_accessible`, `phone_required_before_arrival`, `overnight_allowed`
 - Trust fields (migration 010): `confidence_score` (0–100), `stale_after_days`, `last_provider_update_at`, `last_verified_at`
-- Import fields (migration 009): `external_id`, `import_batch`, `import_source`
+- Import fields (migrations 009/016): `external_id` (stable, human-readable, e.g. `ACTS-001`), `import_batch`, `import_source`
 - **Public query filter:** `is_active=true AND verification_status IN ('verified','pending') AND is_map_ready=true AND lat IS NOT NULL AND lng IS NOT NULL`
 
 ### `bookings`
-Service requests submitted by users (or anonymously). Status: `pending → confirmed | waitlisted | cancelled | completed | no_show`. `user_id` is nullable (anonymous allowed since migration 007).
+Service requests submitted by users (or anonymously; `user_id` nullable since migration 007). **Status enum has drifted between repo and live:** migration 001 created `pending | confirmed | waitlisted | cancelled | completed | no_show`; the live enum was extended by hand and the TS `BookingStatus` type matches live: adds `declined | needs_info | contacted | no_response | closed`. No repo migration exists for the extension. Also carries triage fields: `admin_notes`, `provider_notes`, `decision_note`, `last_contacted_at`, `decided_at`, `contact_preference`, `best_contact_time`, `contact_consent`.
+
+### `conversations` / `conversation_messages` / `conversation_admin_notes`
+Admin↔provider messaging (migrations 014, 015, 018). `conversation_admin_notes` exists because `conversations.description` was provider-readable — admin-only triage notes live there with strict RLS. Migration 030 adds `provider_last_read_at` / `admin_last_read_at` for unread tracking (see Current Status for its live-apply state). Unread logic lives in `src/lib/conversations.ts`.
 
 ### `work_exchanges`
-Volunteer/paid/skills-trade/internship opportunities posted by providers. `lat`/`lng` nullable since migration 005.
+Volunteer/paid/skills-trade/internship opportunities posted by providers. `lat`/`lng` nullable since migration 005. The `/work` page reads **this table** — migration 008's `work_exchange` category rows live in `resources` and never appear on `/work`. Seeded in 020/028.
+
+### `blog_posts`
+Backs `/blog` and `/admin/blog` (migration 029). Public-read/admin-write RLS mirroring `faq`. `body_markdown` is not yet rendered as markdown on the public page.
 
 ### `faq`
 CMS-managed FAQ items served to `/faq`.
@@ -231,7 +238,7 @@ Stripe-backed campaigns; `provider_id = null` means platform-level campaign.
 
 ## RLS Policy Summary
 
-Defined in `002_rls_policies.sql` and extended in `006_security_verified_provider_gate.sql`.
+Defined in `002_rls_policies.sql`, extended in `006` (verified-provider gate), `015` (conversation fixes), `018` (admin notes), and `024`–`026` (claim-flow hardening).
 
 Key SQL helpers:
 - `is_admin()` — returns `true` if current user has `role IN ('admin','super_admin')` AND `verification_status = 'verified'`
@@ -244,9 +251,14 @@ Key SQL helpers:
 | `bookings` | none | own resources' bookings | all |
 | `work_exchanges` | active | own | all |
 | `faq` | active | — | all |
+| `blog_posts` | published | — | all |
 | `donation_campaigns` | active | own | all |
+| `conversations` | none | own | all |
+| `conversation_admin_notes` | none | none | all |
 
 Anonymous users can **INSERT** bookings (`bookings_public_insert` — `WITH CHECK (TRUE)`).
+
+Known RLS gap (low severity, `docs/OPEN_ITEMS.md`): the `conversations` UPDATE policy is column-agnostic — a provider can update any column on their own conversation, not just their read timestamp.
 
 ---
 
@@ -255,11 +267,11 @@ Anonymous users can **INSERT** bookings (`bookings_public_insert` — `WITH CHEC
 Three Zustand stores in `src/lib/store.ts`:
 
 **`useMapStore`** (persisted as `streetrise-map-v3`)
-- `mapCenter` / `mapZoom` — drive `MapSync` component which calls `map.setView()`
-- `filters: MapFilters` — quickFilter, category, resourceType, genderPolicy, availability, accessibility, trust, radius, language, and more (see `mapFilters.ts`)
+- `mapCenter` / `mapZoom` — drive the map view sync in `MapPage`
+- `filters: MapFilters` — quickFilter, category, resourceType, genderPolicy, availability, accessibility, trust, radius, and more (see `mapFilters.ts`)
 - `userLocation` — set from browser geolocation; also sets `mapCenter`
 - `selectedId` — which resource marker is active
-- Default map center: Tampa Bay, FL — `{ lat: 27.9506, lng: -82.4572 }` at zoom 12
+- Default map center: `{ lat: 28.2, lng: -81.9 }` at zoom 9 — a wide Tampa Bay / Central Florida view
 
 **`useAuthStore`** (persisted as `streetrise-auth`)
 - `userId`, `userEmail`, `role`, `providerId`, `verificationStatus`
@@ -279,11 +291,14 @@ import { db, supabase } from '@/lib/supabase'
 // Typed table access
 db.resources()       // supabase.from('resources')
 db.providers()       // supabase.from('providers')
-db.bookings()        // supabase.from('bookings')
+db.bookings()        // supabase.from('bookings') as any — known lint debt, see Current Status
 db.work_exchanges()
 db.faq()
+db.blog_posts()
 db.moderation_logs()
 db.donations()       // supabase.from('donation_campaigns')
+db.conversations()
+db.messages()        // supabase.from('conversation_messages')
 
 // Realtime
 subscribeToBedUpdates(resourceIds, callback)  // Postgres UPDATE on resources
@@ -311,49 +326,55 @@ Custom component classes are defined in `src/styles/globals.css`:
 .label             form label
 .error-text        validation error text
 .badge             small pill label
-.badge-available / .badge-limited / .badge-full / .badge-unknown / .badge-verified
+.badge-available / .badge-limited / .badge-full / .badge-unknown
+.badge-verified / .badge-pending
 .skeleton          animated loading placeholder
-.bottom-sheet      fixed mobile bottom drawer
+.bottom-sheet      fixed mobile bottom drawer (+ .bottom-sheet-handle)
+.map-container     Leaflet wrapper
+.map-marker-available / -limited / -full   colored map pins
 ```
 
-Brand color: `primary-600` = `#1a56db` (blue).  
-Availability status colors: `available` (#22c55e), `limited` (#f59e0b), `full` (#ef4444), `unknown` (#94a3b8).  
-Font: Inter (CSS sans stack).
+Brand color: `primary-600` = `#1a56db` (blue).
+Availability status colors: `available` (#22c55e), `limited` (#f59e0b), `full` (#ef4444), `unknown` (#94a3b8).
+Font: Inter (via `@fontsource/inter`). Dark-mode variants exist on most component classes.
 
 ---
 
 ## Key Conventions
 
 - **Path alias**: `@/` resolves to `src/`. Always use `@/` for internal imports.
-- **No test suite** — verify via `npm run typecheck` and `npm run lint` (zero warnings).
-- **Lazy loading**: All pages except `HomePage` and `MapPage` are `React.lazy()` split by route.
-- **Category slug normalization**: `MapPage` maps URL slugs (e.g. `legal_help`) to canonical DB values via `CATEGORY_SLUG_MAP` in `mapFilters.ts`.
+- **No test suite** — verify via `npm run typecheck` and `npm run lint`.
+- **Lazy loading**: All pages except `HomePage` are `React.lazy()` split by route.
+- **Category pages are presentation-only**: `lib/categories.ts` maps public slugs to existing map filters. Never introduce a new category value or alter `/map` filtering from there.
+- **Category slug normalization**: `MapPage` maps URL slugs to canonical DB values via `mapFilters.ts`.
 - **Booking language**: shelter → "Request a Spot" / "Beds Available"; other categories → "Request Help" / "Open Now". Never use "book" for non-reservable services.
 - **Verification badges**: `verified` → "Staff Verified" (primary blue); `pending` → "Community Listed" (amber). Do not use "certified," "guaranteed," or "always up-to-date."
 - **Anonymous bookings**: `bookings.user_id` is nullable. Do not require login to submit a request.
 - **Never edit applied migrations** — always add a new numbered file for schema changes.
+- **SEO**: public pages use `SeoHead` (`src/lib/seo/`) for titles/descriptions/structured data.
 
 ---
 
-## Database Migrations
+## Database Migrations — READ THIS BEFORE TOUCHING THE SCHEMA
 
-Migrations live in `supabase/migrations/` and are applied in order (001–011).
+Migrations live in `supabase/migrations/`, numbered 001–030 **with gaps: 012, 013, and 021 do not exist** (023 and 027 were renumbered from 010/021 to resolve collisions — see their headers).
 
-```bash
-supabase db push
-# or paste into the Supabase SQL editor
-```
+**How they are actually applied:** by hand, in the Supabase SQL editor, against live project `mldatfcwnmvrmxumzxyb`. NOT by the deploy pipeline and not reliably by `supabase db push` — filenames have no timestamp prefixes, so repo and live migration history **drift**. Treat live as a separate source of truth; verify actual live state with read-only SQL before assuming a migration's effect exists. Runbooks for the most recent hand-applies are in `docs/apply-migration-029.md` and `docs/apply-migration-030.md`.
+
+**Do not regenerate `src/lib/database.types.ts` from the CLI** unless you have confirmed live has every migration the code depends on — the `blog_posts` block and the two conversation read columns were hand-written to match intended state, and a regen against a lagging DB would delete them.
+
+Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog.
 
 ---
 
 ## Deployment
 
-- **Platform**: Cloudflare Pages (`wrangler.jsonc`)
-- **Build output**: `dist/`
-- **SPA fallback**: `public/_redirects` rewrites all paths to `/index.html`
-- **Env vars**: Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in Cloudflare Pages → Settings → Environment Variables for both Preview and Production. Never commit secrets.
-- **CI/CD**: GitHub Actions (`.github/workflows/deploy.yml`) — triggers on push/PR to `main`; runs `tsc`, `vite build` with env secrets.
-- **PWA**: Service worker auto-registers. Supabase API responses cached 5 min (NetworkFirst). Map tiles cached 7 days (CacheFirst).
+- **Platform**: Cloudflare Pages (`wrangler.jsonc`, project name `streetrise`), production at app.streetrise.org
+- **Build output**: `dist/`; SPA fallback via `public/_redirects`
+- **CI**: `.github/workflows/deploy.yml` (named "CI") runs typecheck + build on push/PR to `main`. The workflow itself contains no deploy step; pushes to `main` reach production via the Pages integration — treat **merging to `main` as a production deploy** and never merge with red CI.
+- **Manual deploy**: `npm run deploy` (needs `CLOUDFLARE_API_TOKEN` + 32-char `CLOUDFLARE_ACCOUNT_ID`)
+- **Env vars**: `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` set in Cloudflare Pages settings and GitHub secrets. Never commit secrets.
+- **PWA**: Service worker auto-registers. Supabase API responses cached 5 min (NetworkFirst). OSM tiles cached 7 days (CacheFirst).
 
 ---
 
@@ -362,8 +383,11 @@ supabase db push
 - Do not add `console.log` or debug artifacts to committed code.
 - Do not skip the `tsc` step — `npm run build` runs `tsc && vite build`.
 - Do not use `supabase.from(...)` directly; use the `db.*()` helpers from `@/lib/supabase`.
-- Do not put portal or admin routes in `sitemap.xml`.
+- Do not put `/login`, portal, or admin routes in `sitemap.xml`.
 - Do not promise instant confirmation in booking copy — requests go to providers for review.
 - Do not use "certified," "guaranteed," or "always up-to-date" in copy.
 - Do not require login to submit a booking request (anonymous is by design).
+- Do not regenerate `database.types.ts` against a live DB that lags the repo's migrations.
+- Do not edit applied migrations or reuse the gap numbers (012/013/021) without checking live state first.
+- Do not write to the live DB (INSERT/UPDATE/DDL) without explicit go-ahead; reads are fine.
 - Do not add features or abstractions not required by the immediate task.
