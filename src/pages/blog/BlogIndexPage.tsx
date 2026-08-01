@@ -46,13 +46,25 @@ export default function BlogIndexPage() {
           <div className="space-y-3">
             {posts.map((post) => (
               <Card<typeof Link> key={post.id} as={Link} to={`/blog/${post.slug}`} hoverable className="block">
-                <p className="font-bold text-slate-900 dark:text-white">{post.title}</p>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{post.excerpt}</p>
-                {post.published_at && (
-                  <p className="mt-2 text-xs text-slate-400">
-                    {new Date(post.published_at).toLocaleDateString()}
-                  </p>
-                )}
+                <div className="flex gap-4">
+                  {post.cover_image_url && (
+                    <img
+                      src={post.cover_image_url}
+                      alt=""
+                      loading="lazy"
+                      className="h-20 w-20 flex-shrink-0 rounded-xl object-cover"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900 dark:text-white">{post.title}</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{post.excerpt}</p>
+                    {post.published_at && (
+                      <p className="mt-2 text-xs text-slate-400">
+                        {new Date(post.published_at).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </Card>
             ))}
           </div>
