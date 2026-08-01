@@ -46,6 +46,14 @@ export default function BlogIndexPage() {
           <div className="space-y-3">
             {posts.map((post) => (
               <Card<typeof Link> key={post.id} as={Link} to={`/blog/${post.slug}`} hoverable className="block">
+                {post.cover_image_url && (
+                  <img
+                    src={post.cover_image_url}
+                    alt=""
+                    loading="lazy"
+                    className="mb-3 aspect-[3/2] w-full rounded-xl object-cover"
+                  />
+                )}
                 <p className="font-bold text-slate-900 dark:text-white">{post.title}</p>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{post.excerpt}</p>
                 {post.published_at && (

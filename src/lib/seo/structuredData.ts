@@ -45,6 +45,7 @@ export function articleSchema(opts: {
   path: string
   publishedAt: string
   authorName: string
+  image?: string
 }) {
   return {
     '@context': 'https://schema.org',
@@ -54,6 +55,7 @@ export function articleSchema(opts: {
     url: `${SITE_URL}${opts.path}`,
     datePublished: opts.publishedAt,
     author: { '@type': 'Person', name: opts.authorName },
+    ...(opts.image ? { image: [opts.image] } : {}),
   }
 }
 

@@ -30,7 +30,13 @@ export default function BlogPostPage() {
 
   return (
     <div className="bg-white dark:bg-slate-900">
-      <SeoHead title={post.title} description={post.excerpt} path={`/blog/${post.slug}`} type="article">
+      <SeoHead
+        title={post.title}
+        description={post.excerpt}
+        path={`/blog/${post.slug}`}
+        type="article"
+        image={post.cover_image_url ?? undefined}
+      >
         {post.published_at && (
           <script type="application/ld+json">
             {JSON.stringify(articleSchema({
@@ -39,6 +45,7 @@ export default function BlogPostPage() {
               path: `/blog/${post.slug}`,
               publishedAt: post.published_at,
               authorName: post.author_name,
+              image: post.cover_image_url ?? undefined,
             }))}
           </script>
         )}
@@ -50,6 +57,13 @@ export default function BlogPostPage() {
           {post.published_at && ` · ${new Date(post.published_at).toLocaleDateString()}`}
         </p>
         <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{post.title}</h1>
+        {post.cover_image_url && (
+          <img
+            src={post.cover_image_url}
+            alt={post.title}
+            className="mt-6 aspect-[3/2] w-full rounded-2xl object-cover"
+          />
+        )}
         <div className="prose-sm mt-6 whitespace-pre-wrap text-sm leading-relaxed text-slate-600 dark:text-slate-300">
           {post.body_markdown}
         </div>
