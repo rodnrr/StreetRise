@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Working With the Maintainer
+
+The maintainer often works from an **iPhone** with no terminal access. At the start of each new session, ask which device they are on (iPhone / Windows / Mac / Linux) before giving any device-specific instructions. Never assume a desktop shell: when they are on iPhone, prefer dashboard/web-UI steps, and deliver files by attaching them to the chat instead of pointing at local paths or git commands.
+
 ## Current Status
 
 The pre-debut launch review described in earlier versions of this file is **done** — its findings and applied fixes are recorded in `LAUNCH_REVIEW.md` (footer, contact info, sitemap corrections, honest copy, "Become a Provider" nav entry all shipped). Open work is tracked in:
