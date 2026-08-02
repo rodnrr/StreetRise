@@ -233,7 +233,7 @@ export default function AdminBlog() {
                   className="input bg-gray-700 border-gray-600 text-white text-sm"
                   placeholder="https://…"
                 />
-                <p className="text-xs text-gray-500 mt-1">Stored, not yet shown on the public page.</p>
+                <p className="text-xs text-gray-500 mt-1">Shown at the top of the post, on the blog index, and as the social share image. PNG, JPEG, WebP, or GIF.</p>
               </div>
             </div>
 
