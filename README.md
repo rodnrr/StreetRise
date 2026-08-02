@@ -142,7 +142,7 @@ Shipped and live:
 Tracked in detail in `docs/OPEN_ITEMS.md`; the short list:
 
 - [ ] **Apply migration 030 to live** (conversation read tracking) — until then chat unread indicators can never clear. Runbook: `docs/apply-migration-030.md`.
-- [ ] **Render blog markdown** — `BlogPostPage` currently shows raw `body_markdown`; `cover_image_url` is stored but never displayed publicly.
+- [ ] **Render blog markdown** — `BlogPostPage` currently shows raw `body_markdown`.
 - [ ] **Filter internal tags from public pages** — `subcategory:`/`service_area:`/`import:`/`access_src:` tags render as public badges on `ResourceDetailPage`.
 - [ ] **Fix the one known lint error** — `supabase.from('bookings') as any` at `src/lib/supabase.ts:29`.
 - [ ] **Tighten `conversations` UPDATE RLS** — currently column-agnostic (low severity).

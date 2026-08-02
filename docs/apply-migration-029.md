@@ -137,4 +137,4 @@ appears at `/blog` and `/blog/<slug>`.
   `conversations.admin_last_read_at` / `provider_last_read_at`, which do not
   exist on live. Needs its own pass.
 - `body_markdown` is rendered as plain text by `BlogPostPage` — no markdown
-  renderer yet. `cover_image_url` is stored but displayed nowhere.
+  renderer yet.

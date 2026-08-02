@@ -60,8 +60,6 @@ exactly one error — `supabase.from('bookings') as any` at `supabase.ts:29` —
 - **`BlogPostPage` does not render markdown.** `body_markdown` is dumped into a
   `whitespace-pre-wrap` div, so `##` and `**` show as literal characters. The
   admin editor labels this honestly. Needs a renderer to be real.
-- **`cover_image_url`** is stored and editable but displayed nowhere on the
-  public blog pages.
 - **`CLAUDE.md` is stale on `booking_status`.** Live enum also includes
   `needs_info, contacted, no_response, closed` beyond the documented set.
 - **`conversations_update` RLS is column-agnostic.** A provider can update any
