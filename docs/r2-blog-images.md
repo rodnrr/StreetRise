@@ -1,5 +1,13 @@
 # Blog cover images — R2 upload runbook
 
+> **Status 2026-08-05:** The two launch covers are ALSO shipped in
+> `public/images/blog/` and served by Pages at
+> `https://app.streetrise.org/images/blog/<name>.jpg` — this is the path the
+> live posts' `cover_image_url` should use for now. It was added because
+> iPhone-dashboard uploads to R2 kept corrupting the files (Photos/Files
+> conversions); the R2 flow below still works and remains the plan for future
+> covers uploaded from a desktop, or for anything too big to ship with the app.
+
 The R2 bucket `assets-streetrise` (created 2026-07-30, location ENAM) hosts blog
 cover images. Web-optimized covers live in this repo under `assets/r2/blog/`
 (1536×1024 progressive JPEGs, ~170 KB each, converted from the original PNGs):
