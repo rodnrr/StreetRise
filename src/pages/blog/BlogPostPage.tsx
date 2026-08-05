@@ -60,8 +60,8 @@ export default function BlogPostPage() {
         {post.cover_image_url && (
           <img
             src={post.cover_image_url}
-            alt={post.title}
-            className="mt-6 aspect-[3/2] w-full rounded-2xl object-cover"
+            alt=""
+            className="mt-6 w-full rounded-2xl object-cover"
           />
         )}
         <div className="prose-sm mt-6 whitespace-pre-wrap text-sm leading-relaxed text-slate-600 dark:text-slate-300">
