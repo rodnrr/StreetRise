@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Working With the Maintainer
+
+The maintainer often works from an **iPhone** with no terminal access. At the start of each new session, ask which device they are on (iPhone / Windows / Mac / Linux) before giving any device-specific instructions. Never assume a desktop shell: when they are on iPhone, prefer dashboard/web-UI steps, and deliver files by attaching them to the chat instead of pointing at local paths or git commands.
+
 ## Current Status
 
 The pre-debut launch review described in earlier versions of this file is **done** — its findings and applied fixes are recorded in `LAUNCH_REVIEW.md` (footer, contact info, sitemap corrections, honest copy, "Become a Provider" nav entry all shipped). Open work is tracked in:
@@ -14,7 +18,7 @@ Known open items (verified 2026-07-31):
 
 - **Migration 030 was not yet applied to live** as of 2026-07-29 (`docs/apply-migration-030.md`). Until it is, chat unread indicators can never clear — `markConversationRead()` writes to columns that don't exist and silently no-ops.
 - **`npm run lint` has exactly one known error**: `supabase.from('bookings') as any` at `src/lib/supabase.ts:29` (`@typescript-eslint/no-explicit-any`). Pre-existing; `npm run typecheck` is clean.
-- **`BlogPostPage` does not render markdown** — `body_markdown` is shown in a `whitespace-pre-wrap` div.
+- **`BlogPostPage` does not render markdown** — `body_markdown` is shown in a `whitespace-pre-wrap` div. `cover_image_url` now renders (hero on `BlogPostPage`, thumbnail on `BlogIndexPage`, og:image) when set; images are hosted in the R2 bucket `assets-streetrise` — upload + DB-update runbook in `docs/r2-blog-images.md`.
 - **Internal tags leak on `ResourceDetailPage`** — tags with `subcategory:`, `service_area:`, `import:`, `access_src:` prefixes render as public badges. Recommended fix (a `publicTags()` filter) is written up in `docs/OPEN_ITEMS.md`.
 
 ---
