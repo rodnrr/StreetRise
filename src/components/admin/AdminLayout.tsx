@@ -15,8 +15,12 @@ type NavLinkDef = {
   to: string
   label: string
   icon: typeof MapPin
-  /** Which pending count to surface as a badge, if any. */
-  badgeKey?: keyof AdminCounts
+  /**
+   * Which pending counts to surface as a badge, if any. Several keys sum into
+   * one badge when a single page actions all of them — /admin/providers
+   * reviews both new applications and organization claims.
+   */
+  badgeKeys?: (keyof AdminCounts)[]
 }
 
 const NAV_GROUPS: { label: string | null; links: NavLinkDef[] }[] = [
@@ -27,10 +31,10 @@ const NAV_GROUPS: { label: string | null; links: NavLinkDef[] }[] = [
   {
     label: 'Moderation',
     links: [
-      { to: '/admin/providers', label: 'Providers', icon: Building2,     badgeKey: 'providersPending' },
-      { to: '/admin/resources', label: 'Resources', icon: MapPin,        badgeKey: 'resourcesPending' },
-      { to: '/admin/bookings',  label: 'Bookings',  icon: CalendarDays,  badgeKey: 'bookingsPending' },
-      { to: '/admin/messages',  label: 'Messages',  icon: MessageSquare, badgeKey: 'messagesOpen' },
+      { to: '/admin/providers', label: 'Providers', icon: Building2,     badgeKeys: ['providersPending', 'claimsPending'] },
+      { to: '/admin/resources', label: 'Resources', icon: MapPin,        badgeKeys: ['resourcesPending'] },
+      { to: '/admin/bookings',  label: 'Bookings',  icon: CalendarDays,  badgeKeys: ['bookingsPending'] },
+      { to: '/admin/messages',  label: 'Messages',  icon: MessageSquare, badgeKeys: ['messagesOpen'] },
     ],
   },
   {
@@ -59,7 +63,7 @@ export default function AdminLayout() {
   const isAdmin = role === 'admin' || role === 'super_admin'
   const { data: counts = EMPTY_ADMIN_COUNTS } = useAdminCounts(isAdmin)
   const totalPending =
-    counts.providersPending + counts.resourcesPending +
+    counts.providersPending + counts.claimsPending + counts.resourcesPending +
     counts.bookingsPending + counts.messagesOpen
 
   // Close the mobile drawer whenever the route changes.
@@ -116,8 +120,8 @@ export default function AdminLayout() {
                   {group.label}
                 </p>
               )}
-              {group.links.map(({ to, label, icon: Icon, badgeKey }) => {
-                const count = badgeKey ? counts[badgeKey] : 0
+              {group.links.map(({ to, label, icon: Icon, badgeKeys }) => {
+                const count = (badgeKeys ?? []).reduce((n, k) => n + counts[k], 0)
                 return (
                   <NavLink key={to} to={to} className={navLinkClass}>
                     <Icon size={17} className="shrink-0" />

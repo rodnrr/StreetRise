@@ -73,6 +73,20 @@ export default function ProviderLandingPage() {
             Sign in
           </Link>
         </div>
+
+        {/* Most orgs on the map were seeded from public information and are
+            waiting to be claimed — steer them there before they register a
+            duplicate. providers.user_id is UNIQUE, so an account that
+            registers a new org can never claim an existing one. */}
+        <div className="rounded-2xl bg-primary-50/60 border border-primary-100 p-4 mt-4 text-left sm:text-center">
+          <p className="text-sm text-gray-700">
+            <strong>Already on StreetRise?</strong> Many organizations are listed from
+            public information and are waiting to be claimed.
+          </p>
+          <Link to="/claim" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:underline mt-1.5">
+            Find and claim your organization <ArrowRight size={14} />
+          </Link>
+        </div>
       </div>
 
       {/* What you can do */}

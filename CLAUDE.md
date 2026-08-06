@@ -21,7 +21,7 @@ Known open items (verified 2026-07-31):
 - **`BlogPostPage` does not render markdown** — `body_markdown` is shown in a `whitespace-pre-wrap` div. `cover_image_url` now renders (hero on `BlogPostPage`, thumbnail on `BlogIndexPage`, og:image) when set; images are hosted in the R2 bucket `assets-streetrise` — upload + DB-update runbook in `docs/r2-blog-images.md`.
 - **Internal tags leak on `ResourceDetailPage`** — tags with `subcategory:`, `service_area:`, `import:`, `access_src:` prefixes render as public badges. Recommended fix (a `publicTags()` filter) is written up in `docs/OPEN_ITEMS.md`.
 - **Provider signup depends on two column defaults.** `providers_insert_self` (tightened by migration 023) requires `claim_status='claimed'` and `source_type='self_registered'`, but `ProviderOnboarding.tsx` sets neither — the column defaults supply both before `WITH CHECK` runs. Drop or change those defaults and provider signup starts failing RLS.
-- **Claiming an org hides it from `/work` until an admin approves.** Once `claim_status` goes `unclaimed → pending_claim`, the row matches neither `providers_unclaimed_read` nor `providers_public_read` (it is also `pending`), so the org drops out of public reads mid-claim. Needs handling when the claim UI is built — see `docs/apply-migrations-023-027.md`.
+- ~~Claiming an org hides it from `/work`~~ — **fixed by migration 033**, which adds `providers_pending_claim_read` so a mid-claim org stays publicly visible.
 - **Default map center still points at Tampa Bay** — `useMapStore` opens at `{ lat: 28.2, lng: -81.9 }` zoom 9. Since migration 032 added South Florida (2026-08-06), a Miami or Hollywood visitor who does not grant geolocation or search lands on a map with no nearby pins. Worth revisiting now that coverage spans ~400 km of the state; the persisted store key would need bumping (`streetrise-map-v3` → `v4`) for existing visitors to pick up a new default.
 
 ---
@@ -183,6 +183,8 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/faq` | `FaqPage` | Lazy; data from DB |
 | `/login` | `LoginPage` | Lazy; `?signup=1` opens signup tab; `?next=` redirect |
 | `/provider/onboarding` | `ProviderLandingPage` | Public pitch page |
+| `/claim` | `ClaimIndexPage` | Lazy; public directory of `unclaimed` orgs |
+| `/claim/:id` | `ClaimDetailPage` | Lazy; claim submission (auth required to submit) |
 | `/about`, `/contact`, `/partner-with-us`, `/privacy`, `/terms`, `/accessibility` | marketing pages | Lazy |
 | `/blog`, `/blog/:slug` | blog pages | Lazy; backed by `blog_posts` |
 | `/food-pantries`, `/shelters`, `/medical`, `/employment`, `/hygiene`, `/showers`, `/legal`, `/veterans`, `/youth`, `/families` | `CategoryPage` | Presentation-only aliases over existing `/map` filters via `lib/categories.ts` — never introduce new category values here |
@@ -190,7 +192,7 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/portal/*` | Provider portal | Auth-gated; dashboard, onboarding, listings, bookings, messages, work |
 | `/admin/*` | Admin portal | Auth-gated; dashboard, providers, resources (+new), bookings, messages, faq, blog |
 
-**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/work`, `/donate`, `/faq`, the 10 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/portal/*`, or `/admin/*`.
+**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/claim`, `/work`, `/donate`, `/faq`, the 10 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/portal/*`, `/admin/*`, or individual `/claim/:id` pages.
 **robots.txt disallows:** `/portal/`, `/admin/`
 
 ---
@@ -204,7 +206,16 @@ Organizations that list resources. **The `providers` row is not created at signu
 - `verification_status`: `'pending' | 'verified' | 'rejected' | 'suspended'`
 - `ein`: optional Tax ID for nonprofits
 - Trust fields (migration 010): `identity_confirmed`, `re_verification_due_at`, `suspension_reason`, `verification_notes`, `suspended_at`
-- Claim fields (migrations 023–027): `claim_status`, `source_type` — **applied to live 2026-08-06** (runbook: `docs/apply-migrations-023-027.md`). Seeded org records can exist before a provider claims them; RLS locks `claim_status` against self-approval. Live state: 119 `unclaimed`/`seeded`/`verified`, 4 `claimed`/`self_registered`, 3 `unclaimed`/`seeded`/`pending`. **The DB is ready but there is no claim UI** — nothing in `src/` references these columns outside `database.types.ts`, and there is no `/claim` route.
+- Claim fields (migrations 023–027): `claim_status`, `source_type` — **applied to live 2026-08-06** (runbook: `docs/apply-migrations-023-027.md`). Seeded org records can exist before a provider claims them; RLS locks `claim_status` against self-approval. Live state: 119 `unclaimed`/`seeded`/`verified`, 4 `claimed`/`self_registered`, 3 `unclaimed`/`seeded`/`pending`. The claim UI ships on `/claim` — see `provider_claims` below.
+
+### `provider_claims`
+Claim submissions (migration 033, applied to live 2026-08-06). One row per claim attempt: `provider_id`, `user_id`, `claim_email`, `claim_note`, `status` (`pending | approved | denied`), plus decision fields.
+
+Exists as its own table because `providers_claim_submit` locks every column on `providers` except `user_id` and `claim_status`, so there is nowhere on that row to record who is claiming and why — and `providers_pending_claim_read` makes a mid-claim row publicly readable, so claimant PII must not live on it. Same reasoning as `conversation_admin_notes`.
+
+- `claim_email` is pinned by RLS to `auth.jwt() ->> 'email'` — a claimant cannot submit under someone else's address.
+- RLS: claimant inserts/reads/deletes **their own** rows; admins read/update/delete all; **the public can read none**.
+- Partial unique index `uniq_provider_claims_open` allows one open claim per (provider, user); re-claiming after a denial is allowed.
 
 ### `resources`
 Individual service listings owned by a provider.

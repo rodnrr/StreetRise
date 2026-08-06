@@ -269,6 +269,30 @@ export interface Database {
         Relationships: []
       }
 
+      // Migration 033. Claim evidence lives here rather than on `providers`
+      // because providers_claim_submit locks every column on that row, and
+      // providers_pending_claim_read makes a claimed row publicly readable —
+      // the claimant's email must not ride along on it.
+      provider_claims: {
+        Row: {
+          id: string
+          provider_id: string
+          user_id: string
+          claim_email: string
+          claim_note: string | null
+          status: 'pending' | 'approved' | 'denied'
+          decided_at: string | null
+          decided_by: string | null
+          decision_note: string | null
+          created_at: string
+        }
+        Insert: Optional<
+          Omit<Database['public']['Tables']['provider_claims']['Row'], 'id' | 'created_at'>,
+          'claim_note' | 'status' | 'decided_at' | 'decided_by' | 'decision_note'
+        >
+        Update: Partial<Database['public']['Tables']['provider_claims']['Insert']>
+        Relationships: []
+      }
       blog_posts: {
         Row: {
           id: string

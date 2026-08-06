@@ -12,7 +12,12 @@ export default function LoginPage() {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
   const navigate      = useNavigate()
-  const next          = params.get('next') ?? '/portal/dashboard'
+  // An explicit ?next= wins over the default post-signup routing. Without
+  // this, someone signing up to claim an organization (?next=/claim/:id)
+  // would be bounced into /portal/onboarding and asked to register a second,
+  // duplicate org instead of landing back on the claim they came for.
+  const explicitNext  = params.get('next')
+  const next          = explicitNext ?? '/portal/dashboard'
   const { setAuth }   = useAuthStore()
 
   async function handleSubmit(e: React.FormEvent) {
@@ -40,10 +45,10 @@ export default function LoginPage() {
         })
         // Route based on role and account state
         let destination = next
-        if (!provider && mode === 'signup') {
-          destination = '/portal/onboarding'
-        } else if (provider?.role === 'admin' || provider?.role === 'super_admin') {
+        if (provider?.role === 'admin' || provider?.role === 'super_admin') {
           destination = '/admin/dashboard'
+        } else if (!provider && mode === 'signup' && !explicitNext) {
+          destination = '/portal/onboarding'
         }
         navigate(destination, { replace: true })
       }
