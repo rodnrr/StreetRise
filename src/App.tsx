@@ -18,6 +18,9 @@ const WorkExchangePage     = lazy(() => import('@/pages/WorkExchangePage'))
 const DonatePage           = lazy(() => import('@/pages/DonatePage'))
 const FaqPage              = lazy(() => import('@/pages/FaqPage'))
 const LoginPage            = lazy(() => import('@/pages/LoginPage'))
+const ForgotPasswordPage   = lazy(() => import('@/pages/ForgotPasswordPage'))
+const ResetPasswordPage    = lazy(() => import('@/pages/ResetPasswordPage'))
+const AuthCallbackPage     = lazy(() => import('@/pages/AuthCallbackPage'))
 const NotFoundPage         = lazy(() => import('@/pages/NotFoundPage'))
 
 // Marketing pages
@@ -86,6 +89,9 @@ export default function App() {
           <Route path="donate"     element={<DonatePage />} />
           <Route path="faq"        element={<FaqPage />} />
           <Route path="login"              element={<LoginPage />} />
+          <Route path="forgot-password"    element={<ForgotPasswordPage />} />
+          <Route path="reset-password"     element={<ResetPasswordPage />} />
+          <Route path="auth/callback"      element={<AuthCallbackPage />} />
           <Route path="provider/onboarding" element={<ProviderLandingPage />} />
           <Route path="claim"      element={<ClaimIndexPage />} />
           <Route path="claim/:id"  element={<ClaimDetailPage />} />
