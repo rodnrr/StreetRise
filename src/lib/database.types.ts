@@ -269,6 +269,37 @@ export interface Database {
         Relationships: []
       }
 
+      // Migration 033. Claim evidence lives here rather than on `providers`
+      // because providers_claim_submit locks every column on that row, and
+      // providers_pending_claim_read makes a claimed row publicly readable —
+      // the claimant's email must not ride along on it.
+      provider_claims: {
+        Row: {
+          id: string
+          provider_id: string
+          user_id: string
+          // Pinned by RLS to auth.jwt()->>'email' — evidence, not a contact detail.
+          claim_email: string
+          // Claimant-supplied address to reach them at (migration 034). Free text,
+          // so it proves nothing; never use it for domain matching.
+          contact_email: string
+          claim_note: string | null
+          status: 'pending' | 'approved' | 'denied'
+          decided_at: string | null
+          decided_by: string | null
+          decision_note: string | null
+          submitted_notified_at: string | null
+          decision_notified_at: string | null
+          created_at: string
+        }
+        Insert: Optional<
+          Omit<Database['public']['Tables']['provider_claims']['Row'], 'id' | 'created_at'>,
+          'claim_note' | 'status' | 'decided_at' | 'decided_by' | 'decision_note'
+          | 'submitted_notified_at' | 'decision_notified_at'
+        >
+        Update: Partial<Database['public']['Tables']['provider_claims']['Insert']>
+        Relationships: []
+      }
       blog_posts: {
         Row: {
           id: string

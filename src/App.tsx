@@ -35,6 +35,10 @@ const BlogPostPage         = lazy(() => import('@/pages/blog/BlogPostPage'))
 // Category pages — all share one component, parameterized via categories.ts
 const CategoryPage         = lazy(() => import('@/pages/categories/CategoryPage'))
 
+// Provider claim flow (migrations 023–027 + 033)
+const ClaimIndexPage       = lazy(() => import('@/pages/claim/ClaimIndexPage'))
+const ClaimDetailPage      = lazy(() => import('@/pages/claim/ClaimDetailPage'))
+
 // Provider portal
 const ProviderDashboard    = lazy(() => import('@/pages/provider/ProviderDashboard'))
 const ProviderListings     = lazy(() => import('@/pages/provider/ProviderListings'))
@@ -82,6 +86,8 @@ export default function App() {
           <Route path="faq"        element={<FaqPage />} />
           <Route path="login"              element={<LoginPage />} />
           <Route path="provider/onboarding" element={<ProviderLandingPage />} />
+          <Route path="claim"      element={<ClaimIndexPage />} />
+          <Route path="claim/:id"  element={<ClaimDetailPage />} />
 
           {/* Marketing */}
           <Route path="about"          element={<AboutPage />} />

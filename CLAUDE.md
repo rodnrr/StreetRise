@@ -17,9 +17,12 @@ The pre-debut launch review described in earlier versions of this file is **done
 Known open items (verified 2026-07-31):
 
 - **Migration 030 was not yet applied to live** as of 2026-07-29 (`docs/apply-migration-030.md`). Until it is, chat unread indicators can never clear — `markConversationRead()` writes to columns that don't exist and silently no-ops.
-- **`npm run lint` has exactly one known error**: `supabase.from('bookings') as any` at `src/lib/supabase.ts:29` (`@typescript-eslint/no-explicit-any`). Pre-existing; `npm run typecheck` is clean.
+- **`npm run lint`, `npm run typecheck`, and `npm run build` are all clean** (re-verified 2026-08-06). The previously documented lint error on `supabase.from('bookings') as any` is gone — `src/lib/supabase.ts` now carries an `eslint-disable-next-line` for it, so the cast itself is still lint debt to unwind when `database.types.ts` is regenerated.
 - **`BlogPostPage` does not render markdown** — `body_markdown` is shown in a `whitespace-pre-wrap` div. `cover_image_url` now renders (hero on `BlogPostPage`, thumbnail on `BlogIndexPage`, og:image) when set; images are hosted in the R2 bucket `assets-streetrise` — upload + DB-update runbook in `docs/r2-blog-images.md`.
 - **Internal tags leak on `ResourceDetailPage`** — tags with `subcategory:`, `service_area:`, `import:`, `access_src:` prefixes render as public badges. Recommended fix (a `publicTags()` filter) is written up in `docs/OPEN_ITEMS.md`.
+- **Provider signup depends on two column defaults.** `providers_insert_self` (tightened by migration 023) requires `claim_status='claimed'` and `source_type='self_registered'`, but `ProviderOnboarding.tsx` sets neither — the column defaults supply both before `WITH CHECK` runs. Drop or change those defaults and provider signup starts failing RLS.
+- ~~Claiming an org hides it from `/work`~~ — **fixed by migration 033**, which adds `providers_pending_claim_read` so a mid-claim org stays publicly visible.
+- **Default map center still points at Tampa Bay** — `useMapStore` opens at `{ lat: 28.2, lng: -81.9 }` zoom 9. Since migration 032 added South Florida (2026-08-06), a Miami or Hollywood visitor who does not grant geolocation or search lands on a map with no nearby pins. Worth revisiting now that coverage spans ~400 km of the state; the persisted store key would need bumping (`streetrise-map-v3` → `v4`) for existing visitors to pick up a new default.
 
 ---
 
@@ -28,7 +31,7 @@ Known open items (verified 2026-07-31):
 - **app.streetrise.org** — this React SPA (the resource-finder app)
 - **streetrise.org** — separate marketing/org site (not in this repo)
 
-StreetRise connects people in need with local service providers (shelters, food pantries, clinics, legal aid, etc.). Original coverage was Tampa Bay, FL; seed migrations 017/020/022 expanded to Central Florida (Orlando, Hernando, Pasco, Manatee/Bradenton). Public copy says "Tampa Bay and Orlando." Providers manage listings; the public searches the map; no sign-up required to find resources.
+StreetRise connects people in need with local service providers (shelters, food pantries, clinics, legal aid, etc.). Original coverage was Tampa Bay, FL; seed migrations 017/020/022 expanded to Central Florida (Orlando, Hernando, Pasco, Manatee/Bradenton); migration 032 added South Florida (Miami-Dade + South Broward/Hollywood). Public copy says "Tampa Bay, Orlando, and Miami" — `HomePage`'s `CITIES` array is the source of truth for which metros read as live, and a metro is only flipped to `live: true` once it has publicly visible seeded listings. Providers manage listings; the public searches the map; no sign-up required to find resources.
 
 ---
 
@@ -38,7 +41,7 @@ StreetRise connects people in need with local service providers (shelters, food 
 npm run dev          # Vite dev server (requires .env.local)
 npm run build        # tsc + vite build (typecheck is mandatory)
 npm run typecheck    # Type-only check without building
-npm run lint         # ESLint, zero warnings — currently fails with 1 known error (see Current Status)
+npm run lint         # ESLint, zero warnings — currently passing
 npm run preview      # Preview production build locally
 npm run deploy       # scripts/deploy-pages.sh → wrangler pages deploy dist
 npm run import:seed  # Run scripts/import-seed-candidates.ts via tsx
@@ -73,6 +76,7 @@ Deploy only: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (32-char hex; valid
 | Maps | Leaflet + react-leaflet + OpenStreetMap tiles |
 | Deploy | Cloudflare Pages (`wrangler.jsonc`) |
 | Payments | Stripe (via Supabase Edge Function `create-checkout-session`) |
+| Transactional email | Resend (via Supabase Edge Function `notify-claim`) |
 
 ---
 
@@ -154,7 +158,7 @@ scripts/
   deploy-pages.sh           # Cloudflare Pages deploy (validates env vars)
   import-seed-candidates.ts # Seed import (needs SUPABASE_SERVICE_ROLE_KEY)
 
-supabase/migrations/        # 001–030 with gaps: NO 012, 013, or 021 exist.
+supabase/migrations/        # 001–034 with gaps: NO 012, 013, or 021 exist.
                             # See Migrations section — applied to live BY HAND.
 
 public/
@@ -180,6 +184,8 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/faq` | `FaqPage` | Lazy; data from DB |
 | `/login` | `LoginPage` | Lazy; `?signup=1` opens signup tab; `?next=` redirect |
 | `/provider/onboarding` | `ProviderLandingPage` | Public pitch page |
+| `/claim` | `ClaimIndexPage` | Lazy; public directory of `unclaimed` orgs |
+| `/claim/:id` | `ClaimDetailPage` | Lazy; claim submission (auth required to submit) |
 | `/about`, `/contact`, `/partner-with-us`, `/privacy`, `/terms`, `/accessibility` | marketing pages | Lazy |
 | `/blog`, `/blog/:slug` | blog pages | Lazy; backed by `blog_posts` |
 | `/food-pantries`, `/shelters`, `/medical`, `/employment`, `/hygiene`, `/showers`, `/legal`, `/veterans`, `/youth`, `/families` | `CategoryPage` | Presentation-only aliases over existing `/map` filters via `lib/categories.ts` — never introduce new category values here |
@@ -187,7 +193,7 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/portal/*` | Provider portal | Auth-gated; dashboard, onboarding, listings, bookings, messages, work |
 | `/admin/*` | Admin portal | Auth-gated; dashboard, providers, resources (+new), bookings, messages, faq, blog |
 
-**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/work`, `/donate`, `/faq`, the 10 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/portal/*`, or `/admin/*`.
+**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/claim`, `/work`, `/donate`, `/faq`, the 10 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/portal/*`, `/admin/*`, or individual `/claim/:id` pages.
 **robots.txt disallows:** `/portal/`, `/admin/`
 
 ---
@@ -201,13 +207,22 @@ Organizations that list resources. **The `providers` row is not created at signu
 - `verification_status`: `'pending' | 'verified' | 'rejected' | 'suspended'`
 - `ein`: optional Tax ID for nonprofits
 - Trust fields (migration 010): `identity_confirmed`, `re_verification_due_at`, `suspension_reason`, `verification_notes`, `suspended_at`
-- Claim fields (migrations 023–027): `claim_status`, `source_type` — seeded org records can exist before a provider claims them; RLS locks `claim_status` against self-approval
+- Claim fields (migrations 023–027): `claim_status`, `source_type` — **applied to live 2026-08-06** (runbook: `docs/apply-migrations-023-027.md`). Seeded org records can exist before a provider claims them; RLS locks `claim_status` against self-approval. Live state: 119 `unclaimed`/`seeded`/`verified`, 4 `claimed`/`self_registered`, 3 `unclaimed`/`seeded`/`pending`. The claim UI ships on `/claim` — see `provider_claims` below.
+
+### `provider_claims`
+Claim submissions (migration 033, applied to live 2026-08-06). One row per claim attempt: `provider_id`, `user_id`, `claim_email`, `claim_note`, `status` (`pending | approved | denied`), plus decision fields.
+
+Exists as its own table because `providers_claim_submit` locks every column on `providers` except `user_id` and `claim_status`, so there is nowhere on that row to record who is claiming and why — and `providers_pending_claim_read` makes a mid-claim row publicly readable, so claimant PII must not live on it. Same reasoning as `conversation_admin_notes`.
+
+- `claim_email` is pinned by RLS to `auth.jwt() ->> 'email'` — a claimant cannot submit under someone else's address. **`contact_email` (migration 034) is different**: required free text for where the claimant wants to be reached. Notification mail goes to `contact_email`; domain matching must only ever use `claim_email`, or the anti-spoofing guarantee is lost.
+- RLS: claimant inserts/reads/deletes **their own** rows; admins read/update/delete all; **the public can read none**.
+- Partial unique index `uniq_provider_claims_open` allows one open claim per (provider, user); re-claiming after a denial is allowed.
 
 ### `resources`
 Individual service listings owned by a provider.
 
 - `category`: `shelter | food | work_exchange | mental_health | medical | legal | hygiene | clothing | childcare | transportation | outdoor_space | day_space | substance_recovery | legal_aid | employment | outreach | hotline | healthcare | other`
-- `resource_type` (migration 011): `emergency_shelter | transitional_housing | permanent_supportive | rapid_rehousing | food_pantry | hot_meal | mobile_meal | soup_kitchen | primary_care | urgent_care | mobile_clinic | free_clinic | dental | vision | mental_health_counseling | substance_recovery | harm_reduction | legal_aid | employment_training | day_center | public_restroom | public_shower | other`
+- `resource_type` — **live differs from migration 011.** The live `resources_resource_type_check` constraint (verified 2026-08-06) accepts: `emergency_shelter | transitional_housing | food_pantry | hot_meal | shower_facility | restroom_access | day_use_park | warming_cooling_center | domestic_violence_shelter | veteran_housing | youth_shelter | work_exchange | crisis_hotline | job_training | legal_services | medical_clinic | mental_health_clinic | substance_recovery_program | clothing_closet | hygiene_supplies | laundry_facility | childcare_services | transportation_assistance | outreach_program | other`. Write against this list, not 011's — values like `primary_care`, `free_clinic`, `soup_kitchen`, and `legal_aid` will fail the check on live.
 - `gender_policy`: `gender_inclusive | men_only | women_only | family_only | couples_only | youth_only | unknown`
 - `population_focus`: text array (veterans, lgbtq, domestic_violence, families, seniors, young_adults, pregnant_women, substance_recovery, mental_health, reentry, hiv_aids)
 - `access_type`: `onsite | phone_intake | web_intake | confidential_address | not_map_ready`
@@ -361,13 +376,13 @@ Font: Inter (via `@fontsource/inter`). Dark-mode variants exist on most componen
 
 ## Database Migrations — READ THIS BEFORE TOUCHING THE SCHEMA
 
-Migrations live in `supabase/migrations/`, numbered 001–030 **with gaps: 012, 013, and 021 do not exist** (023 and 027 were renumbered from 010/021 to resolve collisions — see their headers).
+Migrations live in `supabase/migrations/`, numbered 001–034 **with gaps: 012, 013, and 021 do not exist** (023 and 027 were renumbered from 010/021 to resolve collisions — see their headers).
 
-**How they are actually applied:** by hand, in the Supabase SQL editor, against live project `mldatfcwnmvrmxumzxyb`. NOT by the deploy pipeline and not reliably by `supabase db push` — filenames have no timestamp prefixes, so repo and live migration history **drift**. Treat live as a separate source of truth; verify actual live state with read-only SQL before assuming a migration's effect exists. Runbooks for the most recent hand-applies are in `docs/apply-migration-029.md` and `docs/apply-migration-030.md`.
+**How they are actually applied:** by hand, in the Supabase SQL editor, against live project `mldatfcwnmvrmxumzxyb`. NOT by the deploy pipeline and not reliably by `supabase db push` — filenames have no timestamp prefixes, so repo and live migration history **drift**. Treat live as a separate source of truth; verify actual live state with read-only SQL before assuming a migration's effect exists. Runbooks for the most recent applies are in `docs/apply-migration-032.md`, `docs/apply-migrations-023-027.md`, and `docs/claim-flow.md` (033/034).
 
 **Do not regenerate `src/lib/database.types.ts` from the CLI** unless you have confirmed live has every migration the code depends on — the `blog_posts` block and the two conversation read columns were hand-written to match intended state, and a regen against a lagging DB would delete them.
 
-Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog.
+Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage, 032 South Florida seed, 033/034 claim submissions + notification fields.
 
 ---
 

@@ -206,6 +206,43 @@ export interface DayHours {
 
 export type ProviderRole = 'provider' | 'admin' | 'super_admin'
 
+export type ProviderClaimStatus = 'unclaimed' | 'pending_claim' | 'claimed'
+export type ProviderSourceType  = 'self_registered' | 'seeded' | 'imported'
+
+/** Row of `provider_claims` (migration 033). Admin- and owner-readable only. */
+export interface ProviderClaim {
+  id: string
+  provider_id: string
+  user_id: string
+  /** Pinned by RLS to the claimant's account email — evidence, not a contact detail. */
+  claim_email: string
+  /** Claimant-supplied address to reach them at. Free text; proves nothing. */
+  contact_email: string
+  claim_note?: string | null
+  status: 'pending' | 'approved' | 'denied'
+  decided_at?: string | null
+  decided_by?: string | null
+  decision_note?: string | null
+  submitted_notified_at?: string | null
+  decision_notified_at?: string | null
+  created_at: string
+}
+
+/**
+ * The public-safe subset of a provider shown on /claim. Deliberately narrower
+ * than `Provider` — the claim directory has no business selecting user_id or
+ * the trust/verification internals.
+ */
+export interface ClaimableProvider {
+  id: string
+  organization_name: string
+  contact_email: string
+  contact_phone?: string | null
+  website?: string | null
+  bio?: string | null
+  claim_status: ProviderClaimStatus
+}
+
 export interface Provider {
   id: string
   user_id: string
@@ -219,6 +256,9 @@ export interface Provider {
   verification_status: VerificationStatus
   role: ProviderRole
   bio?: string
+  // Claim fields (migrations 023–027)
+  claim_status?: ProviderClaimStatus
+  source_type?: ProviderSourceType
   // Trust fields (migration 010)
   identity_confirmed?: boolean
   re_verification_due_at?: string | null

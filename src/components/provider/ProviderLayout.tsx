@@ -1,8 +1,9 @@
 import { Outlet, NavLink, Navigate, useLocation } from 'react-router-dom'
 import { LayoutDashboard, ListChecks, CalendarDays, Briefcase, LogOut, Clock, XCircle, ShieldOff, MessageSquare } from 'lucide-react'
 import clsx from 'clsx'
+import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/lib/store'
-import { supabase } from '@/lib/supabase'
+import { db, supabase } from '@/lib/supabase'
 import ToastContainer from '../shared/ToastContainer'
 
 const LINKS = [
@@ -13,7 +14,7 @@ const LINKS = [
   { to: '/portal/work',      label: 'Work Exchange', icon: Briefcase },
 ]
 
-function PendingScreen({ status, onLogout }: { status: string; onLogout: () => void }) {
+function PendingScreen({ status, isClaim, onLogout }: { status: string; isClaim: boolean; onLogout: () => void }) {
   const isRejected  = status === 'rejected'
   const isSuspended = status === 'suspended'
 
@@ -37,13 +38,23 @@ function PendingScreen({ status, onLogout }: { status: string; onLogout: () => v
         ) : (
           <>
             <Clock size={52} className="text-amber-500 mx-auto mb-4" />
-            <h1 className="text-xl font-bold text-gray-900 mb-2">Application under review</h1>
+            <h1 className="text-xl font-bold text-gray-900 mb-2">
+              {isClaim ? 'Claim under review' : 'Application under review'}
+            </h1>
             <p className="text-gray-500 text-sm mb-2">
-              Your provider application has been submitted and is pending manual review by our team.
+              {isClaim
+                ? 'Your claim on this organization has been submitted and is pending manual review by our team.'
+                : 'Your provider application has been submitted and is pending manual review by our team.'}
             </p>
             <p className="text-gray-500 text-sm mb-6">
-              This typically takes <strong>1–2 business days</strong>. You'll receive an email when your account is verified.
+              This typically takes <strong>1–2 business days</strong>. You'll receive an email
+              {isClaim ? ' when your claim is decided.' : ' when your account is verified.'}
             </p>
+            {isClaim && (
+              <p className="text-gray-500 text-sm mb-6">
+                Your listing stays live and unchanged in the meantime, so people can still find help there.
+              </p>
+            )}
           </>
         )}
         <button
@@ -58,8 +69,21 @@ function PendingScreen({ status, onLogout }: { status: string; onLogout: () => v
 }
 
 export default function ProviderLayout() {
-  const { role, verificationStatus, clearAuth } = useAuthStore()
+  const { role, verificationStatus, providerId, clearAuth } = useAuthStore()
   const location = useLocation()
+
+  // Only fetched while the account is waiting on review, so verified providers
+  // pay nothing for it. Distinguishes "claimed an existing org" from "applied
+  // as a new provider" — the two states need different copy on the wait screen.
+  const { data: claimStatus } = useQuery({
+    queryKey: ['portal-claim-status', providerId],
+    queryFn: async () => {
+      const { data } = await db.providers().select('claim_status').eq('id', providerId!).maybeSingle()
+      return (data as { claim_status?: string } | null)?.claim_status ?? null
+    },
+    enabled: !!providerId && verificationStatus === 'pending',
+    staleTime: 1000 * 60,
+  })
 
   // Redirect unauthenticated users
   if (role === 'guest') {
@@ -86,7 +110,13 @@ export default function ProviderLayout() {
 
   // Block providers waiting for review / rejected / suspended
   if (role === 'provider' && verificationStatus !== 'verified') {
-    return <PendingScreen status={verificationStatus!} onLogout={handleLogout} />
+    return (
+      <PendingScreen
+        status={verificationStatus!}
+        isClaim={claimStatus === 'pending_claim'}
+        onLogout={handleLogout}
+      />
+    )
   }
 
   return (

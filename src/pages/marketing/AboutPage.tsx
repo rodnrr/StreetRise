@@ -57,7 +57,7 @@ export default function AboutPage() {
       <Section containerSize="prose" className="text-center">
         <SectionHeading
           title="Where We Are Today"
-          subtitle="StreetRise is live in Tampa Bay and Orlando, with Miami and Jacksonville coming soon. Every listing is checked and updated by the organization that runs it."
+          subtitle="StreetRise is live in Tampa Bay, Orlando, and Miami/Hollywood, with Jacksonville coming soon. Every listing is checked and updated by the organization that runs it."
         />
         <Button to="/map">See the Map</Button>
       </Section>

@@ -38,6 +38,7 @@ export const db = {
   conversations:    () => supabase.from('conversations'),
   messages:         () => supabase.from('conversation_messages'),
   adminNotes:       () => supabase.from('conversation_admin_notes'),
+  provider_claims:  () => supabase.from('provider_claims'),
 }
 
 export function subscribeToBedUpdates(
