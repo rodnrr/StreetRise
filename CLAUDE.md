@@ -76,6 +76,7 @@ Deploy only: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (32-char hex; valid
 | Maps | Leaflet + react-leaflet + OpenStreetMap tiles |
 | Deploy | Cloudflare Pages (`wrangler.jsonc`) |
 | Payments | Stripe (via Supabase Edge Function `create-checkout-session`) |
+| Transactional email | Resend (via Supabase Edge Function `notify-claim`) |
 
 ---
 
@@ -157,7 +158,7 @@ scripts/
   deploy-pages.sh           # Cloudflare Pages deploy (validates env vars)
   import-seed-candidates.ts # Seed import (needs SUPABASE_SERVICE_ROLE_KEY)
 
-supabase/migrations/        # 001–030 with gaps: NO 012, 013, or 021 exist.
+supabase/migrations/        # 001–034 with gaps: NO 012, 013, or 021 exist.
                             # See Migrations section — applied to live BY HAND.
 
 public/
@@ -213,7 +214,7 @@ Claim submissions (migration 033, applied to live 2026-08-06). One row per claim
 
 Exists as its own table because `providers_claim_submit` locks every column on `providers` except `user_id` and `claim_status`, so there is nowhere on that row to record who is claiming and why — and `providers_pending_claim_read` makes a mid-claim row publicly readable, so claimant PII must not live on it. Same reasoning as `conversation_admin_notes`.
 
-- `claim_email` is pinned by RLS to `auth.jwt() ->> 'email'` — a claimant cannot submit under someone else's address.
+- `claim_email` is pinned by RLS to `auth.jwt() ->> 'email'` — a claimant cannot submit under someone else's address. **`contact_email` (migration 034) is different**: required free text for where the claimant wants to be reached. Notification mail goes to `contact_email`; domain matching must only ever use `claim_email`, or the anti-spoofing guarantee is lost.
 - RLS: claimant inserts/reads/deletes **their own** rows; admins read/update/delete all; **the public can read none**.
 - Partial unique index `uniq_provider_claims_open` allows one open claim per (provider, user); re-claiming after a denial is allowed.
 
@@ -375,13 +376,13 @@ Font: Inter (via `@fontsource/inter`). Dark-mode variants exist on most componen
 
 ## Database Migrations — READ THIS BEFORE TOUCHING THE SCHEMA
 
-Migrations live in `supabase/migrations/`, numbered 001–030 **with gaps: 012, 013, and 021 do not exist** (023 and 027 were renumbered from 010/021 to resolve collisions — see their headers).
+Migrations live in `supabase/migrations/`, numbered 001–034 **with gaps: 012, 013, and 021 do not exist** (023 and 027 were renumbered from 010/021 to resolve collisions — see their headers).
 
-**How they are actually applied:** by hand, in the Supabase SQL editor, against live project `mldatfcwnmvrmxumzxyb`. NOT by the deploy pipeline and not reliably by `supabase db push` — filenames have no timestamp prefixes, so repo and live migration history **drift**. Treat live as a separate source of truth; verify actual live state with read-only SQL before assuming a migration's effect exists. Runbooks for the most recent hand-applies are in `docs/apply-migration-029.md` and `docs/apply-migration-030.md`.
+**How they are actually applied:** by hand, in the Supabase SQL editor, against live project `mldatfcwnmvrmxumzxyb`. NOT by the deploy pipeline and not reliably by `supabase db push` — filenames have no timestamp prefixes, so repo and live migration history **drift**. Treat live as a separate source of truth; verify actual live state with read-only SQL before assuming a migration's effect exists. Runbooks for the most recent applies are in `docs/apply-migration-032.md`, `docs/apply-migrations-023-027.md`, and `docs/claim-flow.md` (033/034).
 
 **Do not regenerate `src/lib/database.types.ts` from the CLI** unless you have confirmed live has every migration the code depends on — the `blog_posts` block and the two conversation read columns were hand-written to match intended state, and a regen against a lagging DB would delete them.
 
-Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog.
+Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage, 032 South Florida seed, 033/034 claim submissions + notification fields.
 
 ---
 

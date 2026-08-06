@@ -98,15 +98,19 @@ export class ClaimError extends Error {
 export async function submitClaim(opts: {
   providerId: string
   userId: string
+  /** Account email. Must equal the JWT's email or RLS rejects the insert. */
   email: string
+  /** Where the claimant wants to be reached. Free text, required. */
+  contactEmail: string
   note: string
-}): Promise<void> {
+}): Promise<{ claimId: string }> {
   const { data: claim, error: claimErr } = await db.provider_claims()
     .insert({
-      provider_id: opts.providerId,
-      user_id:     opts.userId,
-      claim_email: opts.email,
-      claim_note:  opts.note.trim() || null,
+      provider_id:   opts.providerId,
+      user_id:       opts.userId,
+      claim_email:   opts.email,
+      contact_email: opts.contactEmail.trim(),
+      claim_note:    opts.note.trim() || null,
     })
     .select('id')
     .single()
@@ -141,6 +145,13 @@ export async function submitClaim(opts: {
     // the update matched no row, so someone claimed it in the meantime.
     throw new ClaimError('Someone else claimed this organization first. Refresh to see its current status.', 'taken')
   }
+
+  return { claimId: claim.id }
+}
+
+/** Rejects obvious junk without pretending to validate deliverability. */
+export function isEmailShaped(value: string): boolean {
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value.trim())
 }
 
 /** The signed-in user's email, read from the session rather than form input. */

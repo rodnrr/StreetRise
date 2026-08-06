@@ -8,9 +8,10 @@ import {
 import SeoHead from '@/lib/seo/SeoHead'
 import { useAuthStore, useToast } from '@/lib/store'
 import {
-  useClaimableProvider, submitClaim, currentUserEmail,
+  useClaimableProvider, submitClaim, currentUserEmail, isEmailShaped,
   ClaimError, CLAIMABLE_KEY, MY_CLAIMS_KEY,
 } from '@/lib/claims'
+import { notifyClaim } from '@/lib/notifications'
 
 function Shell({ children }: { children: React.ReactNode }) {
   return <div className="max-w-xl mx-auto px-4 py-10 pb-28 md:pb-12">{children}</div>
@@ -26,23 +27,38 @@ export default function ClaimDetailPage() {
 
   const [note, setNote]           = useState('')
   const [email, setEmail]         = useState<string | null>(null)
+  const [contactEmail, setContactEmail] = useState('')
+  const [contactTouched, setContactTouched] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone]           = useState(false)
 
-  // Email comes from the session, never from a form field — the RLS policy on
-  // provider_claims pins claim_email to auth.jwt()->>'email', so a value typed
-  // by the user would simply be rejected.
+  // `email` is the account address. It comes from the session, never from a
+  // form field — the RLS policy on provider_claims pins claim_email to
+  // auth.jwt()->>'email', so a typed value would simply be rejected.
+  // `contactEmail` is separate and editable: where they actually want to be
+  // reached, which may not be the account they signed up with.
   useEffect(() => {
     if (!userId) { setEmail(null); return }
-    currentUserEmail().then(e => setEmail(e ?? userEmail ?? null))
+    currentUserEmail().then(e => {
+      const resolved = e ?? userEmail ?? null
+      setEmail(resolved)
+      setContactEmail(prev => prev || resolved || '')
+    })
   }, [userId, userEmail])
+
+  const contactValid = isEmailShaped(contactEmail)
+  const showContactError = contactTouched && !contactValid
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!id || !userId || !email) return
+    setContactTouched(true)
+    if (!id || !userId || !email || !contactValid) return
     setSubmitting(true)
     try {
-      await submitClaim({ providerId: id, userId, email, note })
+      const { claimId } = await submitClaim({ providerId: id, userId, email, contactEmail, note })
+      // Best effort — the claim is already saved, so a mail failure must not
+      // be reported to the user as a failed claim.
+      void notifyClaim(claimId, 'submitted')
       // The account now owns this provider row, pending admin approval.
       setAuth({
         userId,
@@ -89,7 +105,7 @@ export default function ClaimDetailPage() {
         <p className="text-gray-500 mb-6 leading-relaxed">
           We’ve received your claim for <strong>{org.organization_name}</strong>. A
           StreetRise staff member reviews every claim by hand, usually within
-          1–2 business days. We’ll email <strong>{email}</strong> once it’s approved.
+          1–2 business days. We’ll email <strong>{contactEmail}</strong> when it’s decided.
         </p>
         <div className="text-left rounded-2xl bg-gray-50 border border-gray-100 p-5 space-y-2.5 mb-6">
           <p className="text-sm font-semibold text-gray-900">While you wait</p>
@@ -213,6 +229,27 @@ export default function ClaimDetailPage() {
           </div>
 
           <div>
+            <label htmlFor="claim-contact-email" className="label">Best email to reach you *</label>
+            <input
+              id="claim-contact-email"
+              type="email"
+              value={contactEmail}
+              onChange={e => setContactEmail(e.target.value)}
+              onBlur={() => setContactTouched(true)}
+              aria-invalid={showContactError}
+              aria-describedby={showContactError ? 'claim-contact-email-error' : undefined}
+              className={showContactError ? 'input-error' : 'input'}
+              placeholder="you@yourorg.org"
+            />
+            {showContactError
+              ? <p id="claim-contact-email-error" className="error-text">Enter a valid email address</p>
+              : <p className="text-xs text-gray-400 mt-1">
+                  We’ll send updates about this claim here. A work address at the
+                  organization helps us approve it faster.
+                </p>}
+          </div>
+
+          <div>
             <label htmlFor="claim-note" className="label">
               Your role at {org.organization_name}{' '}
               <span className="text-gray-400 font-normal">(helps us approve faster)</span>
@@ -237,7 +274,7 @@ export default function ClaimDetailPage() {
             </p>
           </div>
 
-          <button type="submit" disabled={submitting || !email} className="btn-primary w-full">
+          <button type="submit" disabled={submitting || !email || !contactValid} className="btn-primary w-full">
             {submitting ? 'Submitting…' : 'Submit claim'}
           </button>
           <p className="text-xs text-gray-400 text-center">

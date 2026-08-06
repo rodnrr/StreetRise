@@ -124,17 +124,85 @@ lists only unclaimed orgs, search filters by name and website, signed-out state
 hides the form and preserves `?next=`, and an org already in `pending_claim`
 cannot be re-claimed. No console errors.
 
+## Email notifications
+
+Migration 034 and the `notify-claim` edge function. Three events:
+
+| Event | Admin (`info@streetrise.org`) | Claimant |
+|---|---|---|
+| `submitted` | claim to review, with both emails, the note, and a domain check | receipt + what happens next |
+| `approved` | — (they did it) | portal access, link to the dashboard |
+| `denied` | — | the reviewer's reason, and that they may claim again |
+
+**Email is best effort and never fails a claim.** A claim written to the
+database succeeded whether or not mail went out; reporting a mail failure as a
+failed claim would be worse than sending nothing, because the user would retry
+something that already worked. Every non-authorization problem returns
+`200 { sent: false, reason }` and the client treats it as advisory. The admin
+toast says plainly whether the claimant was actually emailed.
+
+The function trusts nothing from the caller. The request carries only a claim
+id and an event name; every fact in the email is re-read server-side with the
+service-role key, and authorization is checked **per event** — a claimant may
+announce their own claim and nothing else, only an admin may announce a
+decision. Without that split, any signed-in user could read back another
+person's claim contact details by asking for an email about them.
+
+`submitted_notified_at` / `decision_notified_at` make sends idempotent, so a
+double-click or retry cannot mail the same person twice.
+
+### contact_email vs claim_email
+
+Two columns, deliberately not merged:
+
+- **`claim_email`** — pinned by RLS to `auth.jwt() ->> 'email'`. The account
+  the claim was filed from. Evidence, not a contact detail; the claimant
+  cannot choose it, which is what makes it useful.
+- **`contact_email`** — required free text the claimant supplies, e.g. filing
+  from a personal Gmail but asking to be reached at their work address. All
+  notification mail goes here.
+
+Domain matching in the admin UI and in the admin email uses **`claim_email`
+only**. Matching on `contact_email` would undo the anti-spoofing guarantee,
+since anyone can type anything into it.
+
+### Setup required before this sends anything
+
+The function is deployed and live but has no API key, so it currently returns
+`{ sent: false, reason: 'not_configured' }` and logs a warning. All dashboard
+steps — no terminal needed:
+
+1. **resend.com** → create an account → **Domains** → add `streetrise.org` and
+   add the DNS records it gives you at your registrar. Sending fails until the
+   domain shows Verified.
+2. **Resend → API Keys** → create one with send permission, copy it.
+3. **Supabase dashboard** → project `mldatfcwnmvrmxumzxyb` → **Edge Functions →
+   Secrets** → add `RESEND_API_KEY` with that value.
+
+Optional overrides, same Secrets screen — all have working defaults:
+
+| Secret | Default |
+|---|---|
+| `CLAIM_ADMIN_EMAIL` | `info@streetrise.org` |
+| `CLAIM_FROM_EMAIL` | `StreetRise <notifications@streetrise.org>` |
+| `APP_URL` | `https://app.streetrise.org` |
+
+`CLAIM_FROM_EMAIL` must be on the domain verified in step 1, or Resend rejects
+every send.
+
+Nothing needs redeploying after adding the key — the function reads it at
+invocation.
+
 ## Not built yet
 
-- **No email notifications.** Nothing tells a claimant their claim was approved
-  or denied — the UI promises an email, so this needs wiring before launch, or
-  the copy needs softening.
-- **No entry point from `/resources/:id`.** Someone from an organization is
-  most likely to arrive at their own listing, not at `/provider/onboarding`.
-  A "Do you work here? Claim this listing" link on the resource detail page is
-  the highest-value next addition.
-- **No claim status surface for the claimant.** After submitting they land on
-  the portal's pending screen, which is the generic provider-application copy
-  rather than claim-specific.
-- **Denials are silent and un-annotated.** `decision_note` exists on the table
-  but the admin UI does not collect one.
+- **The edge function has not been exercised against a live request.** The
+  sandbox it was written in cannot reach `supabase.co` from a browser or shell,
+  and has no Deno runtime, so its logic is reviewed and its deployment is
+  confirmed ACTIVE, but no real invocation has run. First real claim is the
+  first true test — watch **Edge Functions → Logs** in the Supabase dashboard.
+- **No in-app claim history for the claimant.** `useMyClaims` exists in
+  `src/lib/claims.ts` and is unused; there is no "your claims" screen. The
+  portal wait screen now says "Claim under review", which covers the common case.
+- **Denial reason is collected via `prompt()`**, matching the existing
+  provider-rejection flow on the same page. Fine for the current volume, worth
+  a real modal when claims get frequent.

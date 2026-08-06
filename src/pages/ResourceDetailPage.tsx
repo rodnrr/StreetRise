@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Phone, Globe, MapPin, Clock, BedDouble, ChevronLeft, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { Phone, Globe, MapPin, Clock, BedDouble, ChevronLeft, CheckCircle, XCircle, AlertTriangle, ArrowRight } from 'lucide-react'
 import { db } from '@/lib/supabase'
 import {
   CATEGORY_EMOJI,
@@ -66,14 +66,21 @@ export default function ResourceDetailPage() {
   const { data: resource, isLoading } = useQuery<Resource | null>({
     queryKey: ['resource', id],
     queryFn:  async () => {
+      // `id` and `claim_status` on the joined provider drive the "claim this
+      // listing" prompt below. Unclaimed providers are publicly readable
+      // (providers_unclaimed_read), so this join works for anonymous visitors.
       const { data } = await db.resources()
-        .select('*, providers(organization_name, website)')
+        .select('*, providers(id, organization_name, website, claim_status)')
         .eq('id', id!)
         .single()
       return data as unknown as Resource
     },
     enabled: !!id,
   })
+
+  const owner = (resource as unknown as {
+    providers?: { id: string; organization_name: string; claim_status?: string } | null
+  } | null)?.providers ?? null
 
   if (isLoading) {
     return (
@@ -309,6 +316,26 @@ export default function ResourceDetailPage() {
           {resource.tags.map((t) => (
             <span key={t} className="badge bg-gray-100 text-gray-600">{t}</span>
           ))}
+        </div>
+      )}
+
+      {/* Claim prompt — the highest-intent place to catch someone who works
+          at this organization, since they are far likelier to land on their
+          own listing than on the provider pitch page. Only shown while the
+          owning provider is genuinely unclaimed. */}
+      {owner?.claim_status === 'unclaimed' && (
+        <div className="rounded-2xl border border-primary-100 bg-primary-50/60 p-4">
+          <p className="text-sm text-gray-700">
+            <strong>Do you work at {owner.organization_name}?</strong> This listing was
+            built from public information. Claim it to keep the hours, availability,
+            and contact details accurate.
+          </p>
+          <Link
+            to={`/claim/${owner.id}`}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:underline mt-2"
+          >
+            Claim this listing <ArrowRight size={14} />
+          </Link>
         </div>
       )}
 

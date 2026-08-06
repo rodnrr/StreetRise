@@ -214,12 +214,17 @@ export interface ProviderClaim {
   id: string
   provider_id: string
   user_id: string
+  /** Pinned by RLS to the claimant's account email — evidence, not a contact detail. */
   claim_email: string
+  /** Claimant-supplied address to reach them at. Free text; proves nothing. */
+  contact_email: string
   claim_note?: string | null
   status: 'pending' | 'approved' | 'denied'
   decided_at?: string | null
   decided_by?: string | null
   decision_note?: string | null
+  submitted_notified_at?: string | null
+  decision_notified_at?: string | null
   created_at: string
 }
 

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Search, Pencil, Mail, Undo2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { db } from '@/lib/supabase'
+import { notifyClaim } from '@/lib/notifications'
 import { useAuthStore, useToast } from '@/lib/store'
 import type { Provider, ProviderClaim, VerificationStatus } from '@/types'
 
@@ -64,7 +65,7 @@ export default function AdminProviders() {
    * on a denial — the org's own trust level is a separate decision.
    */
   const decideClaim = useMutation({
-    mutationFn: async ({ provider, approve }: { provider: Provider; approve: boolean }) => {
+    mutationFn: async ({ provider, approve, reason }: { provider: Provider; approve: boolean; reason?: string }) => {
       const claim = claimFor(provider.id)
       const { error } = await db.providers().update(
         approve
@@ -73,11 +74,15 @@ export default function AdminProviders() {
       ).eq('id', provider.id)
       if (error) throw error
 
+      // The decision note is written before the email is triggered, because
+      // the edge function reads it back out of the row to quote in the
+      // denial message rather than taking it from the request.
       if (claim) {
         await db.provider_claims().update({
-          status:     approve ? 'approved' : 'denied',
-          decided_at: new Date().toISOString(),
-          decided_by: userId!,
+          status:        approve ? 'approved' : 'denied',
+          decided_at:    new Date().toISOString(),
+          decided_by:    userId!,
+          decision_note: reason?.trim() || null,
         }).eq('id', claim.id)
       }
 
@@ -86,11 +91,24 @@ export default function AdminProviders() {
         target_type: 'provider',
         target_id:   provider.id,
         action:      approve ? 'approved' : 'rejected',
-        reason:      approve ? 'Claim approved' : 'Claim denied',
+        reason:      approve ? 'Claim approved' : `Claim denied${reason ? `: ${reason}` : ''}`,
       })
+
+      // Best effort — the decision is already recorded either way.
+      const mail = claim
+        ? await notifyClaim(claim.id, approve ? 'approved' : 'denied')
+        : { sent: false, reason: 'error' as const }
+      return { mailed: mail.sent, mailReason: mail.sent ? null : mail.reason }
     },
-    onSuccess: (_, { approve }) => {
-      toast.success(approve ? 'Claim approved' : 'Claim denied')
+    onSuccess: ({ mailed, mailReason }, { approve }) => {
+      const verb = approve ? 'approved' : 'denied'
+      if (mailed) {
+        toast.success(`Claim ${verb}`, 'The claimant has been emailed.')
+      } else if (mailReason === 'not_configured') {
+        toast.success(`Claim ${verb}`, 'Email is not configured yet — tell them yourself.')
+      } else {
+        toast.success(`Claim ${verb}`, 'Saved, but the email did not go out.')
+      }
       qc.invalidateQueries({ queryKey: ['admin-providers'] })
       qc.invalidateQueries({ queryKey: ['admin-provider-claims'] })
     },
@@ -211,7 +229,15 @@ export default function AdminProviders() {
                       <p className="flex items-center gap-1.5 text-sm text-gray-200 break-all">
                         <Mail size={12} className="text-gray-400 shrink-0" />
                         {claim.claim_email}
+                        <span className="text-[11px] text-gray-500">(account)</span>
                       </p>
+                      {claim.contact_email && claim.contact_email !== claim.claim_email && (
+                        <p className="flex items-center gap-1.5 text-sm text-gray-200 break-all">
+                          <Mail size={12} className="text-gray-400 shrink-0" />
+                          {claim.contact_email}
+                          <span className="text-[11px] text-gray-500">(contact at)</span>
+                        </p>
+                      )}
                       {claim.claim_note && (
                         <p className="text-sm text-gray-400 whitespace-pre-wrap">“{claim.claim_note}”</p>
                       )}
@@ -244,7 +270,12 @@ export default function AdminProviders() {
                   <button
                     onClick={() => {
                       if (!confirm(`Deny this claim? ${p.organization_name} goes back to the public claim directory and the account is detached.`)) return
-                      decideClaim.mutate({ provider: p, approve: false })
+                      // Quoted verbatim to the claimant, so it is written for
+                      // them to read, not as an internal note.
+                      const reason = prompt(
+                        'Reason for the claimant (optional, included in their email):',
+                      )
+                      decideClaim.mutate({ provider: p, approve: false, reason: reason ?? undefined })
                     }}
                     disabled={decideClaim.isPending}
                     className="flex items-center gap-1.5 bg-gray-600 hover:bg-gray-500 text-white text-xs font-medium rounded-xl px-3 py-1.5 transition-colors"
