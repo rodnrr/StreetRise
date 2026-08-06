@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
-import { Plus, Pencil, Trash2, ChevronDown, Eye, EyeOff, ExternalLink, Wand2 } from 'lucide-react'
-import { db } from '@/lib/supabase'
+import { Plus, Pencil, Trash2, ChevronDown, Eye, EyeOff, ExternalLink, Wand2, Upload } from 'lucide-react'
+import { db, supabase } from '@/lib/supabase'
 import { useToast } from '@/lib/store'
 import type { Database } from '@/lib/database.types'
 
@@ -27,6 +27,41 @@ const EMPTY_FORM: PostForm = {
   cover_image_url: '',
 }
 
+const MAX_COVER_WIDTH = 1600
+const COVER_JPEG_QUALITY = 0.82
+
+/**
+ * Re-encode any browser-readable image as a JPEG, downscaled to
+ * MAX_COVER_WIDTH. Every upload goes through this so the stored file is
+ * guaranteed decodable by all browsers — phone pickers can hand over HEIC or
+ * otherwise mangled files even when the name says .jpeg.
+ */
+async function toWebJpeg(file: File): Promise<Blob> {
+  const url = URL.createObjectURL(file)
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = () => reject(new Error('That file could not be read as an image.'))
+      el.src = url
+    })
+    const scale = Math.min(1, MAX_COVER_WIDTH / img.naturalWidth)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(img.naturalWidth * scale)
+    canvas.height = Math.round(img.naturalHeight * scale)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Image processing is unavailable in this browser.')
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>(resolve =>
+      canvas.toBlob(resolve, 'image/jpeg', COVER_JPEG_QUALITY),
+    )
+    if (!blob) throw new Error('The image could not be converted.')
+    return blob
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
 /** URL-safe slug from a title. Keeps a-z, 0-9 and single hyphens. */
 function slugify(value: string): string {
   return value
@@ -42,6 +77,8 @@ function slugify(value: string): string {
 export default function AdminBlog() {
   const [editing, setEditing]   = useState<BlogPostRow | null | 'new'>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const coverFileRef = useRef<HTMLInputElement>(null)
   const toast = useToast()
   const qc    = useQueryClient()
 
@@ -72,6 +109,29 @@ export default function AdminBlog() {
         author_name: post.author_name,
         cover_image_url: post.cover_image_url ?? '',
       })
+    }
+  }
+
+  async function handleCoverFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploading(true)
+    try {
+      const blob = await toWebJpeg(file)
+      const base = slugify(file.name.replace(/\.[^.]+$/, '')) || 'cover'
+      const path = `covers/${Date.now()}-${base}.jpg`
+      const { error } = await supabase.storage
+        .from('blog-images')
+        .upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' })
+      if (error) throw error
+      const { data } = supabase.storage.from('blog-images').getPublicUrl(path)
+      setValue('cover_image_url', data.publicUrl, { shouldDirty: true })
+      toast.success('Image uploaded', 'Cover URL filled in — save the post to keep it.')
+    } catch (err) {
+      toast.error('Upload failed', err instanceof Error ? err.message : String(err))
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -227,13 +287,34 @@ export default function AdminBlog() {
                 />
               </div>
               <div>
-                <label className="label text-gray-300">Cover image URL</label>
-                <input
-                  {...register('cover_image_url')}
-                  className="input bg-gray-700 border-gray-600 text-white text-sm"
-                  placeholder="https://…"
-                />
-                <p className="text-xs text-gray-500 mt-1">Shown at the top of the post, on the blog index, and as the social share image. PNG, JPEG, WebP, or GIF.</p>
+                <label className="label text-gray-300">Cover image</label>
+                <div className="flex gap-2">
+                  <input
+                    {...register('cover_image_url')}
+                    className="input bg-gray-700 border-gray-600 text-white text-sm"
+                    placeholder="https://…"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => coverFileRef.current?.click()}
+                    disabled={uploading}
+                    className="btn-secondary btn-sm shrink-0 gap-1.5"
+                    title="Upload a photo"
+                  >
+                    <Upload size={14} /> {uploading ? 'Uploading…' : 'Upload'}
+                  </button>
+                  <input
+                    ref={coverFileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleCoverFile}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Shown at the top of the post, on the blog index, and as the social share
+                  image. Uploads are resized and converted to JPEG automatically.
+                </p>
               </div>
             </div>
 
