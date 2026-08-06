@@ -35,7 +35,7 @@ const CATEGORIES = [
 const CITIES = [
   { name: 'Tampa Bay',    live: true },
   { name: 'Orlando',      live: true },
-  { name: 'Miami',        live: false },
+  { name: 'Miami',        live: true },
   { name: 'Jacksonville', live: false },
 ]
 
@@ -132,7 +132,7 @@ export default function HomePage() {
     <div className="bg-white dark:bg-slate-900">
       <SeoHead
         title="StreetRise — Find Shelter, Food & Support Near You"
-        description="A free app connecting people in Tampa Bay and Orlando to verified shelter, food, medical, and support resources — updated in real time by the organizations that provide them."
+        description="A free app connecting people in Tampa Bay, Orlando, and Miami to verified shelter, food, medical, and support resources — updated in real time by the organizations that provide them."
         path="/"
       >
         <script type="application/ld+json">{JSON.stringify(organizationSchema())}</script>
@@ -147,7 +147,7 @@ export default function HomePage() {
                 Real-time local resources
               </p>
               <h1 className="mb-4 text-3xl font-bold leading-tight text-slate-900 dark:text-white md:text-5xl lg:text-6xl">
-                Find Real Shelter, Food &amp; Support in Tampa Bay or Orlando
+                Find Real Shelter, Food &amp; Support in Tampa Bay, Orlando &amp; Miami
               </h1>
               <p className="mb-7 max-w-xl leading-relaxed text-slate-500 dark:text-slate-400 md:text-lg lg:mx-0 mx-auto">
                 A free app that connects you to verified local resources — updated

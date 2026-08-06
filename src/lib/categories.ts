@@ -39,7 +39,7 @@ export const CATEGORY_PAGES: CategoryPageConfig[] = [
     emoji: '🍽️',
     mode: 'live',
     mapLink: { category: 'food' },
-    description: 'Food pantries, hot meals, and food assistance across Tampa Bay and Orlando.',
+    description: 'Food pantries, hot meals, and food assistance across Tampa Bay, Orlando, and South Florida.',
     liveResourceCountSnapshot: 26,
   },
   {

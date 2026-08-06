@@ -17,9 +17,10 @@ The pre-debut launch review described in earlier versions of this file is **done
 Known open items (verified 2026-07-31):
 
 - **Migration 030 was not yet applied to live** as of 2026-07-29 (`docs/apply-migration-030.md`). Until it is, chat unread indicators can never clear — `markConversationRead()` writes to columns that don't exist and silently no-ops.
-- **`npm run lint` has exactly one known error**: `supabase.from('bookings') as any` at `src/lib/supabase.ts:29` (`@typescript-eslint/no-explicit-any`). Pre-existing; `npm run typecheck` is clean.
+- **`npm run lint`, `npm run typecheck`, and `npm run build` are all clean** (re-verified 2026-08-06). The previously documented lint error on `supabase.from('bookings') as any` is gone — `src/lib/supabase.ts` now carries an `eslint-disable-next-line` for it, so the cast itself is still lint debt to unwind when `database.types.ts` is regenerated.
 - **`BlogPostPage` does not render markdown** — `body_markdown` is shown in a `whitespace-pre-wrap` div. `cover_image_url` now renders (hero on `BlogPostPage`, thumbnail on `BlogIndexPage`, og:image) when set; images are hosted in the R2 bucket `assets-streetrise` — upload + DB-update runbook in `docs/r2-blog-images.md`.
 - **Internal tags leak on `ResourceDetailPage`** — tags with `subcategory:`, `service_area:`, `import:`, `access_src:` prefixes render as public badges. Recommended fix (a `publicTags()` filter) is written up in `docs/OPEN_ITEMS.md`.
+- **Default map center still points at Tampa Bay** — `useMapStore` opens at `{ lat: 28.2, lng: -81.9 }` zoom 9. Since migration 032 added South Florida (2026-08-06), a Miami or Hollywood visitor who does not grant geolocation or search lands on a map with no nearby pins. Worth revisiting now that coverage spans ~400 km of the state; the persisted store key would need bumping (`streetrise-map-v3` → `v4`) for existing visitors to pick up a new default.
 
 ---
 
@@ -28,7 +29,7 @@ Known open items (verified 2026-07-31):
 - **app.streetrise.org** — this React SPA (the resource-finder app)
 - **streetrise.org** — separate marketing/org site (not in this repo)
 
-StreetRise connects people in need with local service providers (shelters, food pantries, clinics, legal aid, etc.). Original coverage was Tampa Bay, FL; seed migrations 017/020/022 expanded to Central Florida (Orlando, Hernando, Pasco, Manatee/Bradenton). Public copy says "Tampa Bay and Orlando." Providers manage listings; the public searches the map; no sign-up required to find resources.
+StreetRise connects people in need with local service providers (shelters, food pantries, clinics, legal aid, etc.). Original coverage was Tampa Bay, FL; seed migrations 017/020/022 expanded to Central Florida (Orlando, Hernando, Pasco, Manatee/Bradenton); migration 032 added South Florida (Miami-Dade + South Broward/Hollywood). Public copy says "Tampa Bay, Orlando, and Miami" — `HomePage`'s `CITIES` array is the source of truth for which metros read as live, and a metro is only flipped to `live: true` once it has publicly visible seeded listings. Providers manage listings; the public searches the map; no sign-up required to find resources.
 
 ---
 
@@ -38,7 +39,7 @@ StreetRise connects people in need with local service providers (shelters, food 
 npm run dev          # Vite dev server (requires .env.local)
 npm run build        # tsc + vite build (typecheck is mandatory)
 npm run typecheck    # Type-only check without building
-npm run lint         # ESLint, zero warnings — currently fails with 1 known error (see Current Status)
+npm run lint         # ESLint, zero warnings — currently passing
 npm run preview      # Preview production build locally
 npm run deploy       # scripts/deploy-pages.sh → wrangler pages deploy dist
 npm run import:seed  # Run scripts/import-seed-candidates.ts via tsx
@@ -201,13 +202,13 @@ Organizations that list resources. **The `providers` row is not created at signu
 - `verification_status`: `'pending' | 'verified' | 'rejected' | 'suspended'`
 - `ein`: optional Tax ID for nonprofits
 - Trust fields (migration 010): `identity_confirmed`, `re_verification_due_at`, `suspension_reason`, `verification_notes`, `suspended_at`
-- Claim fields (migrations 023–027): `claim_status`, `source_type` — seeded org records can exist before a provider claims them; RLS locks `claim_status` against self-approval
+- Claim fields (migrations 023–027): `claim_status`, `source_type` — **not present on live** as of 2026-08-06; these columns exist only in the repo migrations, so 023–027 were never hand-applied. Do not reference them in queries or seeds until they are.
 
 ### `resources`
 Individual service listings owned by a provider.
 
 - `category`: `shelter | food | work_exchange | mental_health | medical | legal | hygiene | clothing | childcare | transportation | outdoor_space | day_space | substance_recovery | legal_aid | employment | outreach | hotline | healthcare | other`
-- `resource_type` (migration 011): `emergency_shelter | transitional_housing | permanent_supportive | rapid_rehousing | food_pantry | hot_meal | mobile_meal | soup_kitchen | primary_care | urgent_care | mobile_clinic | free_clinic | dental | vision | mental_health_counseling | substance_recovery | harm_reduction | legal_aid | employment_training | day_center | public_restroom | public_shower | other`
+- `resource_type` — **live differs from migration 011.** The live `resources_resource_type_check` constraint (verified 2026-08-06) accepts: `emergency_shelter | transitional_housing | food_pantry | hot_meal | shower_facility | restroom_access | day_use_park | warming_cooling_center | domestic_violence_shelter | veteran_housing | youth_shelter | work_exchange | crisis_hotline | job_training | legal_services | medical_clinic | mental_health_clinic | substance_recovery_program | clothing_closet | hygiene_supplies | laundry_facility | childcare_services | transportation_assistance | outreach_program | other`. Write against this list, not 011's — values like `primary_care`, `free_clinic`, `soup_kitchen`, and `legal_aid` will fail the check on live.
 - `gender_policy`: `gender_inclusive | men_only | women_only | family_only | couples_only | youth_only | unknown`
 - `population_focus`: text array (veterans, lgbtq, domestic_violence, families, seniors, young_adults, pregnant_women, substance_recovery, mental_health, reentry, hiv_aids)
 - `access_type`: `onsite | phone_intake | web_intake | confidential_address | not_map_ready`
