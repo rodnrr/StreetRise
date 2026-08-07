@@ -99,6 +99,8 @@ src/
     conversations.ts        # Unread logic + markConversationRead for admin/provider chat
     blog.ts                 # Blog post queries
     adminCounts.ts          # Shared pending-count queries for admin nav badges
+    auth.ts                 # Enabled-OAuth-provider probe + shared post-login routing
+    lazyWithReload.ts       # React.lazy that survives a deploy under an open tab
     seo/                    # SeoHead.tsx, structuredData.ts
 
   pages/
@@ -182,7 +184,10 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/work` | `WorkExchangePage` | Lazy |
 | `/donate` | `DonatePage` | Lazy; Stripe checkout |
 | `/faq` | `FaqPage` | Lazy; data from DB |
-| `/login` | `LoginPage` | Lazy; `?signup=1` opens signup tab; `?next=` redirect |
+| `/login` | `LoginPage` | Lazy; `?signup=1` opens signup tab; `?next=` redirect; social buttons render only for providers Supabase reports as enabled |
+| `/forgot-password` | `ForgotPasswordPage` | Lazy; never reveals whether an account exists |
+| `/reset-password` | `ResetPasswordPage` | Lazy; handles both implicit-fragment and PKCE `?code=` links |
+| `/auth/callback` | `AuthCallbackPage` | Lazy; OAuth return, resolves post-login destination |
 | `/provider/onboarding` | `ProviderLandingPage` | Public pitch page |
 | `/claim` | `ClaimIndexPage` | Lazy; public directory of `unclaimed` orgs |
 | `/claim/:id` | `ClaimDetailPage` | Lazy; claim submission (auth required to submit) |
@@ -193,7 +198,7 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/portal/*` | Provider portal | Auth-gated; dashboard, onboarding, listings, bookings, messages, work |
 | `/admin/*` | Admin portal | Auth-gated; dashboard, providers, resources (+new), bookings, messages, faq, blog |
 
-**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/claim`, `/work`, `/donate`, `/faq`, the 10 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/portal/*`, `/admin/*`, or individual `/claim/:id` pages.
+**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/claim`, `/work`, `/donate`, `/faq`, the 10 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, `/portal/*`, `/admin/*`, or individual `/claim/:id` pages.
 **robots.txt disallows:** `/portal/`, `/admin/`
 
 ---
