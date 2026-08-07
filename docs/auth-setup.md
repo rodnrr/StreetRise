@@ -6,8 +6,29 @@ it works. All steps are web-UI only; nothing here needs a terminal.
 | Feature | Works now? | Needs |
 |---|---|---|
 | Forgot password | **Yes**, but see the email warning | Redirect URL allow-listed; custom SMTP strongly recommended |
+| Email me a sign-in link | **Yes** | Same redirect URL + SMTP as above. No provider setup |
 | Continue with Google | Button hidden until enabled | Google Cloud OAuth client → Supabase |
 | Continue with Apple | Button hidden until enabled | Apple Developer membership → Supabase |
+
+## Magic link (passwordless sign-in)
+
+Added as the free alternative to Sign in with Apple, which needs a paid
+Developer membership. Phone/SMS login was considered and rejected — see the
+note at the bottom.
+
+Nothing to configure beyond steps 1 and 2 below: it reuses the same
+`/auth/callback` redirect and the same SMTP as password reset. There is no
+provider to enable, so the button is always visible.
+
+- Uses the email already typed into the form, so it costs one tap.
+- `shouldCreateUser` is left at its default (true), so the link both signs in
+  and signs up. That is intended, and it also avoids leaking which addresses
+  have accounts — with it disabled, an unregistered address returns a distinct
+  error anyone could use to probe your provider list.
+- Rate-limit errors are shown plainly ("Too many requests, wait a minute").
+  Every other failure is reported generically, for the same reason.
+- Lands on `/auth/callback` and carries `?next=` through, so a magic link sent
+  from a claim page returns the user to that claim.
 
 ## Why the social buttons are invisible right now
 
@@ -114,6 +135,27 @@ claimants are never diverted into registering a duplicate organization.
 `/reset-password` accepts both link shapes Supabase can produce — an
 implicit-flow token in the URL fragment and a PKCE `?code=` — so the reset
 link keeps working if the project's auth flow is ever switched.
+
+## Why not phone / SMS login
+
+Considered as an Apple replacement and rejected on three grounds, the first
+being decisive:
+
+1. **Phone-only accounts cannot claim a listing.** `provider_claims_insert_self`
+   pins `claim_email` to `auth.jwt() ->> 'email'`, which is `NULL` for a
+   phone-OTP user — the insert is rejected. Supporting it would mean trusting a
+   typed-in email, which throws away the anti-spoofing guarantee that makes
+   claim review meaningful.
+2. **It isn't free.** US A2P 10DLC requires brand registration (from $4.50) plus
+   a monthly campaign fee, a number rental (~$1.15/mo), and per-message cost —
+   realistically $30–140/year, ongoing, versus Apple's one-off annual fee.
+3. **Wrong audience.** `/login` is the provider portal: shelter and clinic staff
+   who have work email, which is also what makes a claim credible. The people
+   who would benefit from phone access are help-seekers, and they never sign in
+   — anonymous booking is by design.
+
+Magic link gives the same "no password to remember" benefit for £0, keeps the
+email in the JWT, and needs no carrier registration.
 
 ## Deliberate: no "account not found" message
 
