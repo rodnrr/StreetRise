@@ -99,7 +99,7 @@ src/
     conversations.ts        # Unread logic + markConversationRead for admin/provider chat
     blog.ts                 # Blog post queries
     adminCounts.ts          # Shared pending-count queries for admin nav badges
-    auth.ts                 # Enabled-OAuth-provider probe + shared post-login routing
+    auth.ts                 # OAuth-provider probe, magic link, shared post-login routing
     lazyWithReload.ts       # React.lazy that survives a deploy under an open tab
     seo/                    # SeoHead.tsx, structuredData.ts
 
@@ -184,7 +184,7 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/work` | `WorkExchangePage` | Lazy |
 | `/donate` | `DonatePage` | Lazy; Stripe checkout |
 | `/faq` | `FaqPage` | Lazy; data from DB |
-| `/login` | `LoginPage` | Lazy; `?signup=1` opens signup tab; `?next=` redirect; social buttons render only for providers Supabase reports as enabled |
+| `/login` | `LoginPage` | Lazy; `?signup=1` opens signup tab; `?next=` redirect; magic-link sign-in; social buttons render only for providers Supabase reports as enabled |
 | `/forgot-password` | `ForgotPasswordPage` | Lazy; never reveals whether an account exists |
 | `/reset-password` | `ResetPasswordPage` | Lazy; handles both implicit-fragment and PKCE `?code=` links |
 | `/auth/callback` | `AuthCallbackPage` | Lazy; OAuth return, resolves post-login destination |

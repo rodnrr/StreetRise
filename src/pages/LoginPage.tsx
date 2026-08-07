@@ -1,10 +1,14 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { MailCheck } from 'lucide-react'
 import {
-  useEnabledOAuthProviders, signInWithProvider,
+  useEnabledOAuthProviders, signInWithProvider, sendMagicLink,
   applySessionAndResolveDestination, PROVIDER_LABEL, type OAuthProvider,
 } from '@/lib/auth'
+
+/** Enough to catch a typo and enable the button; the server does the real check. */
+const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
 /** Brand marks are inlined so the buttons never depend on a third-party host. */
 function ProviderIcon({ provider }: { provider: OAuthProvider }) {
@@ -31,6 +35,8 @@ export default function LoginPage() {
   const [mode, setMode]         = useState<'login'|'signup'>(initialMode)
   const [loading, setLoading]   = useState(false)
   const [oauthBusy, setOauthBusy] = useState<OAuthProvider | null>(null)
+  const [magicBusy, setMagicBusy] = useState(false)
+  const [magicSentTo, setMagicSentTo] = useState<string | null>(null)
   const [error, setError]       = useState('')
   const [notice, setNotice]     = useState('')
   const navigate      = useNavigate()
@@ -78,6 +84,45 @@ export default function LoginPage() {
     // Reached only if the redirect never started — otherwise the page is gone.
     if (err) { setError(err.message); setOauthBusy(null) }
   }
+
+  async function handleMagicLink() {
+    setMagicBusy(true); setError(''); setNotice('')
+    const { error: err } = await sendMagicLink(email, explicitNext ?? undefined)
+    setMagicBusy(false)
+    if (err) {
+      // Rate limits are worth showing — the user can act on them by waiting.
+      // Anything else is reported generically so this can't be used to test
+      // which addresses have accounts.
+      setError(/rate|limit|too many|seconds/i.test(err.message)
+        ? 'Too many requests. Wait a minute and try again.'
+        : 'We couldn’t send the link. Check the address and try again.')
+      return
+    }
+    setMagicSentTo(email.trim())
+  }
+
+  const emailValid = EMAIL_SHAPE.test(email.trim())
+
+  // ── Link sent ────────────────────────────────────────────────
+  if (magicSentTo) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="card w-full max-w-sm text-center">
+        <MailCheck size={44} className="text-success-600 mx-auto mb-4" />
+        <h1 className="text-xl font-bold text-gray-900 mb-2">Check your email</h1>
+        <p className="text-sm text-gray-500 mb-5">
+          We sent a sign-in link to <strong className="break-all">{magicSentTo}</strong>.
+          Open it on this device and you’ll be signed straight in — no password needed.
+        </p>
+        <p className="text-xs text-gray-400 mb-6">
+          The link works once and expires in about an hour. If it doesn’t arrive,
+          check your spam folder.
+        </p>
+        <button onClick={() => setMagicSentTo(null)} className="btn-secondary w-full">
+          Use a different email
+        </button>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -143,10 +188,26 @@ export default function LoginPage() {
           </div>
           {notice && <p className="text-sm text-center text-primary-700 bg-primary-50 rounded-xl py-2 px-3">{notice}</p>}
           {error && <p className="error-text text-center">{error}</p>}
-          <button type="submit" disabled={loading || !!oauthBusy} className="btn-primary w-full">
+          <button type="submit" disabled={loading || !!oauthBusy || magicBusy} className="btn-primary w-full">
             {loading ? 'Please wait…' : mode === 'login' ? 'Sign In' : 'Create Account'}
           </button>
         </form>
+
+        {/* Passwordless fallback. Uses the email already typed above, so it
+            costs one tap rather than a separate form. */}
+        <button
+          type="button"
+          onClick={handleMagicLink}
+          disabled={!emailValid || magicBusy || loading || !!oauthBusy}
+          title={emailValid ? undefined : 'Enter your email address first'}
+          className="btn-secondary w-full mt-2.5 flex items-center justify-center gap-2 disabled:opacity-55"
+        >
+          <MailCheck size={15} />
+          {magicBusy ? 'Sending…' : 'Email me a sign-in link'}
+        </button>
+        <p className="text-xs text-gray-400 text-center mt-2">
+          No password needed — we’ll send a link that signs you in.
+        </p>
 
         <p className="text-center text-sm text-gray-500 mt-4">
           {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}

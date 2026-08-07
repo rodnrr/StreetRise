@@ -69,6 +69,28 @@ export async function signInWithProvider(provider: OAuthProvider, next?: string)
 }
 
 /**
+ * Emails a one-tap sign-in link.
+ *
+ * Uses the same `/auth/callback` landing point as social sign-in, so the
+ * post-login routing is identical however someone got here.
+ *
+ * `shouldCreateUser` is left at its default of true. That makes this a signup
+ * path as well as a sign-in one, which is intended — but it also matters for
+ * privacy: with it disabled, requesting a link for an unregistered address
+ * returns a distinct error, which would let anyone test which organizations'
+ * staff have accounts here. Same reasoning as the password-reset page.
+ */
+export async function sendMagicLink(email: string, next?: string) {
+  const callback = new URL('/auth/callback', window.location.origin)
+  if (next) callback.searchParams.set('next', next)
+
+  return supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: { emailRedirectTo: callback.toString() },
+  })
+}
+
+/**
  * Loads the signed-in user's provider profile into the auth store and works
  * out where they belong.
  *
