@@ -31,6 +31,7 @@ export const db = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   bookings:         () => supabase.from('bookings') as any,
   work_exchanges:   () => supabase.from('work_exchanges'),
+  work_candidates:  () => supabase.from('work_exchange_candidates'),
   faq:              () => supabase.from('faq'),
   blog_posts:       () => supabase.from('blog_posts'),
   moderation_logs:  () => supabase.from('moderation_logs'),

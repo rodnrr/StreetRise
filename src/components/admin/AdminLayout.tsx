@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Outlet, NavLink, Navigate, Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Building2, MapPin, CalendarDays, HelpCircle, LogOut,
-  ShieldAlert, MessageSquare, Newspaper, Menu, X, ExternalLink,
+  ShieldAlert, MessageSquare, Newspaper, Menu, X, ExternalLink, Briefcase,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuthStore } from '@/lib/store'
@@ -34,6 +34,9 @@ const NAV_GROUPS: { label: string | null; links: NavLinkDef[] }[] = [
       { to: '/admin/providers', label: 'Providers', icon: Building2,     badgeKeys: ['providersPending', 'claimsPending'] },
       { to: '/admin/resources', label: 'Resources', icon: MapPin,        badgeKeys: ['resourcesPending'] },
       { to: '/admin/bookings',  label: 'Bookings',  icon: CalendarDays,  badgeKeys: ['bookingsPending'] },
+      // Agent-drafted work exchange changes. Sits under Moderation because
+      // approving one publishes it to /work.
+      { to: '/admin/work-exchange', label: 'Work Exchange', icon: Briefcase, badgeKeys: ['workCandidatesPending'] },
       { to: '/admin/messages',  label: 'Messages',  icon: MessageSquare, badgeKeys: ['messagesOpen'] },
     ],
   },
@@ -64,7 +67,7 @@ export default function AdminLayout() {
   const { data: counts = EMPTY_ADMIN_COUNTS } = useAdminCounts(isAdmin)
   const totalPending =
     counts.providersPending + counts.claimsPending + counts.resourcesPending +
-    counts.bookingsPending + counts.messagesOpen
+    counts.bookingsPending + counts.messagesOpen + counts.workCandidatesPending
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => { setDrawerOpen(false) }, [location.pathname])

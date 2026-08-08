@@ -62,6 +62,7 @@ const AdminResources       = lazy(() => import('@/pages/admin/AdminResources'))
 const AdminResourceEdit    = lazy(() => import('@/pages/admin/AdminResourceEdit'))
 const AdminResourceCreate  = lazy(() => import('@/pages/admin/AdminResourceCreate'))
 const AdminBookings        = lazy(() => import('@/pages/admin/AdminBookings'))
+const AdminWorkExchange    = lazy(() => import('@/pages/admin/AdminWorkExchange'))
 const AdminChat            = lazy(() => import('@/pages/admin/AdminChat'))
 const AdminFaq             = lazy(() => import('@/pages/admin/AdminFaq'))
 const AdminBlog            = lazy(() => import('@/pages/admin/AdminBlog'))
@@ -151,6 +152,7 @@ export default function App() {
           <Route path="resources/new"    element={<AdminResourceCreate />} />
           <Route path="resources/:id"    element={<AdminResourceEdit />} />
           <Route path="bookings"         element={<AdminBookings />} />
+          <Route path="work-exchange"    element={<AdminWorkExchange />} />
           <Route path="messages"         element={<AdminChat />} />
           <Route path="faq"              element={<AdminFaq />} />
           <Route path="blog"             element={<AdminBlog />} />
