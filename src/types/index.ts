@@ -383,7 +383,7 @@ export interface WorkExchange {
 }
 
 export type WorkExchangeSourceType = 'provider_posted' | 'seeded' | 'agent_assisted'
-export type WorkExchangeVerifyStatus = 'confirmed' | 'changed' | 'gone' | 'unreachable'
+export type WorkExchangeVerifyStatus = 'confirmed' | 'changed' | 'gone' | 'unclear' | 'unreachable'
 
 // ------ Work exchange review queue (migration 035) ------
 

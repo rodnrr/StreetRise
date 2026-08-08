@@ -248,7 +248,7 @@ export interface Database {
           source_url: string | null
           source_type: 'provider_posted' | 'seeded' | 'agent_assisted'
           last_verified_at: string | null
-          last_verify_status: 'confirmed' | 'changed' | 'gone' | 'unreachable' | null
+          last_verify_status: 'confirmed' | 'changed' | 'gone' | 'unclear' | 'unreachable' | null
         }
         Insert: Optional<
           Omit<Database['public']['Tables']['work_exchanges']['Row'], 'id' | 'created_at' | 'updated_at'>,

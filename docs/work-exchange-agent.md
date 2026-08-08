@@ -7,7 +7,7 @@
 
 Every row in `work_exchanges` was either typed in by a provider or transcribed
 by hand from an organization's public "get involved / careers" page
-(migrations 020 and 028). Nothing ever re-read those pages. A listing whose
+(migrations 020, 028 and 032). Nothing ever re-read those pages. A listing whose
 program ended last spring still renders on `/work` with a working-looking
 "Apply on Website" button — which sends someone who needs work to a dead page.
 
@@ -33,6 +33,13 @@ Two consequences worth knowing:
 
 - A page the agent **could not fetch** is stamped `unreachable` and proposes
   nothing. A site being down is not evidence a program ended.
+- A page that **isn't the kind of page that would list the program** — an org
+  homepage, a donation appeal, a news post — is stamped `unclear` and proposes
+  nothing either. This matters: migration 035 backfills some seeded listings
+  with their provider's website because the seed named no specific page, and
+  without `unclear` those would all come back as false `delist` proposals.
+  `gone` is reserved for a page that does enumerate the org's opportunities
+  and does not include this one.
 - Approving a `delist` sets `is_active = false`. The row and its history stay,
   so it can be switched back on.
 
@@ -106,7 +113,7 @@ and they drop out of every run.
 ## Cost
 
 Claude Opus 5 at `effort: 'low'`, one call per page, ~4–6k input tokens and a
-few hundred output tokens each. A full `--verify` pass over the current 17
+few hundred output tokens each. A full `--verify` pass over the current 29
 seeded listings runs to a few cents. Every run prints its token counts and an
 approximate cost at list price.
 

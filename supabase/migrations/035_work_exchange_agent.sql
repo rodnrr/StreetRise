@@ -52,7 +52,7 @@ BEGIN
     ALTER TABLE work_exchanges
       ADD CONSTRAINT work_exchanges_last_verify_status_check
       CHECK (last_verify_status IS NULL
-             OR last_verify_status IN ('confirmed', 'changed', 'gone', 'unreachable'));
+             OR last_verify_status IN ('confirmed', 'changed', 'gone', 'unclear', 'unreachable'));
   END IF;
 END $$;
 
@@ -92,6 +92,43 @@ FROM (VALUES
 ) AS v(id, external_id, source_url)
 WHERE work_exchanges.id = v.id::uuid
   AND work_exchanges.external_id IS NULL;
+
+-- Migration 032 seeds work exchanges too (12 South Florida listings), which is
+-- easy to miss — CLAUDE.md credited only 020/028. Without these they would keep
+-- the `provider_posted` default and no source URL, and the agent skips any
+-- listing without one, so a third of the corpus would never be checked.
+UPDATE work_exchanges SET
+  source_type = 'seeded',
+  external_id = v.external_id
+FROM (VALUES
+  ('4b123d4d-e9f5-53ac-9441-ed5269b52797', 'WX-FSF-001'),
+  ('2dfaca03-28cb-5719-ad56-f43debd9ecb2', 'WX-FSF-002'),
+  ('d8c23b65-f430-5115-91d8-9c3a6c4498d6', 'WX-CAMILLUS-001'),
+  ('86549ad9-b576-51cc-9bac-bccedb6049ef', 'WX-LOTUS-001'),
+  ('e656efd4-1b5c-501e-b306-88f3571e1c1e', 'WX-LOTUS-002'),
+  ('1a6ec753-6bcd-5d16-b824-fd1e97319575', 'WX-HABBRO-001'),
+  ('1bb1515d-2d54-518e-b70a-1bff306f46d2', 'WX-HABBRO-002'),
+  ('e967b92a-2924-5a28-b093-8a6a60f4cbdf', 'WX-BOC-001'),
+  ('9fdf321a-634a-5a2e-bb01-71ecbc7c57bd', 'WX-FARMSHARE-001'),
+  ('161ef7a8-10c1-579e-ba3f-8bf498d4bc49', 'WX-LN4F-001'),
+  ('e2ccb2d7-ffc6-555e-b5ba-a37e85e34255', 'WX-JUBILEE-001'),
+  ('7aaf287a-130a-53c2-9db3-803514c8c564', 'WX-HUF-001')
+) AS v(id, external_id)
+WHERE work_exchanges.id = v.id::uuid
+  AND work_exchanges.external_id IS NULL;
+
+-- Migration 032's seed text does not name a source page for every listing the
+-- way 020/028 did. Fall back to the provider's own website — that is the page
+-- /work's "Apply on Website" button already sends people to, so it is exactly
+-- the page worth re-reading. Several of these are already volunteer-specific
+-- pages; the rest are org homepages, which is why the agent has an "unclear"
+-- verdict rather than treating "not mentioned here" as "programme ended".
+UPDATE work_exchanges w SET source_url = p.website
+FROM providers p
+WHERE p.id = w.provider_id
+  AND w.source_type = 'seeded'
+  AND w.source_url IS NULL
+  AND p.website IS NOT NULL;
 
 -- ── 3. The review queue ─────────────────────────────────────────
 

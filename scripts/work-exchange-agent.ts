@@ -136,11 +136,12 @@ const VERIFY_SCHEMA = {
   properties: {
     status: {
       type: 'string',
-      enum: ['confirmed', 'changed', 'gone'],
+      enum: ['confirmed', 'changed', 'gone', 'unclear'],
       description:
         'confirmed = the page still advertises this opportunity; ' +
         'changed = still advertised but a detail we store is now wrong; ' +
-        'gone = the page no longer advertises it',
+        'gone = this page covers the organisation\'s opportunities and this one is not among them; ' +
+        'unclear = the page is not the kind of page that would list it either way',
     },
     confidence: { type: 'integer', description: '0-100, how sure you are of the status' },
     evidence: {
@@ -415,9 +416,12 @@ Decide which is true:
 
 - "confirmed" — the page still advertises this opportunity and our details are still broadly right.
 - "changed" — the opportunity is still on the page, but a detail we store is now wrong (the type, the hours, the compensation, or a description that no longer matches). Fill in "revised" with corrected values for every field, keeping anything that is still accurate.
-- "gone" — the page no longer advertises this opportunity.
+- "gone" — this page is one that covers the organisation's opportunities, and this one is not among them.
+- "unclear" — this page is not the kind of page that would list the opportunity either way: an organisation homepage, a donation appeal, a news post, a cookie wall, a page whose content clearly loads by script.
 
-Judge the opportunity, not the wording: a page that lists the same program under a slightly different heading is still "confirmed". A page that lists other programs but not this one is "gone".
+The difference between "gone" and "unclear" matters more than any other judgement you make here. "gone" gets a listing taken down; a volunteer page that lists five programmes and not this one is real evidence, so say "gone". A homepage that never enumerates programmes is not evidence of anything — say "unclear". When you are torn between the two, choose "unclear".
+
+Judge the opportunity, not the wording: a page that lists the same program under a slightly different heading is still "confirmed".
 
 Set "revised" to null unless the status is "changed".`
 
@@ -529,7 +533,7 @@ async function insertCandidate(
 async function stampVerification(
   sb: SupabaseClient | null,
   listingId: string,
-  status: 'confirmed' | 'changed' | 'gone' | 'unreachable',
+  status: 'confirmed' | 'changed' | 'gone' | 'unclear' | 'unreachable',
   dryRun: boolean,
 ): Promise<void> {
   if (dryRun) return
@@ -592,6 +596,11 @@ async function runVerify(
     console.log(`    ${result.status} (confidence ${result.confidence}) — ${result.note}`)
     await stampVerification(sb, listing.id, result.status, !args.apply)
 
+    // "unclear" proposes nothing on purpose. Several seeded listings point at
+    // an organisation homepage rather than a volunteer page (migration 035
+    // backfills provider websites where the seed named no page), and "this
+    // homepage does not enumerate programmes" is not evidence a programme
+    // ended. The stamp records that we looked.
     if (result.status === 'gone') {
       await insertCandidate(sb, runId, {
         kind: 'delist',

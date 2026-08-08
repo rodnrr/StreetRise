@@ -62,9 +62,10 @@ SELECT polname, polcmd FROM pg_policy
 
 Expected:
 
-- `source_type = 'seeded'` with **17** rows, all 17 with a source URL. Any rows
-  under `provider_posted` are listings a provider entered themselves — those
-  correctly have no source URL and the agent skips them.
+- `source_type = 'seeded'` with **29** rows, all 29 with a source URL — 17 from
+  migrations 020/028 and 12 from 032's South Florida batch. Any rows under
+  `provider_posted` are listings a provider entered themselves; those correctly
+  have no source URL and the agent skips them.
 - `work_exchange_candidates` count `0`.
 - `relrowsecurity = true`, one policy `wx_candidates_admin_all` with `polcmd = *`.
 
