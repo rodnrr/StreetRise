@@ -24,8 +24,12 @@
 # where the real gate belongs: add required reviewers to it under
 # Settings → Environments → work-exchange-apply, and every apply run then
 # waits for a human approval before any secret is available to the job.
-# Until you add reviewers, the environment exists but does not gate — the
-# dry-run path is unaffected either way and holds no secrets it can write with.
+# Until you add reviewers, the environment exists but does not gate.
+#
+# Both environments are created automatically on first run. `work-exchange-
+# dry-run` is intentionally left unprotected: a dry run writes nothing, so
+# requiring an approval to look at what the agent would propose would only
+# discourage looking.
 #
 # Scope the secret if you can: the service role is the only key that can write
 # work_exchange_candidates, but nothing stops you rotating it on suspicion.
@@ -62,9 +66,12 @@ jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # A write run enters the protected environment; a dry run does not, so
-    # looking at what the agent would propose never needs an approval.
-    environment: ${{ inputs.apply && 'work-exchange-apply' || '' }}
+    # A write run enters `work-exchange-apply`; a dry run enters a separate,
+    # deliberately unprotected environment. Both names are non-empty on
+    # purpose — an empty environment name is not a construct worth relying on
+    # here, since a workflow that fails to dispatch takes away the only way to
+    # run this agent without a terminal.
+    environment: ${{ inputs.apply && 'work-exchange-apply' || 'work-exchange-dry-run' }}
     steps:
       - uses: actions/checkout@v4
 

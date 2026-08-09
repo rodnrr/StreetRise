@@ -75,6 +75,10 @@ both.
 **GitHub → Actions → Work Exchange Agent → Run workflow.** Choose the mode,
 leave *apply* off for a dry run, turn it on when you want candidates queued.
 
+> The workflow only appears in the Actions tab once it is on the default
+> branch — GitHub registers `workflow_dispatch` from `main`, not from a PR
+> branch. Until PR #63 merges there is nothing to run there.
+
 That workflow needs three repository secrets under
 *Settings → Secrets and variables → Actions*:
 
@@ -83,6 +87,15 @@ That workflow needs three repository secrets under
 | `VITE_SUPABASE_URL` | Supabase → Project Settings → API |
 | `SUPABASE_SERVICE_ROLE_KEY` | same page, **service_role** key — bypasses RLS, never commit it |
 | `ANTHROPIC_API_KEY` | console.anthropic.com → API keys |
+
+`SUPABASE_SERVICE_ROLE_KEY` bypasses RLS — it is a production administrative
+credential, and the *apply* toggle is not what protects it. Anyone with write
+access to the repository can dispatch the workflow. The real gate is the
+`work-exchange-apply` GitHub Environment the apply path runs in: add required
+reviewers under *Settings → Environments → work-exchange-apply* and every write
+run waits for a human before the secrets reach the job. **Until you add
+reviewers there, the environment exists but gates nothing.** Dry runs use a
+separate unprotected environment, so looking never needs an approval.
 
 ### From a terminal
 
