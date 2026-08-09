@@ -43,6 +43,31 @@ Two consequences worth knowing:
 - Approving a `delist` sets `is_active = false`. The row and its history stay,
   so it can be switched back on.
 
+## How it fails
+
+The rule the whole design bends toward: **fail to "we don't know" rather than
+to "verified" or "gone".** Four things route there.
+
+| Situation | What happens |
+|---|---|
+| Page could not be fetched | stamped `unreachable`, proposes nothing |
+| Page isn't the kind that lists opportunities (homepage, appeal, news post) | stamped `unclear`, proposes nothing |
+| The evidence quote isn't in the page we fetched | finding discarded, listing stamped `unclear` |
+| `gone` below 75% confidence | downgraded to `unclear` — no delist proposal |
+| The candidate failed to save | **the listing is not stamped**, so the next run checks it again rather than recording a check whose finding was dropped |
+
+Delisting has a higher confidence bar than the other kinds because it is the
+destructive direction: a wrong `new` or `update` is caught by the reviewer
+reading it, while a wrong `delist` removes a real opportunity from `/work`.
+
+Page content is treated as untrusted input. The system prompt tells the model
+that anything inside the fetched page addressed to *it* — "ignore previous
+instructions", a demanded verdict, text to include — is evidence the page is
+not a normal opportunities page, to be reported rather than obeyed. The
+evidence check is the backstop: an injected instruction cannot manufacture a
+quote that is absent from the page, and the human approval gate sits behind
+both.
+
 ## Running it
 
 ### From a phone (no terminal)
@@ -74,7 +99,7 @@ only thing that writes.
 | Flag | Default | Meaning |
 |---|---|---|
 | `--verify` | — | re-check existing listings |
-| `--discover` | — | draft new listings from provider websites |
+| `--discover` | — | draft new listings from provider websites (following up to 2 opportunity links only when the landing page advertises nothing) |
 | `--apply` | off | write to Supabase |
 | `--limit N` | 20 | cap pages fetched per mode |
 | `--provider <uuid>` | all | restrict to one organization |
@@ -85,10 +110,16 @@ only thing that writes.
 **/admin/work-exchange**, or the *Work Exchange* entry in the admin sidebar —
 it carries a badge with the pending count.
 
-Each card shows the source URL, a **verbatim quote** from the page, and the
-agent's note. Check the quote against the page before approving: it is the only
-thing standing between a fabricated listing and `/work`. If the quote is not on
-the page, reject it and the model got it wrong.
+Each card shows the source URL, the quote the model gave as evidence, and its
+note.
+
+**Treat the quote as model-extracted evidence, not proof.** The agent checks
+that the quote actually occurs in the page text it fetched, and discards the
+finding if it does not — so a quote the page never contained will not reach
+you. That is a real check, and it is the limit of what a machine can do here:
+it says the words were on the page, not that the model read them correctly, not
+that the page is current, and not that the opportunity is what the surrounding
+description claims. Open the source URL and satisfy yourself before approving.
 
 For `new` and `update` candidates every field stays editable — the draft is a
 starting point, and the words that ship are yours. City and state are required
@@ -123,6 +154,14 @@ approximate cost at list price.
 
 ## What it is not
 
+- **It does not cover provider-posted listings.** Verification needs a
+  `source_url`, and only seeded listings have one — a provider who types a
+  listing into the portal supplies no canonical page, so the agent skips it
+  and it can sit unchecked indefinitely. `/work` therefore does *not* offer a
+  uniform freshness guarantee today, and nothing in the UI says so. Closing
+  this is a product decision, not a code change: either collect a canonical
+  opportunity URL in the provider workflow, or surface "never verified" as its
+  own freshness state on the listing. Tracked in `docs/OPEN_ITEMS.md`.
 - It does not follow links during `--verify` — that mode re-reads exactly the
   listing's `source_url` and nothing else.
 - It does not geocode. A `new` candidate inherits `lat`/`lng` from another

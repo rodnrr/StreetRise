@@ -12,6 +12,23 @@
 #   VITE_SUPABASE_URL
 #   SUPABASE_SERVICE_ROLE_KEY   ← service role, bypasses RLS. Never commit it.
 #   ANTHROPIC_API_KEY
+#
+# ── Permission model ────────────────────────────────────────────────
+# SUPABASE_SERVICE_ROLE_KEY is a production administrative credential: it
+# bypasses RLS entirely. Anyone who can dispatch this workflow can cause
+# service-role writes, so the `apply: true` boolean is NOT the security
+# boundary — GitHub write access is.
+#
+# Dispatching requires write access to the repository. Because of that, the
+# apply path runs in the `work-exchange-apply` GitHub Environment, which is
+# where the real gate belongs: add required reviewers to it under
+# Settings → Environments → work-exchange-apply, and every apply run then
+# waits for a human approval before any secret is available to the job.
+# Until you add reviewers, the environment exists but does not gate — the
+# dry-run path is unaffected either way and holds no secrets it can write with.
+#
+# Scope the secret if you can: the service role is the only key that can write
+# work_exchange_candidates, but nothing stops you rotating it on suspicion.
 name: Work Exchange Agent
 
 on:
@@ -45,6 +62,9 @@ jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # A write run enters the protected environment; a dry run does not, so
+    # looking at what the agent would propose never needs an approval.
+    environment: ${{ inputs.apply && 'work-exchange-apply' || '' }}
     steps:
       - uses: actions/checkout@v4
 
