@@ -1,0 +1,100 @@
+# Run the work exchange agent from the GitHub web UI.
+#
+# The agent needs Node, and the maintainer often has no terminal. This makes it
+# runnable from a phone: Actions → Work Exchange Agent → Run workflow.
+#
+# It is manual-only on purpose. Nothing here publishes — the agent writes to
+# `work_exchange_candidates` and an admin approves at /admin/work-exchange —
+# but it does spend Anthropic tokens and fetch other people's websites, so it
+# should run when someone means it to.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   VITE_SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY   ← service role, bypasses RLS. Never commit it.
+#   ANTHROPIC_API_KEY
+#
+# ── Permission model ────────────────────────────────────────────────
+# SUPABASE_SERVICE_ROLE_KEY is a production administrative credential: it
+# bypasses RLS entirely. Anyone who can dispatch this workflow can cause
+# service-role writes, so the `apply: true` boolean is NOT the security
+# boundary — GitHub write access is.
+#
+# Dispatching requires write access to the repository. Because of that, the
+# apply path runs in the `work-exchange-apply` GitHub Environment, which is
+# where the real gate belongs: add required reviewers to it under
+# Settings → Environments → work-exchange-apply, and every apply run then
+# waits for a human approval before any secret is available to the job.
+# Until you add reviewers, the environment exists but does not gate.
+#
+# Both environments are created automatically on first run. `work-exchange-
+# dry-run` is intentionally left unprotected: a dry run writes nothing, so
+# requiring an approval to look at what the agent would propose would only
+# discourage looking.
+#
+# Scope the secret if you can: the service role is the only key that can write
+# work_exchange_candidates, but nothing stops you rotating it on suspicion.
+name: Work Exchange Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: What to run
+        type: choice
+        default: verify
+        options:
+          - verify
+          - discover
+          - both
+      apply:
+        description: Write candidates to Supabase (off = dry run)
+        type: boolean
+        default: false
+      limit:
+        description: Max pages to fetch per mode
+        default: '20'
+      stale_days:
+        description: Only verify listings unchecked for this many days
+        default: '30'
+
+# Anthropic tokens and outbound requests to provider websites — one run at a time.
+concurrency:
+  group: work-exchange-agent
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # A write run enters `work-exchange-apply`; a dry run enters a separate,
+    # deliberately unprotected environment. Both names are non-empty on
+    # purpose — an empty environment name is not a construct worth relying on
+    # here, since a workflow that fails to dispatch takes away the only way to
+    # run this agent without a terminal.
+    environment: ${{ inputs.apply && 'work-exchange-apply' || 'work-exchange-dry-run' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run agent
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          FLAGS=""
+          case "${{ inputs.mode }}" in
+            verify)   FLAGS="--verify" ;;
+            discover) FLAGS="--discover" ;;
+            both)     FLAGS="--verify --discover" ;;
+          esac
+          if [ "${{ inputs.apply }}" = "true" ]; then FLAGS="$FLAGS --apply"; fi
+          FLAGS="$FLAGS --limit ${{ inputs.limit }} --stale-days ${{ inputs.stale_days }}"
+          echo "Running: npm run agent:work -- $FLAGS"
+          npm run agent:work -- $FLAGS

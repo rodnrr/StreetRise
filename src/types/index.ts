@@ -373,6 +373,62 @@ export interface WorkExchange {
   address: Address
   created_at: string
   updated_at: string
+  // Provenance (migration 035). `source_url` is the page the listing was
+  // transcribed from and the page the agent re-reads to check it is still real.
+  external_id?: string | null
+  source_url?: string | null
+  source_type?: WorkExchangeSourceType
+  last_verified_at?: string | null
+  last_verify_status?: WorkExchangeVerifyStatus | null
+}
+
+export type WorkExchangeSourceType = 'provider_posted' | 'seeded' | 'agent_assisted'
+export type WorkExchangeVerifyStatus = 'confirmed' | 'changed' | 'gone' | 'unclear' | 'unreachable'
+
+// ------ Work exchange review queue (migration 035) ------
+
+export type WorkExchangeCandidateKind = 'new' | 'update' | 'delist'
+export type WorkExchangeCandidateStatus = 'pending' | 'approved' | 'rejected' | 'applied'
+
+/** The subset of a work_exchanges row an agent may propose. */
+export interface WorkExchangeProposal {
+  title?: string
+  description?: string
+  exchange_type?: WorkExchangeType
+  hours_per_week?: number | null
+  compensation?: string | null
+  skills_required?: string[]
+  skills_gained?: string[]
+  address?: Partial<Address>
+  lat?: number | null
+  lng?: number | null
+}
+
+/**
+ * A proposed change to `work_exchanges`, staged for admin review. Nothing
+ * here is public: the agent writes rows, an admin at /admin/work-exchange
+ * decides, and only then does anything reach the listing itself.
+ */
+export interface WorkExchangeCandidate {
+  id: string
+  kind: WorkExchangeCandidateKind
+  status: WorkExchangeCandidateStatus
+  work_exchange_id: string | null
+  provider_id: string | null
+  external_id: string | null
+  source_url: string
+  proposed: WorkExchangeProposal
+  agent_run_id: string
+  agent_model: string | null
+  agent_note: string | null
+  /** Verbatim quote from the source page — the reviewer's check on the model. */
+  evidence: string | null
+  confidence: number | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  review_note: string | null
+  created_at: string
+  updated_at: string
 }
 
 // ------ Donation ------

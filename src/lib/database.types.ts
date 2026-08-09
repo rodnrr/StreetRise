@@ -243,12 +243,54 @@ export interface Database {
           address: AddressJson
           created_at: string
           updated_at: string
+          // Migration 035 — provenance and freshness.
+          external_id: string | null
+          source_url: string | null
+          source_type: 'provider_posted' | 'seeded' | 'agent_assisted'
+          last_verified_at: string | null
+          last_verify_status: 'confirmed' | 'changed' | 'gone' | 'unclear' | 'unreachable' | null
         }
         Insert: Optional<
           Omit<Database['public']['Tables']['work_exchanges']['Row'], 'id' | 'created_at' | 'updated_at'>,
           'description' | 'exchange_type' | 'hours_per_week' | 'compensation' | 'skills_required' | 'skills_gained' | 'is_active' | 'address' | 'lat' | 'lng'
+          | 'external_id' | 'source_url' | 'source_type' | 'last_verified_at' | 'last_verify_status'
         >
         Update: Partial<Database['public']['Tables']['work_exchanges']['Insert']>
+        Relationships: []
+      }
+
+      // Migration 035. Staging table for agent-proposed changes to
+      // work_exchanges — see scripts/work-exchange-agent.ts. Admin-only RLS:
+      // unreviewed machine output about a real charity is not public, and not
+      // shown to the provider before a human has looked at it.
+      work_exchange_candidates: {
+        Row: {
+          id: string
+          kind: 'new' | 'update' | 'delist'
+          status: 'pending' | 'approved' | 'rejected' | 'applied'
+          work_exchange_id: string | null
+          provider_id: string | null
+          external_id: string | null
+          source_url: string
+          proposed: Json
+          agent_run_id: string
+          agent_model: string | null
+          agent_note: string | null
+          evidence: string | null
+          confidence: number | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          review_note: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Optional<
+          Omit<Database['public']['Tables']['work_exchange_candidates']['Row'], 'id' | 'created_at' | 'updated_at'>,
+          'status' | 'work_exchange_id' | 'provider_id' | 'external_id' | 'proposed'
+          | 'agent_model' | 'agent_note' | 'evidence' | 'confidence'
+          | 'reviewed_by' | 'reviewed_at' | 'review_note'
+        >
+        Update: Partial<Database['public']['Tables']['work_exchange_candidates']['Insert']>
         Relationships: []
       }
 

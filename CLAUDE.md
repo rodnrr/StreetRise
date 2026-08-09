@@ -45,6 +45,7 @@ npm run lint         # ESLint, zero warnings — currently passing
 npm run preview      # Preview production build locally
 npm run deploy       # scripts/deploy-pages.sh → wrangler pages deploy dist
 npm run import:seed  # Run scripts/import-seed-candidates.ts via tsx
+npm run agent:work   # Work exchange agent (scripts/work-exchange-agent.ts) — dry run unless --apply
 ```
 
 **Setup:**
@@ -136,6 +137,7 @@ src/
       AdminChat.tsx           # /admin/messages
       AdminFaq.tsx
       AdminBlog.tsx           # Blog CRUD
+      AdminWorkExchange.tsx   # Review queue for the work exchange agent
 
   components/
     shared/                 # RootLayout (nav, footer, Get Help Now CTA, mobile tab bar),
@@ -153,14 +155,18 @@ docs/
   OPEN_ITEMS.md             # Open items from 2026-07-29 session
   apply-migration-029.md    # Hand-apply runbook (029 = blog_posts)
   apply-migration-030.md    # Hand-apply runbook (030 = conversation read tracking)
+  apply-migration-035.md    # Hand-apply runbook (035 = work exchange agent)
+  work-exchange-agent.md    # What the agent does, how to run it, review workflow
   data-dictionary.md
   import-seed-candidates.md
 
 scripts/
   deploy-pages.sh           # Cloudflare Pages deploy (validates env vars)
   import-seed-candidates.ts # Seed import (needs SUPABASE_SERVICE_ROLE_KEY)
+  work-exchange-agent.ts    # Re-verifies /work listings + drafts new ones into a review queue.
+                            # Needs SUPABASE_SERVICE_ROLE_KEY + ANTHROPIC_API_KEY. Never publishes.
 
-supabase/migrations/        # 001–034 with gaps: NO 012, 013, or 021 exist.
+supabase/migrations/        # 001–035 with gaps: NO 012, 013, or 021 exist.
                             # See Migrations section — applied to live BY HAND.
 
 public/
@@ -196,7 +202,7 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/food-pantries`, `/shelters`, `/medical`, `/employment`, `/hygiene`, `/showers`, `/legal`, `/veterans`, `/youth`, `/families` | `CategoryPage` | Presentation-only aliases over existing `/map` filters via `lib/categories.ts` — never introduce new category values here |
 | `/404` | `NotFoundPage` | Wildcard `*` redirects here |
 | `/portal/*` | Provider portal | Auth-gated; dashboard, onboarding, listings, bookings, messages, work |
-| `/admin/*` | Admin portal | Auth-gated; dashboard, providers, resources (+new), bookings, messages, faq, blog |
+| `/admin/*` | Admin portal | Auth-gated; dashboard, providers, resources (+new), bookings, work-exchange, messages, faq, blog |
 
 **`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/claim`, `/work`, `/donate`, `/faq`, the 10 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, `/portal/*`, `/admin/*`, or individual `/claim/:id` pages.
 **robots.txt disallows:** `/portal/`, `/admin/`
@@ -247,7 +253,14 @@ Service requests submitted by users (or anonymously; `user_id` nullable since mi
 Admin↔provider messaging (migrations 014, 015, 018). `conversation_admin_notes` exists because `conversations.description` was provider-readable — admin-only triage notes live there with strict RLS. Migration 030 adds `provider_last_read_at` / `admin_last_read_at` for unread tracking (see Current Status for its live-apply state). Unread logic lives in `src/lib/conversations.ts`.
 
 ### `work_exchanges`
-Volunteer/paid/skills-trade/internship opportunities posted by providers. `lat`/`lng` nullable since migration 005. The `/work` page reads **this table** — migration 008's `work_exchange` category rows live in `resources` and never appear on `/work`. Seeded in 020/028.
+Volunteer/paid/skills-trade/internship opportunities posted by providers. `lat`/`lng` nullable since migration 005. The `/work` page reads **this table** — migration 008's `work_exchange` category rows live in `resources` and never appear on `/work`. Seeded in 020/028/032.
+
+Migration 035 adds provenance: `external_id`, `source_url` (the public "get involved / careers" page the listing came from), `source_type` (`provider_posted | seeded | agent_assisted`), `last_verified_at`, `last_verify_status` (`confirmed | changed | gone | unclear | unreachable`). All 29 seeded rows are backfilled with theirs (17 from 020/028, 12 from 032 — 032 seeds work exchanges too, which this file previously did not say). Where the seed named no page, the backfill falls back to the provider's `website`, which is where /work's "Apply on Website" button already points. `source_url` is what the agent re-reads; a listing with none is skipped.
+
+### `work_exchange_candidates`
+Review queue for `scripts/work-exchange-agent.ts` (migration 035). One row per proposed change: `kind` (`new | update | delist`), `status` (`pending | approved | rejected | applied`), the `proposed` payload as JSONB, plus `source_url`, a verbatim `evidence` quote from the page, `confidence`, and the run/model that produced it.
+
+**The agent never publishes.** It writes `last_verified_at` / `last_verify_status` on `work_exchanges` and nothing else; every content change lands here and an admin approves it at `/admin/work-exchange`. RLS is admin-only — not public (unreviewed machine output about a real charity) and not provider-readable (a provider should not see a draft about their org before a human has). Two partial unique indexes keep re-runs from duplicating an already-open proposal. Runbook: `docs/work-exchange-agent.md`.
 
 ### `blog_posts`
 Backs `/blog` and `/admin/blog` (migration 029). Public-read/admin-write RLS mirroring `faq`. `body_markdown` is not yet rendered as markdown on the public page.
@@ -381,13 +394,13 @@ Font: Inter (via `@fontsource/inter`). Dark-mode variants exist on most componen
 
 ## Database Migrations — READ THIS BEFORE TOUCHING THE SCHEMA
 
-Migrations live in `supabase/migrations/`, numbered 001–034 **with gaps: 012, 013, and 021 do not exist** (023 and 027 were renumbered from 010/021 to resolve collisions — see their headers).
+Migrations live in `supabase/migrations/`, numbered 001–035 **with gaps: 012, 013, and 021 do not exist** (023 and 027 were renumbered from 010/021 to resolve collisions — see their headers).
 
 **How they are actually applied:** by hand, in the Supabase SQL editor, against live project `mldatfcwnmvrmxumzxyb`. NOT by the deploy pipeline and not reliably by `supabase db push` — filenames have no timestamp prefixes, so repo and live migration history **drift**. Treat live as a separate source of truth; verify actual live state with read-only SQL before assuming a migration's effect exists. Runbooks for the most recent applies are in `docs/apply-migration-032.md`, `docs/apply-migrations-023-027.md`, and `docs/claim-flow.md` (033/034).
 
 **Do not regenerate `src/lib/database.types.ts` from the CLI** unless you have confirmed live has every migration the code depends on — the `blog_posts` block and the two conversation read columns were hand-written to match intended state, and a regen against a lagging DB would delete them.
 
-Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage, 032 South Florida seed, 033/034 claim submissions + notification fields.
+Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage, 032 South Florida seed, 033/034 claim submissions + notification fields, 035 work exchange provenance + agent review queue.
 
 ---
 

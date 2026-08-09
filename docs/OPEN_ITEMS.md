@@ -121,3 +121,35 @@ silently swallow a future legitimate tag that happens to contain a colon.
 
 Also check whether these tags feed the SEO description or structured data on
 that page before shipping, so they don't leak via metadata instead.
+
+---
+
+## `/work` freshness is uneven across listings (opened 2026-08-09)
+
+Raised in review on PR #63. The work exchange agent verifies a listing by
+re-reading its `source_url`, and only **seeded** listings have one — migration
+035 backfilled all 29 of them. A provider who types a listing into the portal
+supplies no canonical page, so `--verify` skips it and it can stay unchecked
+indefinitely.
+
+Skipping is the right call in isolation: guessing which page describes a
+provider-entered listing would be exactly the fabrication the agent is built to
+avoid. The problem is what it means in aggregate — `/work` renders verified and
+never-verified listings identically, so a visitor reasonably assumes one
+freshness standard where there are two.
+
+This is a product decision, not a bug fix. Two ways to close it:
+
+1. **Collect a canonical opportunity URL in the provider workflow.** Add the
+   field to `WorkExchangeEdit.tsx` (the column already exists as
+   `work_exchanges.source_url`), optional at first, and the agent covers those
+   listings the moment it is filled in. Best long-term answer; costs providers
+   one more field.
+2. **Surface "never verified" as its own state.** Show freshness on the `/work`
+   card from `last_verified_at` / `last_verify_status`, with a distinct
+   treatment for null. Honest immediately and needs nothing from providers, but
+   it advertises the gap rather than closing it.
+
+They compose — (2) is the honest stopgap while (1) fills in. Neither is
+started. Note that any freshness badge must not read as a guarantee: per
+`CLAUDE.md`, avoid "certified", "guaranteed", or "always up-to-date".

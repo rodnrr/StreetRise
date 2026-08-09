@@ -16,6 +16,7 @@ export type AdminCounts = {
   resourcesPending: number
   bookingsPending: number
   messagesOpen: number
+  workCandidatesPending: number
 }
 
 export const EMPTY_ADMIN_COUNTS: AdminCounts = {
@@ -24,6 +25,7 @@ export const EMPTY_ADMIN_COUNTS: AdminCounts = {
   resourcesPending: 0,
   bookingsPending: 0,
   messagesOpen: 0,
+  workCandidatesPending: 0,
 }
 
 /**
@@ -31,7 +33,7 @@ export const EMPTY_ADMIN_COUNTS: AdminCounts = {
  * in the Content-Range header. Cheap enough to run on every admin page load.
  */
 async function fetchAdminCounts(): Promise<AdminCounts> {
-  const [providers, claims, resources, bookings, messages] = await Promise.all([
+  const [providers, claims, resources, bookings, messages, workCandidates] = await Promise.all([
     db.providers().select('id', { count: 'exact', head: true }).eq('verification_status', 'pending'),
     // Counted off `providers`, not `provider_claims` — the providers row is
     // what actually gates the org, and a claim row can be left behind if the
@@ -40,6 +42,7 @@ async function fetchAdminCounts(): Promise<AdminCounts> {
     db.resources().select('id', { count: 'exact', head: true }).eq('verification_status', 'pending'),
     db.bookings().select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     db.conversations().select('id', { count: 'exact', head: true }).eq('status', 'open'),
+    db.work_candidates().select('id', { count: 'exact', head: true }).eq('status', 'pending'),
   ])
 
   return {
@@ -48,6 +51,7 @@ async function fetchAdminCounts(): Promise<AdminCounts> {
     resourcesPending: resources.count ?? 0,
     bookingsPending: (bookings as { count: number | null }).count ?? 0,
     messagesOpen: messages.count ?? 0,
+    workCandidatesPending: workCandidates.count ?? 0,
   }
 }
 
