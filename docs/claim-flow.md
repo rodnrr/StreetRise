@@ -67,10 +67,35 @@ This is the same split as `conversation_admin_notes` (migration 018).
 **3. One account, one organization.**
 `providers.user_id` is `UNIQUE`. An account that already owns an org — whether
 self-registered or previously claimed — cannot claim another; Postgres raises
-`23505` on `providers_user_id_key`. `submitClaim` translates that into a
-readable message telling the user to register a separate account. There is no
+`23505` on `providers_user_id_key`. `/claim/:id` now checks this **before**
+showing the form (`useMyProviderOrg`) and explains it in place; `submitClaim`
+still translates a `23505` that slips through into the same message. There is no
 way around it without dropping the unique constraint, which would break
 `my_provider_id()`.
+
+**4. Identity comes from Supabase, not from the auth store.**
+`useAuthStore` is persisted to `localStorage` under `streetrise-auth`, and
+nothing in the app reconciles it against the real session — there is no global
+`onAuthStateChange` listener. It therefore stays "signed in" indefinitely after
+the Supabase session behind it has gone. Gating the claim form on `userId` from
+that store is what produced the reported bug: the form rendered as signed in,
+the insert went out as `anon`, and Postgres answered
+
+```
+new row violates row-level security policy for table "provider_claims"
+```
+
+which the page then showed verbatim in a toast. `submitClaim` now resolves the
+claimant through `currentIdentity()` (`supabase.auth.getUser()`, which validates
+against the auth server) and refuses to write without one, and the page swaps in
+the sign-in prompt instead of the form. `ProviderOnboarding` had the identical
+defect against `providers_insert_self` and got the same guard.
+
+**Corollary: no write in this flow may surface a driver string.** Everything
+`submitClaim` can fail with goes through `claimErrorFor`, which maps `42501` /
+`PGRST301` / `401` to "your session expired", `23505` to the one-org rule or a
+duplicate claim, `23514` to a malformed contact email, and anything else to a
+generic retry message.
 
 ## Write ordering, and why it is that way round
 
