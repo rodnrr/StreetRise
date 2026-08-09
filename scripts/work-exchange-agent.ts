@@ -287,6 +287,56 @@ async function robotsAllows(url: string): Promise<boolean> {
   return !rules.some(rule => rule === '/' ? path.startsWith('/') : path.startsWith(rule))
 }
 
+/**
+ * Paths that tend to hold an organisation's opportunities. Used only to pick
+ * which same-origin links are worth one extra fetch during discovery.
+ */
+const OPPORTUNITY_PATH =
+  /(volunteer|get[-_]?involved|careers?|jobs?|join[-_]us|opportunit|ways[-_]to[-_]help|internship|employment|work[-_]with[-_]us|serve)/i
+
+/** Never follow more than this many links from one landing page. */
+const MAX_FOLLOWED_LINKS = 2
+
+/**
+ * Same-origin links from `html` that look like they lead to opportunities.
+ *
+ * Discovery used to read a provider's `website` and nothing else, which works
+ * when that column already points at a volunteer page (many do) and fails
+ * completely when it points at a homepage whose "Volunteer with us" link goes
+ * to /volunteer. Link extraction has to happen before htmlToText, which drops
+ * every anchor along with the rest of the markup.
+ *
+ * Deliberately narrow: same host only, path must look like an opportunities
+ * page, capped at MAX_FOLLOWED_LINKS, and each followed page still goes
+ * through robots.txt and the request delay.
+ */
+function opportunityLinks(html: string, base: string): string[] {
+  let baseUrl: URL
+  try {
+    baseUrl = new URL(base)
+  } catch {
+    return []
+  }
+
+  const found = new Set<string>()
+  for (const match of html.matchAll(/<a\b[^>]*?\bhref\s*=\s*["']([^"']+)["']/gi)) {
+    let url: URL
+    try {
+      url = new URL(match[1], base)
+    } catch {
+      continue
+    }
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') continue
+    if (url.hostname !== baseUrl.hostname) continue
+    url.hash = ''
+    if (url.href === baseUrl.href) continue
+    if (!OPPORTUNITY_PATH.test(url.pathname)) continue
+    found.add(url.href)
+    if (found.size >= MAX_FOLLOWED_LINKS) break
+  }
+  return [...found]
+}
+
 /** Strip a page down to the readable text the model should reason over. */
 function htmlToText(html: string): string {
   return html
@@ -310,7 +360,7 @@ function htmlToText(html: string): string {
 }
 
 type PageResult =
-  | { ok: true; text: string }
+  | { ok: true; text: string; links: string[] }
   | { ok: false; reason: string; blocked?: boolean }
 
 async function fetchPage(url: string, stats: Stats): Promise<PageResult> {
@@ -347,11 +397,15 @@ async function fetchPage(url: string, stats: Stats): Promise<PageResult> {
       return { ok: false, reason: `unexpected content-type ${type}` }
     }
     stats.pagesFetched++
-    const text = htmlToText(await res.text())
+    const html = await res.text()
+    const text = htmlToText(html)
     if (text.length < 200) {
       return { ok: false, reason: 'page had almost no readable text (likely JS-rendered)' }
     }
-    return { ok: true, text }
+    // Links come from the raw HTML — htmlToText has already thrown the anchors
+    // away by the time anything else sees the page. `res.url` rather than the
+    // requested URL so relative links resolve against where we landed.
+    return { ok: true, text, links: opportunityLinks(html, res.url || url) }
   } catch (err) {
     stats.fetchFailures++
     return { ok: false, reason: err instanceof Error ? err.message : 'fetch failed' }
@@ -678,37 +732,63 @@ async function runDiscover(
       continue
     }
 
-    const result = await discoverForProvider(client, provider, page.text, titles, stats)
-    if (!result) continue
-
-    if (result.opportunities.length === 0) {
-      console.log(`    nothing new — ${result.note}`)
-      continue
-    }
-
     // Give a new listing the same place as the org's existing ones. Where
     // there are none, the admin screen collects the address before approving;
     // /work renders "city, state" and an empty address reads as broken.
     const anchor = siblings.find(l => l.address && l.address.city)
 
-    for (const opp of result.opportunities) {
-      const { evidence, confidence, ...payload } = opp
-      await insertCandidate(sb, runId, {
-        kind: 'new',
-        work_exchange_id: null,
-        provider_id: provider.id,
-        external_id: null,
-        source_url: provider.website!,
-        proposed: {
-          ...payload,
-          address: anchor?.address ?? {},
-          lat: anchor?.lat ?? null,
-          lng: anchor?.lng ?? null,
-        },
-        agent_note: result.note,
-        evidence,
-        confidence,
-      }, !args.apply, stats)
+    /** Read one page and queue whatever it advertises. Returns how many. */
+    const harvest = async (url: string, text: string): Promise<number> => {
+      const result = await discoverForProvider(client, provider, text, titles, stats)
+      if (!result) return 0
+
+      if (result.opportunities.length === 0) {
+        console.log(`    nothing new on ${url} — ${result.note}`)
+        return 0
+      }
+
+      for (const opp of result.opportunities) {
+        const { evidence, confidence, ...payload } = opp
+        // The candidate's source_url is the page the evidence actually came
+        // from, not the provider's homepage — that is the page a reviewer
+        // needs to open, and the page --verify will re-read later.
+        await insertCandidate(sb, runId, {
+          kind: 'new',
+          work_exchange_id: null,
+          provider_id: provider.id,
+          external_id: null,
+          source_url: url,
+          proposed: {
+            ...payload,
+            address: anchor?.address ?? {},
+            lat: anchor?.lat ?? null,
+            lng: anchor?.lng ?? null,
+          },
+          agent_note: result.note,
+          evidence,
+          confidence,
+        }, !args.apply, stats)
+        titles.push(payload.title)
+      }
+      return result.opportunities.length
+    }
+
+    const found = await harvest(provider.website!, page.text)
+
+    // Only follow links when the landing page itself yielded nothing. That is
+    // the homepage-with-a-"Volunteer with us"-link case; a page that already
+    // lists opportunities does not need us making extra requests to a small
+    // charity's website.
+    if (found === 0 && page.links.length > 0) {
+      console.log(`    following ${page.links.length} opportunity link(s)`)
+      for (const link of page.links) {
+        const linked = await fetchPage(link, stats)
+        if (!linked.ok) {
+          console.log(`    ${link} unreachable: ${linked.reason}`)
+          continue
+        }
+        await harvest(link, linked.text)
+      }
     }
   }
 }

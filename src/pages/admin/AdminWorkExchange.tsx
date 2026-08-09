@@ -156,19 +156,52 @@ export default function AdminWorkExchange() {
             if (error) throw error
           } else {
             if (!candidate.provider_id) throw new Error('This candidate has no provider to attach to')
-            const { error } = await db.work_exchanges().insert({
+
+            // Approving a `new` candidate is two writes — create the listing,
+            // then mark the candidate applied — and a browser cannot put them
+            // in one transaction. If the second write fails, the listing is
+            // already public while the candidate is still pending, so the
+            // obvious next move (approve again) would insert a *second* copy
+            // onto /work.
+            //
+            // The fix is idempotency rather than atomicity: derive a stable
+            // external_id from the candidate, so a retry converges on the row
+            // that is already there. `uniq_work_exchanges_external_id` is the
+            // backstop when two approvals race.
+            const externalId =
+              candidate.external_id ??
+              `WX-CAND-${candidate.id.replace(/-/g, '').slice(0, 12).toUpperCase()}`
+
+            const listing = {
               ...fields,
               provider_id:        candidate.provider_id,
               is_active:          true,
               lat:                candidate.proposed.lat ?? null,
               lng:                candidate.proposed.lng ?? null,
               source_url:         candidate.source_url,
-              source_type:        'agent_assisted',
-              external_id:        candidate.external_id,
+              source_type:        'agent_assisted' as const,
+              external_id:        externalId,
               last_verified_at:   now,
-              last_verify_status: 'confirmed',
-            })
-            if (error) throw error
+              last_verify_status: 'confirmed' as const,
+            }
+
+            const { data: existing, error: lookupError } = await db.work_exchanges()
+              .select('id').eq('external_id', externalId).maybeSingle()
+            if (lookupError) throw lookupError
+
+            if (existing) {
+              // A previous attempt already created it. Re-apply the current
+              // form values so an edit made on the retry is not lost.
+              const { error } = await db.work_exchanges().update(listing).eq('id', existing.id)
+              if (error) throw error
+            } else {
+              const { error } = await db.work_exchanges().insert(listing)
+              // 23505 means a concurrent approval inserted it between the
+              // lookup and here. The listing exists and is correct; fall
+              // through and mark the candidate applied rather than showing
+              // the reviewer an error for work that succeeded.
+              if (error && error.code !== '23505') throw error
+            }
           }
         }
       }

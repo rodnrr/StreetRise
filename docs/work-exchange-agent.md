@@ -16,7 +16,7 @@ program ended last spring still renders on `/work` with a working-looking
 | Mode | What it reads | What it produces |
 |---|---|---|
 | `--verify` | Each active listing's `source_url` | `last_verified_at` / `last_verify_status` on the listing, plus an `update` or `delist` candidate when the page disagrees with us |
-| `--discover` | A verified provider's `website` | `new` candidates for programs the page advertises that we do not list |
+| `--discover` | A verified provider's `website`, and — only if that page advertises nothing — up to 2 same-origin links that look like opportunity pages | `new` candidates for programs the page advertises that we do not list |
 
 ## The one rule
 
@@ -103,8 +103,12 @@ Small charities run small websites. The agent:
   so anyone reading their access log can tell who it is and reach us
 - reads `robots.txt` per origin and skips disallowed paths
 - waits 2 seconds between requests and times out after 15
-- fetches one page per listing or provider, and follows no links — it is not a
-  crawler, it re-reads pages we already point people at
+- follows at most 2 links per provider, and only from a landing page that
+  advertised nothing. They must be same-origin and their path must look like an
+  opportunities page (`/volunteer`, `/get-involved`, `/careers`, …), and each
+  one goes through the same robots.txt check and delay. Worst case is 3
+  requests to an organisation, and the common case is 1 — it is not a crawler,
+  it re-reads pages we already point people at
 - truncates page text to ~14,000 characters before the model sees it
 
 If an organization asks us to stop, set their listings' `source_url` to null
@@ -119,6 +123,8 @@ approximate cost at list price.
 
 ## What it is not
 
+- It does not follow links during `--verify` — that mode re-reads exactly the
+  listing's `source_url` and nothing else.
 - It does not geocode. A `new` candidate inherits `lat`/`lng` from another
   listing at the same organization, or gets none and needs the address filled
   in by hand.
