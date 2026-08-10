@@ -79,14 +79,27 @@ leave *apply* off for a dry run, turn it on when you want candidates queued.
 > branch — GitHub registers `workflow_dispatch` from `main`, not from a PR
 > branch. Until PR #63 merges there is nothing to run there.
 
-That workflow needs three repository secrets under
-*Settings → Secrets and variables → Actions*:
+That workflow needs **two repository secrets** under *Settings → Secrets and
+variables → Actions* — on the **Secrets** tab, not the Variables tab:
 
 | Secret | Where it comes from |
 |---|---|
-| `VITE_SUPABASE_URL` | Supabase → Project Settings → API |
-| `SUPABASE_SERVICE_ROLE_KEY` | same page, **service_role** key — bypasses RLS, never commit it |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → **service_role** key. Bypasses RLS; never commit it. |
 | `ANTHROPIC_API_KEY` | console.anthropic.com → API keys |
+
+`VITE_SUPABASE_URL` is **not** needed. It is the public project URL — already
+in the deployed client bundle — so the workflow falls back to it. Set a
+`VITE_SUPABASE_URL` repository *variable* only to point the agent at a
+different project.
+
+Two placements that look right and fail, both surfaced by the run's first step
+rather than by a confusing error inside the agent:
+
+- **The Variables tab instead of the Secrets tab.** Variables are `vars`, not
+  `secrets`, and a service-role key should not be in one — variables are
+  plaintext and readable in the UI.
+- **Environment secrets on `work-exchange-apply` only.** A dry run enters
+  `work-exchange-dry-run` and never sees them. Repository secrets cover both.
 
 `SUPABASE_SERVICE_ROLE_KEY` bypasses RLS — it is a production administrative
 credential, and the *apply* toggle is not what protects it. Anyone with write

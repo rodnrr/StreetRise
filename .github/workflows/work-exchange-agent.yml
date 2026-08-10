@@ -8,10 +8,15 @@
 # but it does spend Anthropic tokens and fetch other people's websites, so it
 # should run when someone means it to.
 #
-# Required repository secrets (Settings → Secrets and variables → Actions):
-#   VITE_SUPABASE_URL
+# Required repository secrets (Settings → Secrets and variables → Actions,
+# on the "Secrets" tab — the "Variables" tab is a different thing and this
+# workflow reads secrets):
 #   SUPABASE_SERVICE_ROLE_KEY   ← service role, bypasses RLS. Never commit it.
 #   ANTHROPIC_API_KEY
+#
+# VITE_SUPABASE_URL is NOT required — it is the public project URL and the
+# workflow falls back to it. Set a `VITE_SUPABASE_URL` repository variable
+# only if you need to point the agent at a different project.
 #
 # ── Permission model ────────────────────────────────────────────────
 # SUPABASE_SERVICE_ROLE_KEY is a production administrative credential: it
@@ -77,14 +82,52 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
+
+      # Fail here, with the fix, rather than 40 seconds later inside the agent
+      # with a message that cannot see which of the two is missing or where it
+      # was supposed to go. An empty value here almost always means the secret
+      # was added somewhere the job cannot read it.
+      - name: Check credentials are reachable
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          missing=""
+          [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && missing="$missing SUPABASE_SERVICE_ROLE_KEY"
+          [ -z "$ANTHROPIC_API_KEY" ] && missing="$missing ANTHROPIC_API_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing secret(s):$missing"
+            echo ""
+            echo "This job reads them via the secrets context, so they must be either:"
+            echo "  • repository secrets — Settings → Secrets and variables → Actions"
+            echo "                         → 'Secrets' tab → New repository secret"
+            echo "  • or environment secrets on BOTH environments this workflow uses:"
+            echo "        work-exchange-dry-run   (used when apply is off)"
+            echo "        work-exchange-apply     (used when apply is on)"
+            echo ""
+            echo "Two things that look right but are not:"
+            echo "  • Adding them under the 'Variables' tab. Variables are \$vars, not"
+            echo "    \$secrets, and a service-role key does not belong in a variable —"
+            echo "    variables are plaintext and readable in the UI and logs."
+            echo "  • Adding them to work-exchange-apply only. A dry run never enters"
+            echo "    that environment, so it sees nothing."
+            echo ""
+            echo "Repository secrets are the simplest choice and work for both paths."
+            exit 1
+          fi
+          echo "Credentials present."
 
       - run: npm ci
 
       - name: Run agent
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          # Not a secret: this is the public project URL, already served in the
+          # deployed client bundle and visible in any network trace of the app.
+          # Read an override if one is set, otherwise fall back to the live
+          # project so this can never be the thing that blocks a run.
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || secrets.VITE_SUPABASE_URL || 'https://mldatfcwnmvrmxumzxyb.supabase.co' }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
