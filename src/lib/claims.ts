@@ -17,7 +17,22 @@ import type { ClaimableProvider, ProviderClaim, ProviderClaimStatus } from '@/ty
  * So `submitClaim` sends exactly those four columns and nothing else. Adding
  * any other field to that update — even setting a column to the value it
  * already holds — risks tripping the policy and failing the claim.
+ *
+ * Two rules keep that strictness from reaching a user as gibberish:
+ *
+ *   1. Identity comes from `currentIdentity()`, i.e. from Supabase, never from
+ *      `useAuthStore`. The store is persisted localStorage and outlives the
+ *      session it describes, so trusting it sends claim writes out as `anon`.
+ *   2. Nothing throws a raw driver message. Everything a write can fail with
+ *      is mapped to human copy by `claimErrorFor`.
  */
+
+/** The bare identity of an organization an account already owns. */
+export interface OwnedOrg {
+  id: string
+  organization_name: string
+  claim_status: ProviderClaimStatus
+}
 
 /** The only fields a claim UPDATE is permitted to write. */
 const CLAIM_PATCH = {
@@ -28,6 +43,7 @@ const CLAIM_PATCH = {
 
 export const CLAIMABLE_KEY = ['claimable-providers']
 export const MY_CLAIMS_KEY = ['my-claims']
+export const MY_ORG_KEY    = ['my-provider-org']
 
 /** Public directory of seeded organizations nobody has claimed yet. */
 export function useClaimableProviders() {
@@ -77,10 +93,83 @@ export function useMyClaims(userId: string | null) {
   })
 }
 
+/** The organization this account already owns, if it owns one. */
+export function useMyProviderOrg(userId: string | null) {
+  return useQuery<OwnedOrg | null>({
+    queryKey: [...MY_ORG_KEY, userId],
+    queryFn: async () => {
+      const { data, error } = await db.providers()
+        .select('id, organization_name, claim_status')
+        .eq('user_id', userId!)
+        .maybeSingle()
+      if (error) throw error
+      return (data ?? null) as OwnedOrg | null
+    },
+    enabled: !!userId,
+  })
+}
+
+export type ClaimErrorKind =
+  | 'signed_out'        // no live Supabase session — the write went out as anon
+  | 'already_owns_org'  // providers.user_id is UNIQUE; this account holds another org
+  | 'taken'             // someone else got there first, or this claim already exists
+  | 'invalid_email'     // contact_email failed the shape check at the database
+  | 'unknown'
+
 export class ClaimError extends Error {
-  constructor(message: string, readonly kind: 'already_owns_org' | 'taken' | 'unknown') {
+  constructor(message: string, readonly kind: ClaimErrorKind) {
     super(message)
     this.name = 'ClaimError'
+  }
+}
+
+export const SIGNED_OUT_MESSAGE =
+  'Your session has expired. Sign in again and your claim will go straight through.'
+
+/**
+ * Turns a PostgREST/Postgres error into copy a person can act on.
+ *
+ * Every one of these used to reach the user as the raw driver string — the
+ * reported bug was a toast reading "new row violates row-level security policy
+ * for table provider_claims", which tells a shelter director nothing and
+ * (worse) misdescribes the actual problem, which is an expired session.
+ *
+ * 42501 is deliberately mapped to 'signed_out'. The claim policies grant every
+ * authenticated user the right to file a claim as themselves, so the only way
+ * to fail the WITH CHECK from this form is for the request to have been made
+ * without a valid JWT.
+ */
+function claimErrorFor(
+  err: { code?: string; message?: string } | null,
+  on: 'claim' | 'provider',
+): ClaimError {
+  switch (err?.code) {
+    case '42501':
+    case 'PGRST301':
+    case '401':
+      return new ClaimError(SIGNED_OUT_MESSAGE, 'signed_out')
+
+    case '23505':
+      // providers.user_id is UNIQUE, so one account can only ever hold one
+      // organization. This is the error a user with an existing org hits.
+      return on === 'provider'
+        ? new ClaimError(
+            'This account already manages an organization on StreetRise. Each organization needs its own account — sign out and create one with your work email.',
+            'already_owns_org',
+          )
+        : new ClaimError(
+            'You have already submitted a claim for this organization. It is waiting on review.',
+            'taken',
+          )
+
+    case '23514':
+      return new ClaimError(
+        'That contact email doesn’t look right. Check it and try again.',
+        'invalid_email',
+      )
+
+    default:
+      return new ClaimError('Something went wrong. Please try again.', 'unknown')
   }
 }
 
@@ -97,33 +186,32 @@ export class ClaimError extends Error {
  */
 export async function submitClaim(opts: {
   providerId: string
-  userId: string
-  /** Account email. Must equal the JWT's email or RLS rejects the insert. */
-  email: string
   /** Where the claimant wants to be reached. Free text, required. */
   contactEmail: string
   note: string
-}): Promise<{ claimId: string }> {
+}): Promise<{ claimId: string } & ClaimIdentity> {
+  // Identity comes from the live session, never from the caller. The persisted
+  // auth store outlives the Supabase session, so a page that looks signed in
+  // can be one whose JWT is long gone; taking the ids from it would send the
+  // write out as `anon` and fail RLS with a raw driver error.
+  const me = await currentIdentity()
+  if (!me) throw new ClaimError(SIGNED_OUT_MESSAGE, 'signed_out')
+
   const { data: claim, error: claimErr } = await db.provider_claims()
     .insert({
       provider_id:   opts.providerId,
-      user_id:       opts.userId,
-      claim_email:   opts.email,
+      user_id:       me.userId,
+      claim_email:   me.email,
       contact_email: opts.contactEmail.trim(),
       claim_note:    opts.note.trim() || null,
     })
     .select('id')
     .single()
 
-  if (claimErr) {
-    if (claimErr.code === '23505') {
-      throw new ClaimError('You have already submitted a claim for this organization. It is waiting on review.', 'taken')
-    }
-    throw new ClaimError(claimErr.message, 'unknown')
-  }
+  if (claimErr) throw claimErrorFor(claimErr, 'claim')
 
   const { error: provErr, count } = await db.providers()
-    .update({ user_id: opts.userId, ...CLAIM_PATCH }, { count: 'exact' })
+    .update({ user_id: me.userId, ...CLAIM_PATCH }, { count: 'exact' })
     .eq('id', opts.providerId)
     .eq('claim_status', 'unclaimed')
 
@@ -131,22 +219,14 @@ export async function submitClaim(opts: {
     // Roll back the evidence row so the org stays cleanly claimable.
     await db.provider_claims().delete().eq('id', claim.id)
 
-    // providers.user_id is UNIQUE, so one account can only ever hold one
-    // organization. This is the error a user with an existing org hits.
-    if (provErr?.code === '23505') {
-      throw new ClaimError(
-        'This account is already linked to an organization. Claims need their own account — sign out and register a new one with your work email.',
-        'already_owns_org',
-      )
-    }
-    if (provErr) throw new ClaimError(provErr.message, 'unknown')
+    if (provErr) throw claimErrorFor(provErr, 'provider')
 
     // No error but nothing updated: the `claim_status = 'unclaimed'` guard on
     // the update matched no row, so someone claimed it in the meantime.
     throw new ClaimError('Someone else claimed this organization first. Refresh to see its current status.', 'taken')
   }
 
-  return { claimId: claim.id }
+  return { claimId: claim.id, ...me }
 }
 
 /** Rejects obvious junk without pretending to validate deliverability. */
@@ -154,10 +234,25 @@ export function isEmailShaped(value: string): boolean {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value.trim())
 }
 
-/** The signed-in user's email, read from the session rather than form input. */
-export async function currentUserEmail(): Promise<string | null> {
-  const { data } = await supabase.auth.getUser()
-  return data.user?.email ?? null
+export interface ClaimIdentity {
+  userId: string
+  /** The account address. RLS pins claim_email to this, so it is not editable. */
+  email:  string
+}
+
+/**
+ * The signed-in user according to Supabase — not according to `useAuthStore`.
+ *
+ * `supabase.auth.getUser()` validates the JWT against the auth server (and
+ * refreshes it if it can), so a null here means the next database write really
+ * would go out unauthenticated. Nothing in the claim flow may be gated on the
+ * persisted store alone: `streetrise-auth` is plain localStorage and happily
+ * survives the session it describes.
+ */
+export async function currentIdentity(): Promise<ClaimIdentity | null> {
+  const { data, error } = await supabase.auth.getUser()
+  if (error || !data.user?.email) return null
+  return { userId: data.user.id, email: data.user.email }
 }
 
 export const CLAIM_STATUS_COPY: Record<ProviderClaimStatus, string> = {

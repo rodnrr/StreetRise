@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Building2, CheckCircle } from 'lucide-react'
 import { db } from '@/lib/supabase'
 import { useAuthStore, useToast } from '@/lib/store'
+import { currentIdentity, SIGNED_OUT_MESSAGE } from '@/lib/claims'
 
 const schema = z.object({
   organization_name: z.string().min(2, 'Organization name required'),
@@ -22,16 +24,28 @@ const STEPS = ['Organization Info', 'Contact Details', 'Review & Submit']
 export default function ProviderOnboarding() {
   const [step, setStep]           = useState(0)
   const [submitted, setSubmitted] = useState(false)
-  const { userId, setAuth }       = useAuthStore()
+  const { userId, setAuth, clearAuth } = useAuthStore()
   const toast                     = useToast()
+  const navigate                  = useNavigate()
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, getValues } =
     useForm<FormData>({ resolver: zodResolver(schema), mode: 'onBlur' })
 
   async function onSubmit(data: FormData) {
-    if (!userId) return
+    // The persisted auth store outlives the Supabase session it describes, so
+    // `userId` alone is not proof we can write. Without this the INSERT goes
+    // out as `anon` and the user gets "new row violates row-level security
+    // policy for table providers" — same failure the claim form used to have.
+    const me = await currentIdentity()
+    if (!me) {
+      toast.error('Please sign in again', SIGNED_OUT_MESSAGE)
+      if (userId) clearAuth()
+      navigate(`/login?next=${encodeURIComponent('/portal/onboarding')}`)
+      return
+    }
+
     const { data: provider, error } = await db.providers().insert({
-      user_id:           userId,
+      user_id:           me.userId,
       organization_name: data.organization_name,
       contact_name:      data.contact_name,
       contact_email:     data.contact_email,
@@ -40,8 +54,21 @@ export default function ProviderOnboarding() {
       ein:               data.ein || null,
       bio:               data.bio || null,
     }).select().single()
-    if (error) { toast.error('Submission failed', error.message); return }
-    setAuth({ userId, userEmail: data.contact_email, role: 'provider', providerId: provider.id, verificationStatus: 'pending' })
+
+    if (error) {
+      // Raw driver strings are meaningless to a shelter director; map the two
+      // failures this form can actually produce and stay generic otherwise.
+      const message =
+        error.code === '23505'
+          ? 'This account already manages an organization. Sign out and use a different email to register another one.'
+          : error.code === '42501'
+            ? SIGNED_OUT_MESSAGE
+            : 'We couldn’t save your application. Please try again in a moment.'
+      toast.error('Submission failed', message)
+      return
+    }
+
+    setAuth({ userId: me.userId, userEmail: data.contact_email, role: 'provider', providerId: provider.id, verificationStatus: 'pending' })
     setSubmitted(true)
   }
 

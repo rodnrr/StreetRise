@@ -8,8 +8,9 @@ import {
 import SeoHead from '@/lib/seo/SeoHead'
 import { useAuthStore, useToast } from '@/lib/store'
 import {
-  useClaimableProvider, submitClaim, currentUserEmail, isEmailShaped,
-  ClaimError, CLAIMABLE_KEY, MY_CLAIMS_KEY,
+  useClaimableProvider, useMyProviderOrg, submitClaim, currentIdentity, isEmailShaped,
+  ClaimError, CLAIMABLE_KEY, MY_CLAIMS_KEY, MY_ORG_KEY,
+  type ClaimIdentity,
 } from '@/lib/claims'
 import { notifyClaim } from '@/lib/notifications'
 
@@ -17,34 +18,54 @@ function Shell({ children }: { children: React.ReactNode }) {
   return <div className="max-w-xl mx-auto px-4 py-10 pb-28 md:pb-12">{children}</div>
 }
 
+/**
+ * Who the browser can actually write to the database as.
+ *
+ * `null` while we are still asking Supabase; `false` once we know there is no
+ * usable session. This is deliberately not derived from `useAuthStore` — the
+ * store is persisted localStorage and stays "signed in" long after the session
+ * behind it expires, which is what made this form submit as `anon` and fail RLS.
+ */
+type Session = ClaimIdentity | false | null
+
 export default function ClaimDetailPage() {
   const { id }       = useParams<{ id: string }>()
   const navigate     = useNavigate()
   const qc           = useQueryClient()
   const toast        = useToast()
-  const { userId, setAuth, userEmail } = useAuthStore()
+  const { userId, setAuth, clearAuth } = useAuthStore()
   const { data: org, isLoading, isError } = useClaimableProvider(id)
 
+  const [session, setSession]     = useState<Session>(null)
   const [note, setNote]           = useState('')
-  const [email, setEmail]         = useState<string | null>(null)
   const [contactEmail, setContactEmail] = useState('')
   const [contactTouched, setContactTouched] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone]           = useState(false)
 
-  // `email` is the account address. It comes from the session, never from a
-  // form field — the RLS policy on provider_claims pins claim_email to
-  // auth.jwt()->>'email', so a typed value would simply be rejected.
-  // `contactEmail` is separate and editable: where they actually want to be
-  // reached, which may not be the account they signed up with.
+  // An account may only ever hold one organization (providers.user_id is
+  // UNIQUE), so someone who already has one cannot claim another. Ask up front
+  // rather than letting them fill in the form and fail on submit.
+  const { data: ownedOrg, isLoading: ownedLoading } = useMyProviderOrg(
+    session ? session.userId : null,
+  )
+
+  // The account address is read from the session, never from a form field —
+  // RLS pins claim_email to auth.jwt()->>'email', so a typed value would be
+  // rejected. `contactEmail` is separate and editable: where they actually
+  // want to be reached, which may not be the account they signed up with.
   useEffect(() => {
-    if (!userId) { setEmail(null); return }
-    currentUserEmail().then(e => {
-      const resolved = e ?? userEmail ?? null
-      setEmail(resolved)
-      setContactEmail(prev => prev || resolved || '')
+    let cancelled = false
+    currentIdentity().then(me => {
+      if (cancelled) return
+      setSession(me ?? false)
+      if (me) setContactEmail(prev => prev || me.email)
+      // The store claimed a user the auth server does not recognise. Drop it,
+      // or every other gate in the app keeps believing it too.
+      else if (useAuthStore.getState().userId) clearAuth()
     })
-  }, [userId, userEmail])
+    return () => { cancelled = true }
+  }, [userId, clearAuth])
 
   const contactValid = isEmailShaped(contactEmail)
   const showContactError = contactTouched && !contactValid
@@ -52,16 +73,18 @@ export default function ClaimDetailPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setContactTouched(true)
-    if (!id || !userId || !email || !contactValid) return
+    if (!id || !session || !contactValid) return
     setSubmitting(true)
     try {
-      const { claimId } = await submitClaim({ providerId: id, userId, email, contactEmail, note })
+      const { claimId, userId: uid, email } = await submitClaim({
+        providerId: id, contactEmail, note,
+      })
       // Best effort — the claim is already saved, so a mail failure must not
       // be reported to the user as a failed claim.
       void notifyClaim(claimId, 'submitted')
       // The account now owns this provider row, pending admin approval.
       setAuth({
-        userId,
+        userId: uid,
         userEmail: email,
         role: 'provider',
         providerId: id,
@@ -69,12 +92,22 @@ export default function ClaimDetailPage() {
       })
       qc.invalidateQueries({ queryKey: CLAIMABLE_KEY })
       qc.invalidateQueries({ queryKey: MY_CLAIMS_KEY })
+      qc.invalidateQueries({ queryKey: MY_ORG_KEY })
       setDone(true)
     } catch (err) {
       const msg = err instanceof ClaimError ? err.message : 'Something went wrong. Please try again.'
       toast.error('Claim not submitted', msg)
       if (err instanceof ClaimError && err.kind === 'taken') {
         qc.invalidateQueries({ queryKey: CLAIMABLE_KEY })
+      }
+      // The session died between page load and submit. Swap the form for the
+      // sign-in prompt so the next tap goes somewhere useful.
+      if (err instanceof ClaimError && err.kind === 'signed_out') {
+        setSession(false)
+        clearAuth()
+      }
+      if (err instanceof ClaimError && err.kind === 'already_owns_org') {
+        qc.invalidateQueries({ queryKey: MY_ORG_KEY })
       }
     } finally {
       setSubmitting(false)
@@ -195,8 +228,11 @@ export default function ClaimDetailPage() {
         </p>
       </div>
 
-      {/* Not signed in */}
-      {!userId && (
+      {/* Still asking Supabase who this is, or what they already own */}
+      {(session === null || (!!session && ownedLoading)) && <div className="skeleton h-44 w-full" />}
+
+      {/* Not signed in, or signed in only as far as localStorage is concerned */}
+      {session === false && (
         <div className="card text-center py-8">
           <LogIn size={30} className="text-primary-600 mx-auto mb-3" />
           <h2 className="font-bold text-gray-900 mb-1.5">Sign in to claim this listing</h2>
@@ -215,8 +251,32 @@ export default function ClaimDetailPage() {
         </div>
       )}
 
-      {/* Signed in — claim form */}
-      {userId && (
+      {/* Signed in, but this account already holds a different organization */}
+      {session && ownedOrg && (
+        <div className="card text-center py-8">
+          <Building2 size={30} className="text-amber-500 mx-auto mb-3" />
+          <h2 className="font-bold text-gray-900 mb-1.5">
+            This account already manages an organization
+          </h2>
+          <p className="text-sm text-gray-500 mb-5 max-w-sm mx-auto leading-relaxed">
+            You’re signed in as <strong>{session.email}</strong>, which manages{' '}
+            <strong>{ownedOrg.organization_name}</strong>. Each organization needs
+            its own StreetRise account, so this one can’t also claim{' '}
+            {org.organization_name}. Sign out and create an account with a work
+            email at {org.organization_name.split(' ')[0]}, or email{' '}
+            <a href="mailto:support@streetrise.org" className="text-primary-600 hover:underline">
+              support@streetrise.org
+            </a>{' '}
+            and we’ll link them for you.
+          </p>
+          <button onClick={() => navigate('/portal/dashboard')} className="btn-secondary">
+            Go to your portal
+          </button>
+        </div>
+      )}
+
+      {/* Signed in with a clean account — claim form */}
+      {session && !ownedOrg && !ownedLoading && (
         <form onSubmit={handleSubmit} className="card space-y-4">
           <h2 className="font-bold text-gray-900">Claim this organization</h2>
 
@@ -224,7 +284,7 @@ export default function ClaimDetailPage() {
             <Mail size={15} className="text-gray-400 mt-0.5 shrink-0" />
             <div className="min-w-0">
               <p className="text-xs text-gray-500">Claiming as</p>
-              <p className="text-sm font-medium text-gray-900 truncate">{email ?? '…'}</p>
+              <p className="text-sm font-medium text-gray-900 truncate">{session.email}</p>
             </div>
           </div>
 
@@ -274,7 +334,7 @@ export default function ClaimDetailPage() {
             </p>
           </div>
 
-          <button type="submit" disabled={submitting || !email || !contactValid} className="btn-primary w-full">
+          <button type="submit" disabled={submitting || !contactValid} className="btn-primary w-full">
             {submitting ? 'Submitting…' : 'Submit claim'}
           </button>
           <p className="text-xs text-gray-400 text-center">
