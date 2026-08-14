@@ -152,6 +152,7 @@ interface Stats {
   robotsBlocked: number
   verified: number
   evidenceRejected: number
+  modelErrors: number
   stampsWithheld: number
   candidatesCreated: number
   candidatesSkipped: number
@@ -476,6 +477,41 @@ function pageBlock(url: string, text: string): string {
  */
 const MODEL_EFFORT = 'low' as const
 
+/**
+ * Raised when the run cannot usefully continue. Distinct from a single page
+ * failing, which is expected and skipped.
+ */
+class FatalAgentError extends Error {}
+
+/**
+ * Decide whether a failed model call should stop the run or just skip a page.
+ *
+ * A rejected key, a revoked one, an exhausted credit balance, or a request the
+ * API considers malformed will fail identically on every remaining listing —
+ * grinding through 29 of them produces 29 identical stack traces and a bill for
+ * nothing. Those abort. Rate limits, overloads and network blips are transient,
+ * so they skip the page: the listing keeps its old `last_verified_at` and the
+ * next run picks it up, which is the same "fail to we-don't-know" rule the rest
+ * of the agent follows.
+ */
+function handleModelError(err: unknown, stats: Stats): null {
+  stats.modelErrors++
+
+  if (err instanceof Anthropic.APIError) {
+    const status = err.status
+    if (status === 400 || status === 401 || status === 403) {
+      throw new FatalAgentError(`Anthropic API rejected the request (HTTP ${status}): ${err.message}`)
+    }
+    console.error(`    model call failed (${status ?? 'network'}) — skipping this page: ${err.message}`)
+    return null
+  }
+
+  console.error(
+    `    model call failed — skipping this page: ${err instanceof Error ? err.message : String(err)}`,
+  )
+  return null
+}
+
 function recordUsage(
   response: { usage: { input_tokens: number; output_tokens: number }; stop_reason: string | null },
   stats: Stats,
@@ -521,16 +557,20 @@ Judge the opportunity, not the wording: a page that lists the same program under
 
 Set "revised" to null unless the status is "changed".`
 
-  const response = await client.messages.parse({
-    model: MODEL,
-    max_tokens: 8000,
-    system: SYSTEM_PROMPT,
-    output_config: { effort: MODEL_EFFORT, format: jsonSchemaOutputFormat(VERIFY_SCHEMA) },
-    messages: [{ role: 'user', content: prompt }],
-  })
+  try {
+    const response = await client.messages.parse({
+      model: MODEL,
+      max_tokens: 8000,
+      system: SYSTEM_PROMPT,
+      output_config: { effort: MODEL_EFFORT, format: jsonSchemaOutputFormat(VERIFY_SCHEMA) },
+      messages: [{ role: 'user', content: prompt }],
+    })
 
-  if (!recordUsage(response, stats)) return null
-  return response.parsed_output ?? null
+    if (!recordUsage(response, stats)) return null
+    return response.parsed_output ?? null
+  } catch (err) {
+    return handleModelError(err, stats)
+  }
 }
 
 async function discoverForProvider(
@@ -560,16 +600,20 @@ Use these types:
 
 Set hours_per_week and compensation to null unless the page states them. Return an empty list if the page advertises no specific opportunities.`
 
-  const response = await client.messages.parse({
-    model: MODEL,
-    max_tokens: 8000,
-    system: SYSTEM_PROMPT,
-    output_config: { effort: MODEL_EFFORT, format: jsonSchemaOutputFormat(DISCOVER_SCHEMA) },
-    messages: [{ role: 'user', content: prompt }],
-  })
+  try {
+    const response = await client.messages.parse({
+      model: MODEL,
+      max_tokens: 8000,
+      system: SYSTEM_PROMPT,
+      output_config: { effort: MODEL_EFFORT, format: jsonSchemaOutputFormat(DISCOVER_SCHEMA) },
+      messages: [{ role: 'user', content: prompt }],
+    })
 
-  if (!recordUsage(response, stats)) return null
-  return response.parsed_output ?? null
+    if (!recordUsage(response, stats)) return null
+    return response.parsed_output ?? null
+  } catch (err) {
+    return handleModelError(err, stats)
+  }
 }
 
 // ─── Candidate writing ───────────────────────────────────────────────────────
@@ -898,6 +942,7 @@ function printSummary(stats: Stats, dryRun: boolean): void {
   console.log(`  Listings verified     : ${stats.verified}`)
   console.log(`  Dropped, bad evidence : ${stats.evidenceRejected}`)
   console.log(`  Stamps withheld       : ${stats.stampsWithheld}`)
+  console.log(`  Model call failures   : ${stats.modelErrors}`)
   console.log('')
   console.log(`  Candidates queued     : ${stats.candidatesCreated}`)
   console.log(`  Candidates skipped    : ${stats.candidatesSkipped}`)
@@ -993,15 +1038,36 @@ async function main(): Promise<void> {
 
   const stats: Stats = {
     pagesFetched: 0, fetchFailures: 0, robotsBlocked: 0, verified: 0,
-    evidenceRejected: 0, stampsWithheld: 0,
+    evidenceRejected: 0, stampsWithheld: 0, modelErrors: 0,
     candidatesCreated: 0, candidatesSkipped: 0,
     modelCalls: 0, inputTokens: 0, outputTokens: 0,
   }
 
-  if (args.verify)   await runVerify(sb, client, args, runId, stats)
-  if (args.discover) await runDiscover(sb, client, args, runId, stats)
+  let fatal: FatalAgentError | null = null
+  try {
+    if (args.verify)   await runVerify(sb, client, args, runId, stats)
+    if (args.discover) await runDiscover(sb, client, args, runId, stats)
+  } catch (err) {
+    if (!(err instanceof FatalAgentError)) throw err
+    fatal = err
+  }
 
+  // The summary prints either way — a run that stopped a third of the way
+  // through still did that third, and the numbers say how far it got.
   printSummary(stats, !args.apply)
+
+  if (fatal) {
+    console.error(`\nRun stopped: ${fatal.message}`)
+    if (/credit balance|billing|quota/i.test(fatal.message)) {
+      console.error(
+        '\nThis is an Anthropic billing problem, not a problem with the agent or your\n' +
+        'Supabase setup — everything up to the model call worked. Add credit at\n' +
+        'console.anthropic.com → Plans & Billing, then re-run.\n' +
+        'Note that a Claude subscription does not cover API usage; the API bills separately.',
+      )
+    }
+    process.exit(1)
+  }
 }
 
 main().catch(err => {
