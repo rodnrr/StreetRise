@@ -1,15 +1,16 @@
-import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { CheckCircle, ArrowLeft, Users, Calendar, MessageSquare, BedDouble } from 'lucide-react'
+import clsx from 'clsx'
 import { db } from '@/lib/supabase'
 import { useToast } from '@/lib/store'
 import type { Resource } from '@/types'
 
-const schema = z.object({
+const baseSchema = z.object({
   requester_name:  z.string().trim().min(2, 'Name required'),
   requester_phone: z.string().trim().optional(),
   requester_email: z.string().trim().email('Enter a valid email').optional().or(z.literal('')),
@@ -21,13 +22,27 @@ const schema = z.object({
   check_in_date:   z.string().optional(),
   check_out_date:  z.string().optional(),
   notes:           z.string().max(500).optional(),
-}).superRefine((data, ctx) => {
-  if (!data.requester_phone && !data.requester_email) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['requester_phone'], message: 'Phone or email required' })
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['requester_email'], message: 'Phone or email required' })
-  }
 })
-type FormData = z.infer<typeof schema>
+
+/**
+ * `?intent=question` reaches this form from the map's "Ask a Question" action.
+ * It is the same request record — a provider still replies through the same
+ * queue — but party size and dates are meaningless for a question, and the
+ * question itself becomes the required field.
+ */
+function makeSchema(isQuestion: boolean) {
+  return baseSchema.superRefine((data, ctx) => {
+    if (!data.requester_phone && !data.requester_email) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['requester_phone'], message: 'Phone or email required' })
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['requester_email'], message: 'Phone or email required' })
+    }
+    if (isQuestion && !data.notes?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['notes'], message: 'Type your question so the provider can answer it' })
+    }
+  })
+}
+
+type FormData = z.infer<typeof baseSchema>
 
 const STATUS_STYLE: Record<string, string> = {
   available: 'text-success-600 bg-success-50',
@@ -52,8 +67,12 @@ function getBookingLabel(resource: Resource, isFull: boolean): string {
 
 export default function BookingPage() {
   const { resourceId }  = useParams<{ resourceId: string }>()
+  const [searchParams]  = useSearchParams()
   const [done, setDone] = useState(false)
   const toast           = useToast()
+
+  const isQuestion = searchParams.get('intent') === 'question'
+  const schema = useMemo(() => makeSchema(isQuestion), [isQuestion])
 
   const { data: resource } = useQuery<Resource | null>({
     queryKey: ['resource', resourceId],
@@ -96,9 +115,15 @@ export default function BookingPage() {
   if (done) return (
     <div className="max-w-md mx-auto pt-20 text-center px-4">
       <CheckCircle size={60} className="text-success-600 mx-auto mb-4" />
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Request sent!</h1>
-      <p className="text-gray-500 mb-2">Your request has been sent to <strong>{resource?.name}</strong>.</p>
-      <p className="text-gray-400 text-sm mb-8">This is a request, not a confirmed reservation.</p>
+      <h1 className="text-2xl font-bold text-gray-900 mb-2">{isQuestion ? 'Question sent!' : 'Request sent!'}</h1>
+      <p className="text-gray-500 mb-2">
+        Your {isQuestion ? 'question has' : 'request has'} been sent to <strong>{resource?.name}</strong>.
+      </p>
+      <p className="text-gray-400 text-sm mb-8">
+        {isQuestion
+          ? 'A staff member will reply using the contact details you gave. Replies are not instant.'
+          : 'This is a request, not a confirmed reservation.'}
+      </p>
       <div className="flex flex-col gap-3">
         <Link to="/map" className="btn-primary">Find More Resources</Link>
         <Link to="/" className="btn-secondary">Return Home</Link>
@@ -137,8 +162,14 @@ export default function BookingPage() {
         )}
       </div>
       <div className="card">
-        <h1 className="font-bold text-gray-900 text-lg mb-2">{getBookingLabel(resource, isFull)}</h1>
-        <p className="text-sm text-warning-600 bg-warning-50 rounded-xl p-3 mb-4">This is a request, not a confirmed reservation.</p>
+        <h1 className="font-bold text-gray-900 text-lg mb-2">
+          {isQuestion ? 'Ask a Question' : getBookingLabel(resource, isFull)}
+        </h1>
+        <p className="text-sm text-warning-600 bg-warning-50 rounded-xl p-3 mb-4">
+          {isQuestion
+            ? 'Your question goes to this provider. Replies are not instant — call them if you need help today.'
+            : 'This is a request, not a confirmed reservation.'}
+        </p>
         <form onSubmit={handleSubmit(d => submit.mutate(d))} className="space-y-4">
           <div>
             <label className="label">Your name *</label>
@@ -171,23 +202,34 @@ export default function BookingPage() {
               <input {...register('best_contact_time')} className="input" placeholder="Weekdays after 3 PM" />
             </div>
           </div>
+          {!isQuestion && (
+            <>
+              <div>
+                <label className="label flex items-center gap-1.5"><Users size={14} /> Party size *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <input {...register('adults')} type="number" min={1} className={errors.adults ? 'input-error' : 'input'} />
+                  <input {...register('children')} type="number" min={0} className="input" />
+                </div>
+              </div>
+              <div>
+                <label className="label flex items-center gap-1.5"><Calendar size={14} /> Dates</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <input {...register('check_in_date')} type="date" className="input" />
+                  <input {...register('check_out_date')} type="date" className="input" />
+                </div>
+              </div>
+            </>
+          )}
           <div>
-            <label className="label flex items-center gap-1.5"><Users size={14} /> Party size *</label>
-            <div className="grid grid-cols-2 gap-3">
-              <input {...register('adults')} type="number" min={1} className={errors.adults ? 'input-error' : 'input'} />
-              <input {...register('children')} type="number" min={0} className="input" />
-            </div>
-          </div>
-          <div>
-            <label className="label flex items-center gap-1.5"><Calendar size={14} /> Dates</label>
-            <div className="grid grid-cols-2 gap-3">
-              <input {...register('check_in_date')} type="date" className="input" />
-              <input {...register('check_out_date')} type="date" className="input" />
-            </div>
-          </div>
-          <div>
-            <label className="label flex items-center gap-1.5"><MessageSquare size={14} /> Needs / details</label>
-            <textarea {...register('notes')} className="input min-h-[70px] resize-none" />
+            <label className="label flex items-center gap-1.5">
+              <MessageSquare size={14} /> {isQuestion ? 'Your question *' : 'Needs / details'}
+            </label>
+            <textarea
+              {...register('notes')}
+              className={clsx('min-h-[70px] resize-none', errors.notes ? 'input-error' : 'input')}
+              placeholder={isQuestion ? 'What would you like to ask them?' : undefined}
+            />
+            {errors.notes && <p className="error-text">{errors.notes.message}</p>}
           </div>
           <label className="flex items-start gap-3 rounded-xl bg-gray-50 p-3 text-sm text-gray-700">
             <input {...register('contact_consent')} type="checkbox" className="mt-1" />
@@ -197,7 +239,9 @@ export default function BookingPage() {
             </span>
           </label>
           <button type="submit" disabled={isSubmitting || submit.isPending} className="btn-primary w-full btn-lg">
-            {submit.isPending ? 'Sending request…' : getBookingLabel(resource, isFull)}
+            {submit.isPending
+              ? (isQuestion ? 'Sending question…' : 'Sending request…')
+              : (isQuestion ? 'Send Question' : getBookingLabel(resource, isFull))}
           </button>
         </form>
       </div>

@@ -14,6 +14,8 @@ interface MapState {
   setMapZoom:      (zoom: number) => void
   setFilters:      (filters: Partial<MapFilters>) => void
   clearFilters:    () => void
+  /** Clear every refinement but keep the active need chip. */
+  clearRefinements: () => void
   setSelectedId:   (id: string | null) => void
 }
 
@@ -37,10 +39,19 @@ export const useMapStore = create<MapState>()(
         return { filters: next }
       }),
       clearFilters:    ()       => set({ filters: {} }),
+      clearRefinements: () => set((s) => ({
+        filters: {
+          need:         s.filters.need,
+          category:     s.filters.category,
+          quickFilter:  s.filters.quickFilter,
+        },
+      })),
       setSelectedId:   (id)     => set({ selectedId: id }),
     }),
     {
-      name: 'streetrise-map-v3', // v3: new MapFilters shape with quickFilter + taxonomy
+      // v4: MapFilters gained `need`; radius no longer defaults to 20 km, so a
+      // persisted v3 filter set would silently keep narrowing the new map.
+      name: 'streetrise-map-v4',
       partialize: (s) => ({ mapCenter: s.mapCenter, mapZoom: s.mapZoom, filters: s.filters }),
     }
   )
