@@ -19,7 +19,8 @@ import {
   isUsefulOption,
   hasKnownHours,
   needForCategory,
-  needForQuickFilter,
+  quickFilterToFilters,
+  filterSignature,
   NEED_DEFS,
   NEED_ORDER,
   CATEGORY_SLUG_MAP,
@@ -158,8 +159,10 @@ export default function MapPage() {
     }
     if (quick) {
       clearFilters()
-      const need = needForQuickFilter(quick)
-      setFilters(need ? { need } : { quickFilter: quick })
+      // Translated at the door rather than stored raw, so a legacy key with no
+      // need equivalent (mens_help, womens_help) still narrows the list instead
+      // of showing everything under an "active" label.
+      setFilters(quickFilterToFilters(quick))
       return
     }
     if (subcategory) {
@@ -226,7 +229,7 @@ export default function MapPage() {
   // ── Fit the map to what the list is showing ──
   // Re-fits when the *set* changes (a need chip, a search), not when the user
   // pans — otherwise the map would keep yanking itself back.
-  const fitSignature = `${filters.need ?? filters.category ?? ''}|${deferredQuery.trim()}|${activeRefinements}`
+  const fitSignature = filterSignature(filters, deferredQuery)
   const fitToken = useRef(0)
   useEffect(() => {
     if (!ranked.length) return

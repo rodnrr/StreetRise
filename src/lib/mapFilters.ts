@@ -366,6 +366,30 @@ export function needForQuickFilter(key: QuickFilterKey): NeedKey | undefined {
   return NEED_BY_QUICK_FILTER[key]
 }
 
+/**
+ * Translate a legacy `?quickFilter=` link into modern filter values.
+ *
+ * Most keys map onto a need. The gendered ones don't: there is no "men's help"
+ * need, because eligibility is a refinement rather than a need. They become an
+ * eligibility selection instead — `gender_inclusive` is included alongside the
+ * gendered value because a man can use a mixed shelter, and the eligibility
+ * predicate adds `unknown` itself. Returning `{}` here would leave a shared
+ * link showing the whole unfiltered list under an "active" filter label.
+ */
+export function quickFilterToFilters(key: QuickFilterKey): Partial<MapFilters> {
+  const need = NEED_BY_QUICK_FILTER[key]
+  if (need) return { need }
+  if (key === 'mens_help')   return { genderPolicy: ['men_only', 'gender_inclusive'] }
+  if (key === 'womens_help') return { genderPolicy: ['women_only', 'gender_inclusive'] }
+  return {}
+}
+
+/** Fold any legacy `quickFilter` into the modern fields before filtering. */
+function normalizeFilters(filters: MapFilters): MapFilters {
+  if (!filters.quickFilter) return filters
+  return { ...filters, ...quickFilterToFilters(filters.quickFilter), quickFilter: undefined }
+}
+
 // ── Refinement toggles ────────────────────────────────────────────
 //
 // Each toggle is a named predicate so the drawer can count how many resources
@@ -570,63 +594,60 @@ function buildPredicates(
   now: Date,
 ): Predicate[] {
   const preds: Predicate[] = []
+  // A legacy quickFilter is folded into the modern fields first, so a key with
+  // no need mapping still narrows instead of quietly matching everything.
+  const f = normalizeFilters(filters)
 
   const q = searchQuery.trim().toLowerCase()
   if (q) preds.push({ key: 'search', test: (r) => matchesText(r, q) })
 
-  if (filters.need) {
-    const def = NEED_DEFS[filters.need]
+  if (f.need) {
+    const def = NEED_DEFS[f.need]
     if (def) preds.push({ key: 'need', test: def.match })
-  } else {
-    // Legacy / deep-link paths that set a raw category or quick filter.
-    if (filters.category) {
-      const cat = filters.category
-      preds.push({ key: 'category', test: (r) => r.category === cat })
-    }
-    if (filters.quickFilter) {
-      const need = needForQuickFilter(filters.quickFilter)
-      if (need) preds.push({ key: 'need', test: NEED_DEFS[need].match })
-    }
+  } else if (f.category) {
+    // Legacy deep links that set a raw category.
+    const cat = f.category
+    preds.push({ key: 'category', test: (r) => r.category === cat })
   }
 
-  if (filters.resourceType) {
-    const rt = filters.resourceType
+  if (f.resourceType) {
+    const rt = f.resourceType
     preds.push({ key: 'resourceType', test: (r) => r.resource_type === rt })
   }
-  if (filters.subcategory?.length) {
-    const subs = filters.subcategory
+  if (f.subcategory?.length) {
+    const subs = f.subcategory
     preds.push({ key: 'subcategory', test: (r) => !!r.subcategory && subs.includes(r.subcategory) })
   }
 
   // Eligibility fails open: a resource whose policy is unrecorded stays
   // visible, so an untagged shelter is never hidden from someone who needs it.
-  if (filters.genderPolicy?.length) {
-    const gps = new Set<string>([...filters.genderPolicy, 'unknown'])
+  if (f.genderPolicy?.length) {
+    const gps = new Set<string>([...f.genderPolicy, 'unknown'])
     preds.push({ key: 'genderPolicy', test: (r) => gps.has(r.gender_policy) })
   }
-  if (filters.populationFocus?.length) {
-    const tags = filters.populationFocus
+  if (f.populationFocus?.length) {
+    const tags = f.populationFocus
     preds.push({
       key: 'populationFocus',
       test: (r) => tags.some((t) => r.population_focus?.includes(t)),
     })
   }
 
-  if (filters.availabilityStatus) {
-    const st = filters.availabilityStatus
+  if (f.availabilityStatus) {
+    const st = f.availabilityStatus
     preds.push({ key: 'availabilityStatus', test: (r) => r.availability_status === st })
   }
 
   for (const def of TOGGLE_DEFS) {
-    if (filters[def.key]) preds.push({ key: def.key, test: (r) => def.test(r, now) })
+    if (f[def.key]) preds.push({ key: def.key, test: (r) => def.test(r, now) })
   }
 
-  if (!filters.showLowConfidence) {
+  if (!f.showLowConfidence) {
     preds.push({ key: 'confidence', test: (r) => (r.confidence_score ?? 0) >= MIN_CONFIDENCE_SCORE })
   }
 
-  if (filters.radius != null && origin) {
-    const limit = filters.radius
+  if (f.radius != null && origin) {
+    const limit = f.radius
     preds.push({
       key: 'radius',
       test: (r) =>
@@ -844,6 +865,35 @@ export const TRUST_LEVEL_CLASSES: Record<TrustLevel, string> = {
 }
 
 // ── Filter Utilities ──────────────────────────────────────────────
+
+/**
+ * A stable string identifying *what* is being filtered for, used to decide when
+ * the map should re-fit to the results.
+ *
+ * It deliberately keys on the filter inputs rather than on the resulting IDs.
+ * With a radius active the result set depends on the map centre, so re-fitting
+ * to the results would move the map, which changes the centre, which changes
+ * the set — an oscillation. Filter inputs don't move when the map does.
+ *
+ * Every refinement value is included, not just how many are set: switching
+ * 5 mi to 50 mi leaves the count unchanged while changing the results
+ * completely, and the map has to follow that.
+ */
+export function filterSignature(filters: MapFilters, searchQuery = ''): string {
+  const f = normalizeFilters(filters)
+  return [
+    f.need ?? f.category ?? '',
+    searchQuery.trim().toLowerCase(),
+    f.resourceType ?? '',
+    (f.subcategory ?? []).join('+'),
+    [...(f.genderPolicy ?? [])].sort().join('+'),
+    [...(f.populationFocus ?? [])].sort().join('+'),
+    f.availabilityStatus ?? '',
+    f.radius ?? '',
+    // Sorted by definition order, so the string doesn't depend on click order.
+    TOGGLE_DEFS.filter((d) => f[d.key]).map((d) => d.key).join('+'),
+  ].join('|')
+}
 
 /** Refinements only — the need chip is shown separately in the UI. */
 export function countActiveRefinements(filters: MapFilters): number {
