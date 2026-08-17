@@ -286,7 +286,11 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
           {r.website && (
             <Action href={r.website} external icon={<Globe size={16} />} label="Website" />
           )}
-          {directions && !hideAddress && (
+          {/* Gated on isConfidential, not hideAddress: a confidential-address or
+              phone-intake listing must never get a directions link, whether or
+              not it is also tagged domestic violence. The list row already tells
+              people to call for the location. */}
+          {directions && !isConfidential && (
             <Action href={directions} external icon={<Navigation size={16} />} label="Directions" />
           )}
           <Link

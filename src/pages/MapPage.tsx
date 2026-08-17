@@ -168,8 +168,13 @@ export default function MapPage() {
       return
     }
     if (searchParams.get('hasShowers') === 'true') {
+      // /showers is deliberately narrower than /hygiene (see lib/categories.ts):
+      // it promises somewhere to actually shower. The hygiene need alone would
+      // also match restroom- and laundry-only listings, so the showers
+      // refinement is kept — it shows as a removable chip, so the narrowing is
+      // visible rather than hidden.
       clearFilters()
-      setFilters({ need: 'hygiene' })
+      setFilters({ need: 'hygiene', hasShowers: true })
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
