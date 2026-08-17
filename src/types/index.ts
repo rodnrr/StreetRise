@@ -474,11 +474,25 @@ export interface FaqItem {
 
 // ------ Map / Search ------
 
+/**
+ * The single "what do you need?" chip row on the map. One need is active at a
+ * time; each maps to a predicate in `lib/mapFilters.ts` (NEED_DEFS).
+ * Supersedes the old quickFilter/category split, which let a chip and a
+ * drawer category be set at once with one silently overriding the other.
+ */
+export type NeedKey =
+  | 'shelter' | 'food' | 'hygiene' | 'daytime' | 'medical' | 'mental_health'
+  | 'recovery' | 'legal' | 'work' | 'clothing' | 'transportation' | 'childcare'
+  | 'outreach' | 'families' | 'veterans' | 'dv' | 'youth' | 'lgbtq'
+
 export interface MapFilters {
-  // Quick-select chip (overrides category/resourceType when set)
+  // Active need chip
+  need?: NeedKey
+
+  // Legacy quick-select chip — still honoured for deep links
   quickFilter?: QuickFilterKey
 
-  // Category / type (used when no quickFilter)
+  // Category / type (used when no need/quickFilter)
   category?: ResourceCategory
   resourceType?: string
   subcategory?: string[]
@@ -488,6 +502,8 @@ export interface MapFilters {
   populationFocus?: string[]
 
   // Access
+  /** Open at the moment of viewing, evaluated in the resource's timezone. */
+  openNow?: boolean
   overnightAllowed?: boolean
   walkInsOnly?: boolean
   noCallRequired?: boolean       // phone_required_before_arrival = false

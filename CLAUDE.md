@@ -22,7 +22,7 @@ Known open items (verified 2026-07-31):
 - **Internal tags leak on `ResourceDetailPage`** — tags with `subcategory:`, `service_area:`, `import:`, `access_src:` prefixes render as public badges. Recommended fix (a `publicTags()` filter) is written up in `docs/OPEN_ITEMS.md`.
 - **Provider signup depends on two column defaults.** `providers_insert_self` (tightened by migration 023) requires `claim_status='claimed'` and `source_type='self_registered'`, but `ProviderOnboarding.tsx` sets neither — the column defaults supply both before `WITH CHECK` runs. Drop or change those defaults and provider signup starts failing RLS.
 - ~~Claiming an org hides it from `/work`~~ — **fixed by migration 033**, which adds `providers_pending_claim_read` so a mid-claim org stays publicly visible.
-- **Default map center still points at Tampa Bay** — `useMapStore` opens at `{ lat: 28.2, lng: -81.9 }` zoom 9. Since migration 032 added South Florida (2026-08-06), a Miami or Hollywood visitor who does not grant geolocation or search lands on a map with no nearby pins. Worth revisiting now that coverage spans ~400 km of the state; the persisted store key would need bumping (`streetrise-map-v3` → `v4`) for existing visitors to pick up a new default.
+- ~~Default map center still points at Tampa Bay~~ — **mitigated by the map revamp (2026-08-17)**. `useMapStore` still opens at `{ lat: 28.2, lng: -81.9 }` zoom 9, but `MapPage` now auto-fits the map to the current result set on load and whenever the need chip or search changes, so a Miami visitor who grants nothing still lands on a view containing pins. The stored centre follows the fit, so distances are measured from where the map actually is. Changing the literal default is no longer urgent.
 
 ---
 
@@ -95,7 +95,10 @@ src/
     supabase.ts             # Supabase client, db.*() helpers, realtime helpers
     store.ts                # Zustand stores (map, auth, toast)
     database.types.ts       # Supabase DB types — partially HAND-EDITED, see Migrations
-    mapFilters.ts           # Filter logic, category labels, emoji map, QuickFilterKey helpers
+    mapFilters.ts           # Map data layer: one fetch of the public set, then client-side
+                            # filtering + facet counting. NEED_DEFS/TOGGLE_DEFS are the
+                            # single source of truth for what the map can filter on.
+    geo.ts                  # Haversine distance + mile formatting (map sorting/filtering)
     categories.ts           # Public category-page config (/food-pantries etc. → map filters)
     conversations.ts        # Unread logic + markConversationRead for admin/provider chat
     blog.ts                 # Blog post queries
@@ -144,7 +147,9 @@ src/
                             # Footer, ToastContainer
     provider/               # ProviderLayout, BedCountUpdater
     admin/                  # AdminLayout (mobile nav, pending-count badges)
-    map/                    # ResourceMarker, ResourceCard, FilterDrawer
+    map/                    # ResourceMarker (cached div icons), ResourceCard (list row),
+                            # ResourceSheet (detail overlay + Call / Request / Ask / Website /
+                            # Directions actions), FilterDrawer (counted refinements)
 
 data/
   reference/controlled_vocab.csv
@@ -186,7 +191,7 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/` | `HomePage` | Eagerly loaded (LCP) |
 | `/map` | `MapPage` | Lazy; full-screen Leaflet |
 | `/resources/:id` | `ResourceDetailPage` | Lazy |
-| `/book/:resourceId` | `BookingPage` | Lazy; anonymous allowed |
+| `/book/:resourceId` | `BookingPage` | Lazy; anonymous allowed. `?intent=question` switches it to "Ask a Question": party size and dates are hidden and `notes` becomes required. Same `bookings` row either way. |
 | `/work` | `WorkExchangePage` | Lazy |
 | `/donate` | `DonatePage` | Lazy; Stripe checkout |
 | `/faq` | `FaqPage` | Lazy; data from DB |
@@ -240,6 +245,7 @@ Individual service listings owned by a provider.
 - `is_map_ready`: `false` when lat/lng are null or address is incomplete
 - `availability_status`: `available | limited | full | unknown | closed`
 - `beds_available` / `beds_total`: populated for `shelter` resources; drives realtime UI
+- `hours_of_operation`: `{ monday: { open, close, closed }, …, notes, summary, source_url, verified_at }`. The per-day shape is what `AdminResourceEdit` writes and `ResourceDetailPage` renders, and it is what powers the "Open right now" filter; `summary` is the human sentence shown on the map card. **111 of 146 public listings carry per-day hours as of 2026-08-17** (researched from public sources); 38 of those were reshaped from the seeded summary and are tagged `basis: 'listing_summary'` for auditing. Where a service has two sittings a day (lunch *and* dinner) the day window deliberately under-claims and `summary`/`notes` carry the full picture — a false "open" sends someone on a wasted trip.
 - `tags`: mixes public tags with internal `key:value` tags (`subcategory:`, `service_area:`, `import:`, `access_src:`) — currently all rendered publicly on `ResourceDetailPage` (open item)
 - Facility booleans (migration 011): `has_showers`, `has_restrooms`, `serves_meals`, `has_laundry`, `pet_friendly`, `wheelchair_accessible`, `public_transit_accessible`, `phone_required_before_arrival`, `overnight_allowed`
 - Trust fields (migration 010): `confidence_score` (0–100), `stale_after_days`, `last_provider_update_at`, `last_verified_at`
@@ -303,12 +309,14 @@ Known RLS gap (low severity, `docs/OPEN_ITEMS.md`): the `conversations` UPDATE p
 
 Three Zustand stores in `src/lib/store.ts`:
 
-**`useMapStore`** (persisted as `streetrise-map-v3`)
-- `mapCenter` / `mapZoom` — drive the map view sync in `MapPage`
-- `filters: MapFilters` — quickFilter, category, resourceType, genderPolicy, availability, accessibility, trust, radius, and more (see `mapFilters.ts`)
+**`useMapStore`** (persisted as `streetrise-map-v4`)
+- `mapCenter` / `mapZoom` — the map's initial view, then updated from every settled move (dragged **and** programmatic, so the distance origin tracks the real view)
+- `filters: MapFilters` — `need` (the active chip), plus resourceType, genderPolicy, populationFocus, access/facility/trust toggles, radius (see `mapFilters.ts`). `quickFilter` and `category` are retained only so old deep links keep working.
 - `userLocation` — set from browser geolocation; also sets `mapCenter`
-- `selectedId` — which resource marker is active
-- Default map center: `{ lat: 28.2, lng: -81.9 }` at zoom 9 — a wide Tampa Bay / Central Florida view
+- `selectedId` — which resource is open in the detail sheet (shared by the map pins and the list)
+- `clearRefinements()` drops every refinement but keeps the active need chip; `clearFilters()` drops everything
+- Default map center: `{ lat: 28.2, lng: -81.9 }` at zoom 9, but `MapPage` auto-fits to the results on load
+- **v4 bumped the key deliberately**: `radius` no longer defaults to 20 km, so a persisted v3 filter set would have kept silently narrowing the new map
 
 **`useAuthStore`** (persisted as `streetrise-auth`)
 - `userId`, `userEmail`, `role`, `providerId`, `verificationStatus`
@@ -383,6 +391,12 @@ Font: Inter (via `@fontsource/inter`). Dark-mode variants exist on most componen
 - **No test suite** — verify via `npm run typecheck` and `npm run lint`.
 - **Lazy loading**: All pages except `HomePage` are `React.lazy()` split by route.
 - **Category pages are presentation-only**: `lib/categories.ts` maps public slugs to existing map filters. Never introduce a new category value or alter `/map` filtering from there.
+- **The map fetches once and filters in the browser.** `fetchMapResources()` applies only the public visibility predicate; every facet is a predicate in `mapFilters.ts`. This is what lets each option show the number of results it would return. Adding a filter means adding a `NEED_DEFS` entry or a `TOGGLE_DEFS` row — not a new Supabase query.
+- **Filter options prune themselves.** `isUsefulOption(count, base)` hides any option matching nothing or matching everything, so filters the data can't support (nothing is tagged pet-friendly; every row says no call is needed) disappear until providers fill the field in. Never hard-code a filter's visibility.
+- **Unknown means "maybe", not "no".** `overnight_allowed` is null on most rows and `gender_policy` is often `unknown`; these fail *open* so a real bed is never hidden from someone who needs it. Only an explicit `false`/mismatch excludes a listing.
+- **"Open right now" is the one filter that fails _closed_**, because it makes a positive claim rather than gating eligibility: a listing with no published hours cannot be asserted to be open. `MapPage` shows a count of what was set aside for that reason so those listings aren't hidden silently. Don't "fix" this to match the fail-open rule.
+- **Hours are evaluated in `America/New_York`, never the visitor's timezone** (`RESOURCE_TIME_ZONE` in `mapFilters.ts`). Every listing is in Florida; a visitor in California at 8 PM is looking at 11 PM in Tampa. `zonedNow()` resolves the weekday and minute there, and handles EST/EDT automatically. `MapPage` re-reads the clock every 60 s so results expire on their own.
+- **The map has no list/map toggle.** The map card and the results list are always both on screen, and a pin and a list row open the same `ResourceSheet`. Don't reintroduce a mode switch.
 - **Category slug normalization**: `MapPage` maps URL slugs to canonical DB values via `mapFilters.ts`.
 - **Booking language**: shelter → "Request a Spot" / "Beds Available"; other categories → "Request Help" / "Open Now". Never use "book" for non-reservable services.
 - **Verification badges**: `verified` → "Staff Verified" (primary blue); `pending` → "Community Listed" (amber). Do not use "certified," "guaranteed," or "always up-to-date."
