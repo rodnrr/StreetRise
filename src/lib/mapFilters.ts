@@ -373,7 +373,7 @@ export function needForQuickFilter(key: QuickFilterKey): NeedKey | undefined {
 // of them", which is what made several of these look like decoration.
 
 export type ToggleKey =
-  | 'overnightAllowed' | 'walkInsOnly' | 'noCallRequired' | 'noReferralRequired'
+  | 'openNow' | 'overnightAllowed' | 'walkInsOnly' | 'noCallRequired' | 'noReferralRequired'
   | 'noIdRequired' | 'hasShowers' | 'hasRestrooms' | 'servesMeals' | 'hasLaundry'
   | 'petFriendly' | 'wheelchairAccessible' | 'nearTransit' | 'verifiedOnly' | 'hideStale'
 
@@ -381,10 +381,12 @@ export interface ToggleDef {
   key: ToggleKey
   label: string
   group: 'access' | 'facility' | 'trust'
-  test: (r: Resource) => boolean
+  /** `now` is supplied so time-dependent filters stay live; most ignore it. */
+  test: (r: Resource, now: Date) => boolean
 }
 
 export const TOGGLE_DEFS: ToggleDef[] = [
+  { key: 'openNow',             group: 'access',   label: 'Open right now',            test: (r, now) => isOpenNow(r, now) },
   { key: 'overnightAllowed',    group: 'access',   label: 'Open overnight',            test: (r) => r.overnight_allowed === true },
   { key: 'walkInsOnly',         group: 'access',   label: 'Walk-ins accepted',         test: (r) => r.walk_ins_accepted },
   { key: 'noCallRequired',      group: 'access',   label: 'No call needed first',      test: (r) => r.phone_required_before_arrival === false },
@@ -405,6 +407,112 @@ const TOGGLE_BY_KEY = new Map(TOGGLE_DEFS.map((t) => [t.key, t]))
 
 /** Distance options offered in the drawer, in miles. */
 export const DISTANCE_OPTIONS_MI = [5, 10, 25, 50]
+
+// ── "Open right now" ──────────────────────────────────────────────
+//
+// Opening hours are stored in the listing's own local time and every listing
+// is in Florida, so "now" is resolved in America/New_York rather than in the
+// visitor's timezone. Someone checking from California at 8 PM is looking at
+// 11 PM in Tampa, and a 9-to-5 pantry must not come back as open.
+//
+// This filter is the one place that deliberately fails *closed*. Elsewhere an
+// unrecorded field means "maybe" and the listing stays visible, because hiding
+// a real bed is the worse error. Here the filter makes a positive claim — "this
+// place is open" — so a listing that publishes no hours cannot satisfy it. The
+// map says how many were set aside for that reason rather than hiding them
+// silently.
+
+export const RESOURCE_TIME_ZONE = 'America/New_York'
+
+const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+type DayKey = (typeof DAY_KEYS)[number]
+
+/** Minutes past midnight, or null when the value isn't a usable HH:MM. */
+function toMinutes(value: string | undefined): number | null {
+  if (!value) return null
+  const m = /^(\d{1,2}):(\d{2})$/.exec(value.trim())
+  if (!m) return null
+  const hours = Number(m[1])
+  const mins = Number(m[2])
+  if (hours > 24 || mins > 59) return null
+  return hours * 60 + mins
+}
+
+const zonedFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: RESOURCE_TIME_ZONE,
+  weekday: 'long',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
+
+/** Weekday and minutes-past-midnight where the resources actually are. */
+export function zonedNow(now: Date): { dayIndex: number; minutes: number } {
+  const parts = zonedFormatter.formatToParts(now)
+  const weekday = (parts.find((p) => p.type === 'weekday')?.value ?? '').toLowerCase()
+  // hour12:false reports midnight as "24" in some engines.
+  const rawHour = Number(parts.find((p) => p.type === 'hour')?.value ?? '0')
+  const hour = rawHour >= 24 ? rawHour - 24 : rawHour
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? '0')
+
+  const dayIndex = DAY_KEYS.indexOf(weekday as DayKey)
+  return {
+    dayIndex: dayIndex < 0 ? now.getDay() : dayIndex,
+    minutes: hour * 60 + minute,
+  }
+}
+
+interface DayWindow { open?: string; close?: string; closed?: boolean }
+
+function windowFor(r: Resource, day: DayKey): DayWindow | null {
+  const hours = r.hours_of_operation as Record<string, unknown> | null | undefined
+  if (!hours) return null
+  const win = hours[day]
+  if (!win || typeof win !== 'object') return null
+  return win as DayWindow
+}
+
+/** True when the listing publishes at least one usable day. */
+export function hasKnownHours(r: Resource): boolean {
+  return DAY_KEYS.some((day) => {
+    const win = windowFor(r, day)
+    if (!win) return false
+    if (win.closed) return true // an explicit "closed today" is still knowledge
+    return toMinutes(win.open) != null && toMinutes(win.close) != null
+  })
+}
+
+/**
+ * Is `minutes` inside this window? `spillover` asks the opposite question —
+ * whether a window that opened *yesterday* and runs past midnight still covers
+ * this morning.
+ */
+function coversMinute(win: DayWindow | null, minutes: number, spillover: boolean): boolean {
+  if (!win || win.closed) return false
+  const open = toMinutes(win.open)
+  let close = toMinutes(win.close)
+  if (open == null || close == null) return false
+
+  // 23:59 is how "open until end of day" is stored, including the 24/7 rows.
+  if (close === 23 * 60 + 59) close = 24 * 60
+
+  if (close > open) {
+    // An ordinary same-day window can never reach into the following day.
+    return spillover ? false : minutes >= open && minutes < close
+  }
+  // Window crosses midnight, e.g. 19:00-07:00.
+  return spillover ? minutes < close : minutes >= open
+}
+
+/** Whether the listing is open at `now`, in the listing's own timezone. */
+export function isOpenNow(r: Resource, now: Date): boolean {
+  const { dayIndex, minutes } = zonedNow(now)
+  const today = DAY_KEYS[dayIndex]
+  const yesterday = DAY_KEYS[(dayIndex + 6) % 7]
+
+  if (coversMinute(windowFor(r, today), minutes, false)) return true
+  return coversMinute(windowFor(r, yesterday), minutes, true)
+}
 
 // ── Fetch ─────────────────────────────────────────────────────────
 
@@ -459,6 +567,7 @@ function buildPredicates(
   filters: MapFilters,
   searchQuery: string,
   origin: LatLng | null,
+  now: Date,
 ): Predicate[] {
   const preds: Predicate[] = []
 
@@ -509,7 +618,7 @@ function buildPredicates(
   }
 
   for (const def of TOGGLE_DEFS) {
-    if (filters[def.key]) preds.push({ key: def.key, test: def.test })
+    if (filters[def.key]) preds.push({ key: def.key, test: (r) => def.test(r, now) })
   }
 
   if (!filters.showLowConfidence) {
@@ -543,8 +652,9 @@ export function filterResources(
   filters: MapFilters,
   searchQuery = '',
   origin: LatLng | null = null,
+  now: Date = new Date(),
 ): RankedResource[] {
-  const preds = buildPredicates(filters, searchQuery, origin)
+  const preds = buildPredicates(filters, searchQuery, origin, now)
   const matched = runPredicates(resources, preds)
 
   const ranked: RankedResource[] = matched.map((resource) => ({
@@ -604,8 +714,9 @@ export function computeFacetCounts(
   filters: MapFilters,
   searchQuery = '',
   origin: LatLng | null = null,
+  now: Date = new Date(),
 ): FacetCounts {
-  const all = buildPredicates(filters, searchQuery, origin)
+  const all = buildPredicates(filters, searchQuery, origin, now)
   const without = (...keys: PredicateKey[]) =>
     runPredicates(resources, all.filter((p) => !keys.includes(p.key)))
 
@@ -624,7 +735,7 @@ export function computeFacetCounts(
   for (const def of TOGGLE_DEFS) {
     const base = without(def.key)
     toggleBase[def.key] = base.length
-    toggles[def.key] = countWhere(base, def.test)
+    toggles[def.key] = countWhere(base, (r) => def.test(r, now))
   }
 
   const genderBase = without('genderPolicy')

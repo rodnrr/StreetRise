@@ -502,6 +502,8 @@ export interface MapFilters {
   populationFocus?: string[]
 
   // Access
+  /** Open at the moment of viewing, evaluated in the resource's timezone. */
+  openNow?: boolean
   overnightAllowed?: boolean
   walkInsOnly?: boolean
   noCallRequired?: boolean       // phone_required_before_arrival = false

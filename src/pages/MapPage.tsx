@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Search, SlidersHorizontal, X, LocateFixed, Maximize2, AlertCircle, RotateCcw,
+  Search, SlidersHorizontal, X, LocateFixed, Maximize2, AlertCircle, RotateCcw, Clock,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useMapStore, useToast } from '@/lib/store'
@@ -16,6 +16,8 @@ import {
   activeFilterLabels,
   clearedFilter,
   countActiveRefinements,
+  isUsefulOption,
+  hasKnownHours,
   needForCategory,
   needForQuickFilter,
   NEED_DEFS,
@@ -130,6 +132,15 @@ export default function MapPage() {
   // Typing stays responsive: filtering runs against the deferred value.
   const deferredQuery = useDeferredValue(searchQuery)
 
+  // "Open right now" has to keep being true. The clock is re-read every minute
+  // so a place that closes at 5 drops out of the results at 5, without the
+  // visitor reloading the page.
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const tick = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(tick)
+  }, [])
+
   // ── Deep links from the marketing category pages ──
   // Filters persist across sessions, so a deep link clears first: the linking
   // page has no way to know what the visitor left set last time.
@@ -182,13 +193,26 @@ export default function MapPage() {
   const origin = userLocation ?? stableCenter
 
   const ranked = useMemo(
-    () => filterResources(allResources, filters, deferredQuery, origin),
-    [allResources, filters, deferredQuery, origin],
+    () => filterResources(allResources, filters, deferredQuery, origin, now),
+    [allResources, filters, deferredQuery, origin, now],
   )
   const counts = useMemo(
-    () => computeFacetCounts(allResources, filters, deferredQuery, origin),
-    [allResources, filters, deferredQuery, origin],
+    () => computeFacetCounts(allResources, filters, deferredQuery, origin, now),
+    [allResources, filters, deferredQuery, origin, now],
   )
+
+  // "Open right now" excludes listings that publish no hours at all, so the
+  // map has to say how many were set aside rather than dropping them silently.
+  const hiddenForUnknownHours = useMemo(() => {
+    if (!filters.openNow) return 0
+    return filterResources(
+      allResources, { ...filters, openNow: undefined }, deferredQuery, origin, now,
+    ).filter((r) => !hasKnownHours(r.resource)).length
+  }, [allResources, filters, deferredQuery, origin, now])
+
+  const openNowCount = counts.toggles.openNow ?? 0
+  const showOpenNowPill =
+    !!filters.openNow || isUsefulOption(openNowCount, counts.base.toggles.openNow ?? 0)
 
   const selected = ranked.find((r) => r.resource.id === selectedId)
   const activeRefinements = countActiveRefinements(filters)
@@ -330,8 +354,32 @@ export default function MapPage() {
             </button>
           </div>
 
-          {/* Need chips — one flat list, one active at a time, each with a count */}
+          {/* Need chips — one flat list, one active at a time, each with a count.
+              "Open now" leads the row but is a modifier, not a need, so it is
+              styled apart and separated by a rule. */}
           <div className="flex gap-2 px-3 py-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+            {showOpenNowPill && (
+              <>
+                <button
+                  onClick={() => setFilters({ openNow: filters.openNow ? undefined : true })}
+                  aria-pressed={!!filters.openNow}
+                  className={clsx(
+                    'shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium',
+                    'border transition-colors whitespace-nowrap',
+                    filters.openNow
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                      : 'bg-white text-emerald-700 border-emerald-300 hover:border-emerald-500',
+                  )}
+                >
+                  <Clock size={14} />
+                  Open now
+                  <span className={filters.openNow ? 'text-white/70' : 'text-emerald-500'}>
+                    {openNowCount}
+                  </span>
+                </button>
+                <div className="shrink-0 w-px bg-gray-200 my-1.5" aria-hidden />
+              </>
+            )}
             {NEED_ORDER.filter((key) => (counts.needs[key] ?? 0) > 0 || filters.need === key).map((key) => (
               <NeedChip
                 key={key}
@@ -446,6 +494,14 @@ export default function MapPage() {
             </span>
           </div>
 
+          {filters.openNow && hiddenForUnknownHours > 0 && (
+            <p className="shrink-0 px-4 py-2 text-xs text-amber-700 bg-amber-50 border-b border-amber-100">
+              {hiddenForUnknownHours} more {hiddenForUnknownHours === 1 ? 'place doesn' : 'places don'}’t
+              publish hours, so {hiddenForUnknownHours === 1 ? 'it is' : 'they are'} not shown here.
+              Turn off <span className="font-medium">Open now</span> to see {hiddenForUnknownHours === 1 ? 'it' : 'them'}.
+            </p>
+          )}
+
           <div className="flex-1 overflow-y-auto px-1 py-1 pb-16 md:pb-2">
             {isLoading && (
               <div className="p-3 space-y-2">
@@ -474,13 +530,25 @@ export default function MapPage() {
 
             {!isLoading && !isError && ranked.length === 0 && (
               <div className="text-center py-10 px-6">
-                <p className="text-sm text-gray-700 mb-1">Nothing matches all of that.</p>
+                <p className="text-sm text-gray-700 mb-1">
+                  {filters.openNow ? 'Nothing is open right now.' : 'Nothing matches all of that.'}
+                </p>
                 <p className="text-xs text-gray-400 mb-5">
-                  {activeRefinements > 0
+                  {filters.openNow
+                    ? 'Hours are checked against the current time in Florida.'
+                    : activeRefinements > 0
                     ? 'Your filters are narrower than the listings we have here.'
                     : 'Try a different need, or search a nearby city.'}
                 </p>
                 <div className="flex flex-col gap-2 items-center">
+                  {filters.openNow && (
+                    <button
+                      onClick={() => setFilters({ openNow: undefined })}
+                      className="btn-secondary btn-sm"
+                    >
+                      Show places whatever the time
+                    </button>
+                  )}
                   {activeRefinements > 0 && (
                     <button onClick={clearRefinements} className="btn-secondary btn-sm">
                       Remove filters, keep {filters.need ? NEED_DEFS[filters.need].label.toLowerCase() : 'search'}
