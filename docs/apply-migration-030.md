@@ -1,5 +1,16 @@
 # Applying Migration 030 — conversation read tracking
 
+> **STATUS: APPLIED AND VERIFIED ON LIVE (confirmed 2026-08-18).**
+> Do not run Step 2 again — `ALTER TABLE ... ADD COLUMN` would error with
+> "column already exists". The steps below are kept as the record of what was
+> run and as the verification queries, which are still safe to re-run.
+>
+> The apply happened out-of-band some time between 2026-07-29 (when the
+> pre-flight below recorded both columns absent) and 2026-08-15 (the earliest
+> `admin_last_read_at` value on live). It is **not** in
+> `supabase_migrations.schema_migrations` — that table is itself drifted and
+> is missing 030 and 032–035 — so the columns themselves are the evidence.
+
 Live project ref: `mldatfcwnmvrmxumzxyb`
 Apply by hand in the Supabase SQL editor (see `BRANCH_FRESHNESS_AUDIT.md`).
 
@@ -87,12 +98,26 @@ unread indicator should now stay cleared. Before 030 it always came back.
 
 ---
 
+## Post-apply verification (2026-08-18, read-only)
+
+| Check | Result |
+|---|---|
+| Both columns exist | **yes** — `timestamp with time zone`, nullable, no default |
+| Shape matches the migration | **yes** — nothing else on `conversations` changed |
+| `conversations` RLS UPDATE policy | unchanged: `provider_id = my_provider_id() OR is_admin()` |
+| `admin_last_read_at` populated | **yes**, on all 5 conversations — most recent write 2026-08-18 15:22 UTC |
+| `provider_last_read_at` populated | no — still null everywhere; expected, no provider has opened `/portal/messages` since |
+
+The live `admin_last_read_at` writes are the proof the path works end to end:
+those rows can only have been set by `markConversationRead(id, 'admin')`
+succeeding through RLS from `/admin/messages`.
+
 ## Notes
 
 | Migration | Applied to live | By |
 |---|---|---|
 | 029_add_blog_posts_table | _fill in_ | _fill in_ |
-| 030_conversation_read_tracking | _fill in_ | _fill in_ |
+| 030_conversation_read_tracking | between 2026-07-29 and 2026-08-15; verified 2026-08-18 | maintainer, out-of-band |
 
 - 030's header still says "NOT YET APPLIED" — record the date above rather than
   editing the migration once it's live.

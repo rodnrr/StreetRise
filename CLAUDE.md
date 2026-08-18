@@ -10,13 +10,13 @@ The maintainer often works from an **iPhone** with no terminal access. At the st
 
 The pre-debut launch review described in earlier versions of this file is **done** — its findings and applied fixes are recorded in `LAUNCH_REVIEW.md` (footer, contact info, sitemap corrections, honest copy, "Become a Provider" nav entry all shipped). Open work is tracked in:
 
-- `docs/OPEN_ITEMS.md` — session log of open items (migration 030 status, blog gaps, internal-tag leak on `ResourceDetailPage`, lint debt)
+- `docs/OPEN_ITEMS.md` — session log of open items (blog gaps, internal-tag leak on `ResourceDetailPage`, lint debt; the migration 030 item is now closed)
 - `BRANCH_FRESHNESS_AUDIT.md` — runbook for cleaning up stale AI session branches
 - `LAUNCH_REVIEW.md` — the completed launch assessment, kept for reference
 
 Known open items (verified 2026-07-31):
 
-- **Migration 030 was not yet applied to live** as of 2026-07-29 (`docs/apply-migration-030.md`). Until it is, chat unread indicators can never clear — `markConversationRead()` writes to columns that don't exist and silently no-ops.
+- ~~Migration 030 was not yet applied to live~~ — **applied and verified 2026-08-18** (`docs/apply-migration-030.md`). Both `provider_last_read_at` and `admin_last_read_at` exist on live with the intended shape, and `admin_last_read_at` carries real writes from `/admin/messages`, so `markConversationRead()` now persists and unread indicators clear. Note the apply is **not** recorded in `supabase_migrations.schema_migrations` — that table is drifted and also missing 032–035; verify live columns, not that table.
 - **`npm run lint`, `npm run typecheck`, and `npm run build` are all clean** (re-verified 2026-08-06). The previously documented lint error on `supabase.from('bookings') as any` is gone — `src/lib/supabase.ts` now carries an `eslint-disable-next-line` for it, so the cast itself is still lint debt to unwind when `database.types.ts` is regenerated.
 - **`BlogPostPage` does not render markdown** — `body_markdown` is shown in a `whitespace-pre-wrap` div. `cover_image_url` now renders (hero on `BlogPostPage`, thumbnail on `BlogIndexPage`, og:image) when set; images are hosted in the R2 bucket `assets-streetrise` — upload + DB-update runbook in `docs/r2-blog-images.md`.
 - **Internal tags leak on `ResourceDetailPage`** — tags with `subcategory:`, `service_area:`, `import:`, `access_src:` prefixes render as public badges. Recommended fix (a `publicTags()` filter) is written up in `docs/OPEN_ITEMS.md`.
@@ -256,7 +256,7 @@ Individual service listings owned by a provider.
 Service requests submitted by users (or anonymously; `user_id` nullable since migration 007). **Status enum has drifted between repo and live:** migration 001 created `pending | confirmed | waitlisted | cancelled | completed | no_show`; the live enum was extended by hand and the TS `BookingStatus` type matches live: adds `declined | needs_info | contacted | no_response | closed`. No repo migration exists for the extension. Also carries triage fields: `admin_notes`, `provider_notes`, `decision_note`, `last_contacted_at`, `decided_at`, `contact_preference`, `best_contact_time`, `contact_consent`.
 
 ### `conversations` / `conversation_messages` / `conversation_admin_notes`
-Admin↔provider messaging (migrations 014, 015, 018). `conversation_admin_notes` exists because `conversations.description` was provider-readable — admin-only triage notes live there with strict RLS. Migration 030 adds `provider_last_read_at` / `admin_last_read_at` for unread tracking (see Current Status for its live-apply state). Unread logic lives in `src/lib/conversations.ts`.
+Admin↔provider messaging (migrations 014, 015, 018). `conversation_admin_notes` exists because `conversations.description` was provider-readable — admin-only triage notes live there with strict RLS. Migration 030 adds `provider_last_read_at` / `admin_last_read_at` for unread tracking — applied to live, verified 2026-08-18. Unread logic lives in `src/lib/conversations.ts`.
 
 ### `work_exchanges`
 Volunteer/paid/skills-trade/internship opportunities posted by providers. `lat`/`lng` nullable since migration 005. The `/work` page reads **this table** — migration 008's `work_exchange` category rows live in `resources` and never appear on `/work`. Seeded in 020/028/032.

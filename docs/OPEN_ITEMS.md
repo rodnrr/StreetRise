@@ -33,15 +33,20 @@ exactly one error — `supabase.from('bookings') as any` at `supabase.ts:29` —
 
 ## Must do
 
-1. **Apply 030** — see `docs/apply-migration-030.md`. Until then the unread
-   indicator in admin/provider chat can never clear.
+1. ~~**Apply 030**~~ — **done.** Applied out-of-band and verified against live
+   on 2026-08-18; both columns exist and `admin_last_read_at` is being written
+   from `/admin/messages`. See `docs/apply-migration-030.md` for the
+   post-apply verification table.
 2. **Commit + push** everything above, including the one-line 029 edit so the
    repo matches what was actually run against live.
 3. **Record applied dates** for 029 and 030 in the runbook tables. Do not edit
-   the migrations' "NOT YET APPLIED" headers.
-4. **Do not regenerate `database.types.ts`** from the CLI until 030 is applied —
-   the `blog_posts` block and the two conversation columns are hand-written to
-   match live. A regen against a lagging DB would delete them.
+   the migrations' "NOT YET APPLIED" headers. (030 recorded 2026-08-18; 029
+   still needs its date.)
+4. **Do not regenerate `database.types.ts`** from the CLI without first
+   confirming live has every migration the code depends on. 030 is now applied,
+   but the `blog_posts` block and the two conversation columns are still
+   hand-written, and live lags the repo elsewhere — a regen against it can
+   still delete things.
 5. **Smoke-test blog end-to-end** (needs an authenticated browser session, which
    could not be tested from here): admin → `/admin/blog` → create draft →
    confirm `/blog` still shows "No posts yet" → publish → confirm it appears at
@@ -51,8 +56,8 @@ exactly one error — `supabase.from('bookings') as any` at `supabase.ts:29` —
 
 - **Messages badge semantics.** It currently counts `status = 'open'`, so it does
   **not** drop when you merely read a thread — only when the thread is closed.
-  Once 030 is applied, `admin_last_read_at` makes a true unread count possible.
-  Pick one: "unresolved threads" (today) or "unread threads" (post-030).
+  Now that 030 is applied, `admin_last_read_at` makes a true unread count
+  possible. Pick one: "unresolved threads" (today) or "unread threads".
   Note the two differ: 5 open conversations, but only 4 have any message.
 
 ## Known gaps, not bugs
