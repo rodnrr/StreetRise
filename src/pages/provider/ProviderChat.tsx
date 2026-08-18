@@ -1,22 +1,38 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { db, supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
 import { useToast } from '@/lib/store'
+import { requireProviderId, messagingErrorMessage, SessionExpiredError } from '@/lib/auth'
 import { isConversationUnread, markConversationRead } from '@/lib/conversations'
 import { MessageSquare, Plus, X } from 'lucide-react'
 import clsx from 'clsx'
 import type { Conversation } from '@/types'
 
 export default function ProviderChat() {
-  const { providerId } = useAuthStore()
+  const { providerId, clearAuth } = useAuthStore()
   const toast = useToast()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [showNewConversation, setShowNewConversation] = useState(false)
   const [newSubject, setNewSubject] = useState('')
   const [newDescription, setNewDescription] = useState('')
   const [messageText, setMessageText] = useState('')
+
+  // An expired session is not a failed message — it is a sign-in problem, and
+  // the only thing that fixes it is signing in again. Anything else keeps the
+  // draft on screen so the text the user typed is not lost.
+  function handleWriteError(title: string, err: Error) {
+    if (err instanceof SessionExpiredError) {
+      toast.error('Please sign in again', err.message)
+      clearAuth()
+      navigate(`/login?next=${encodeURIComponent('/portal/messages')}`)
+      return
+    }
+    toast.error(title, err.message)
+  }
 
   // Fetch conversations for this provider
   const { data: conversations, isLoading: conversationsLoading } = useQuery({
@@ -96,15 +112,18 @@ export default function ProviderChat() {
       if (!newSubject) {
         throw new Error('Subject is required')
       }
+      // Resolved from the session, never from the persisted auth store —
+      // see currentProviderId() for why the store is not proof we can write.
+      const senderId = await requireProviderId()
       const { error } = await db.conversations().insert({
-        provider_id: providerId!,
+        provider_id: senderId,
         admin_id: null,
         subject: newSubject,
         description: newDescription,
         created_by_admin: false,
         status: 'open',
       })
-      if (error) throw error
+      if (error) throw new Error(messagingErrorMessage(error))
     },
     onSuccess: () => {
       toast.success('Message sent', 'Our team will get back to you soon')
@@ -114,7 +133,7 @@ export default function ProviderChat() {
       setShowNewConversation(false)
     },
     onError: (err: Error) => {
-      toast.error('Failed to send message', err.message)
+      handleWriteError('Failed to send message', err)
     },
   })
 
@@ -122,13 +141,14 @@ export default function ProviderChat() {
   const sendMessage = useMutation({
     mutationFn: async () => {
       if (!messageText.trim() || !selectedConversationId) return
+      const senderId = await requireProviderId()
       const { error } = await db.messages().insert({
         conversation_id: selectedConversationId,
-        sender_id: providerId,
+        sender_id: senderId,
         message: messageText.trim(),
         is_admin: false,
       })
-      if (error) throw error
+      if (error) throw new Error(messagingErrorMessage(error))
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversation-messages', selectedConversationId] })
@@ -137,7 +157,7 @@ export default function ProviderChat() {
       setMessageText('')
     },
     onError: (err: Error) => {
-      toast.error('Failed to send message', err.message)
+      handleWriteError('Failed to send message', err)
     },
   })
 

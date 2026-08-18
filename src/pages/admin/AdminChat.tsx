@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { db, supabase } from '@/lib/supabase'
 import { useAuthStore, useToast } from '@/lib/store'
 import { isConversationUnread, markConversationRead } from '@/lib/conversations'
+import { requireProviderId, messagingErrorMessage, SessionExpiredError } from '@/lib/auth'
 import { MessageSquare, Plus, X, Search, CheckCircle2, XCircle, RotateCcw } from 'lucide-react'
 import clsx from 'clsx'
 import type { Conversation, ConversationStatus } from '@/types'
@@ -23,9 +25,10 @@ const STATUS_BADGE: Record<ConversationStatus, string> = {
 }
 
 export default function AdminChat() {
-  const { providerId } = useAuthStore()
+  const { clearAuth } = useAuthStore()
   const toast = useToast()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [showNewConversation, setShowNewConversation] = useState(false)
   const [newSubject, setNewSubject] = useState('')
@@ -35,6 +38,19 @@ export default function AdminChat() {
   const [messageText, setMessageText] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | ConversationStatus>('all')
+
+  // An expired session is not a failed message — it is a sign-in problem, and
+  // the only thing that fixes it is signing in again. Anything else keeps the
+  // draft on screen so the text the admin typed is not lost.
+  function handleWriteError(title: string, err: Error) {
+    if (err instanceof SessionExpiredError) {
+      toast.error('Please sign in again', err.message)
+      clearAuth()
+      navigate(`/login?next=${encodeURIComponent('/admin/messages')}`)
+      return
+    }
+    toast.error(title, err.message)
+  }
 
   // Fetch all conversations for admin, joined with provider name so the
   // list is actually identifiable at a glance (previously only showed
@@ -143,25 +159,28 @@ export default function AdminChat() {
       if (!newSubject || !selectedProvider) {
         throw new Error('Subject and provider are required')
       }
+      // Resolved from the session, never from the persisted auth store —
+      // see currentProviderId() for why the store is not proof we can write.
+      const adminId = await requireProviderId()
       const { data: conversationData, error: convError } = await db.conversations().insert({
         provider_id: selectedProvider,
-        admin_id: providerId,
+        admin_id: adminId,
         subject: newSubject,
         description: null,
         created_by_admin: true,
         status: 'open',
       }).select()
-      if (convError) throw convError
+      if (convError) throw new Error(messagingErrorMessage(convError))
       if (!conversationData || conversationData.length === 0) throw new Error('Failed to create conversation')
 
       // Create separate admin note if provided
       if (newDescription && conversationData[0].id) {
         const { error: noteError } = await db.adminNotes().insert({
           conversation_id: conversationData[0].id,
-          admin_id: providerId,
+          admin_id: adminId,
           notes: newDescription,
         })
-        if (noteError) throw noteError
+        if (noteError) throw new Error(messagingErrorMessage(noteError))
       }
     },
     onSuccess: () => {
@@ -174,7 +193,7 @@ export default function AdminChat() {
       setShowNewConversation(false)
     },
     onError: (err: Error) => {
-      toast.error('Failed to create conversation', err.message)
+      handleWriteError('Failed to create conversation', err)
     },
   })
 
@@ -182,17 +201,18 @@ export default function AdminChat() {
   const sendMessage = useMutation({
     mutationFn: async () => {
       if (!messageText.trim() || !selectedConversationId) return
+      const adminId = await requireProviderId()
       const { error } = await db.messages().insert({
         conversation_id: selectedConversationId,
-        sender_id: providerId,
+        sender_id: adminId,
         message: messageText.trim(),
         is_admin: true,
       })
-      if (error) throw error
+      if (error) throw new Error(messagingErrorMessage(error))
       // Claim the thread so the provider can see who's responding
       if (selectedConversation && !selectedConversation.admin_id) {
         await db.conversations()
-          .update({ admin_id: providerId })
+          .update({ admin_id: adminId })
           .eq('id', selectedConversationId)
       }
     },
@@ -203,7 +223,7 @@ export default function AdminChat() {
       setMessageText('')
     },
     onError: (err: Error) => {
-      toast.error('Failed to send message', err.message)
+      handleWriteError('Failed to send message', err)
     },
   })
 
