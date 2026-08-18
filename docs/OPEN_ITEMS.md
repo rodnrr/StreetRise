@@ -210,3 +210,38 @@ distinction stays visible instead of vanishing.
 Watch for: the six previously-live category pages now show more listings than
 before (shelters 23→34, food 26→32; medical and employment are unchanged
 because they have no pending rows).
+
+## Two confidence triggers, the second discarding the first (opened 2026-08-18)
+
+`resources.confidence_score` is written by **two** BEFORE INSERT OR UPDATE
+triggers, fired in alphabetical order by trigger name:
+
+1. `resources_confidence_score` → `compute_confidence_score()` (migration 010),
+   an additive formula over is_active, description length, phone, website,
+   hours, verification_status, freshness and map-readiness, capped at 100.
+2. `trg_resource_confidence` → `fn_update_resource_confidence()`, which runs
+   second (`'t' > 'r'`) and **assigns** rather than accumulating, so it
+   overwrites everything step 1 computed.
+
+Step 1 is therefore dead weight on every insert and update of the table, and
+the real scoring rule is step 2's five-branch ladder (0 rejected/suspended,
+35 pending, then 20/50/70/90 by staleness). Nothing is wrong with the stored
+values — but two functions where one is silently discarded is a trap for the
+next person who tunes the additive formula and sees no effect.
+
+Migration 037 captured trigger 2 into the repo (it previously existed only on
+live — see `docs/apply-migration-037.md`), so the repo now at least describes
+what happens. Consolidating the two is the remaining cleanup, and it is a
+product decision rather than a parity fix: dropping trigger 1 changes nothing,
+but folding its signal into trigger 2 would move scores for `verified` and
+stale rows across the whole table, which changes what the map's
+`MIN_CONFIDENCE_SCORE` filter and the trust badges say about existing
+listings.
+
+Also worth noting the deeper lesson, which cost two review findings on PR #79:
+**live carries state that no migration reproduces**, and verifying a change
+against live cannot detect that by construction. Both the missing trigger here
+and the imported Christian Service Center provider row (migration 036 section
+1b) were invisible to post-apply verification for exactly that reason. A
+periodic diff of live's schema objects — triggers, functions, policies,
+constraints — against what the migrations create would surface the rest.
