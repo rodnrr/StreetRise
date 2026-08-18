@@ -142,9 +142,17 @@ SELECT name FROM resources
         OR hours_of_operation::text ILIKE '%appointment%');
 --    ^ expect ZERO rows.
 
--- 9. Caring for Miami must stay phone_intake so ResourceSheet withholds
---    Directions to a base that is not a storefront: expect 'phone_intake'.
-SELECT access_type FROM resources WHERE external_id = 'CFMIA-001-mobile-closet';
+-- 9. No referral-only row may still offer Directions to a district office.
+SELECT name FROM resources
+ WHERE import_batch_id = 'student_clothing_batch_1'
+   AND requires_referral AND access_type = 'onsite';
+--    ^ expect ZERO rows.
+
+-- 10. Rows that withhold Directions: expect 5 — the four referral-only
+--     offices plus Caring for Miami's travelling Mobile Closet.
+SELECT name FROM resources
+ WHERE import_batch_id = 'student_clothing_batch_1'
+   AND access_type = 'phone_intake' ORDER BY name;
 ```
 
 Then check the app:
@@ -185,11 +193,19 @@ Clothes To Kids rows shipped `TRUE` while their own descriptions said to book an
 appointment — the card contradicted the listing it sat on. Verification query 8
 above exists to stop that recurring.
 
-**Caring for Miami is `phone_intake`, not `onsite`.** The Mobile Closet travels;
-8900 SW 168th St is the ministry base. `phone_intake` makes `ResourceSheet`
-withhold the Directions action and `ResourceCard` show "Call for location", while
-the address still renders for context. Do not "fix" it to `onsite` — that would
-offer turn-by-turn routing to somewhere the program may not be that day.
+**Five rows are `phone_intake`, not `onsite`** — the four referral-only rows
+(OASIS, OCPS Kids' Closet, The Shop, Project UP-START) plus Caring for Miami.
+`phone_intake` makes `ResourceSheet` withhold the Directions action and
+`ResourceCard` show "Call for location", while the address still renders for
+context. Do not "fix" any of them to `onsite`: the first four are district or
+program offices where the clothing is not handed out, and the fifth is a
+ministry base for a program that travels.
+
+The test is **not** "does it take walk-ins". Clothes To Kids and Cornerstone
+Connections are also `walk_ins_accepted = FALSE`, but a family genuinely does
+go there once an appointment is booked — so they stay `onsite` and keep their
+Directions link. The question is whether the stored address is where the
+service reaches the public at all.
 
 **Four rows are referral-only** (`requires_referral = TRUE`,
 `walk_ins_accepted = FALSE`). Their addresses are district or program offices,

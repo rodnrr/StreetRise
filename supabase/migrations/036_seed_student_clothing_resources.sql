@@ -82,15 +82,30 @@
 -- in docs/student-resources-outreach.md.
 --
 -- ── Referral-only listings ───────────────────────────────────
--- Four rows are marked requires_referral = TRUE and
--- walk_ins_accepted = FALSE, because access genuinely runs through a
--- school counsellor, social worker or administrator:
+-- Four rows are marked requires_referral = TRUE,
+-- walk_ins_accepted = FALSE, and access_type = 'phone_intake', because
+-- access genuinely runs through a school counsellor, social worker or
+-- administrator:
 --   OASIS Opportunities, OCPS Kids' Closet,
 --   M-DCPS Foundation "The Shop", Project UP-START.
 -- Their addresses are district or program offices, NOT walk-in stores,
 -- and every one of those descriptions says so in its first two
 -- sentences. The map already renders a "Referral needed" badge for
 -- these; this migration is what finally makes that badge carry weight.
+--
+-- 'phone_intake' is what stops ResourceSheet offering Directions to an
+-- administrative building the service is not delivered from, and makes
+-- ResourceCard say "Call for location". The address still renders, so
+-- nothing is hidden — only turn-by-turn routing is withheld
+-- (Codex review, PR #79).
+--
+-- The test is NOT "does it take walk-ins". Clothes To Kids and
+-- Cornerstone Connections are also walk_ins_accepted = FALSE, but they
+-- ARE places a family goes once an appointment is booked, so they stay
+-- 'onsite' and keep their Directions link. The question is whether the
+-- stored address is where the service reaches the public at all. Five
+-- rows in this batch answer no: the four above plus Caring for Miami,
+-- whose Mobile Closet travels.
 --
 -- ── Hours: why only ONE row publishes any ────────────────────
 -- Exactly ONE row (ECHO of Brandon) carries per-day windows, so it is
@@ -374,7 +389,7 @@ INSERT INTO resources (
    'Works through Hillsborough County school social workers to get clothing, school uniforms, shoes and hygiene supplies to students, including delivery to schools and a teen pop-up shop. Access is arranged by school staff — ask your school’s social worker or counsellor to make the request rather than coming to the site. The phone number reaches the office. Listing built from public information — call to confirm hours, eligibility, and what is in stock before you go.',
    'clothing', 'clothing_closet', 'clothing_closet',
    '{"street": "5101 N 40th St", "city": "Tampa", "state": "FL", "zip": "33610"}'::jsonb,
-   27.991609, -82.41403, 'street_interpolated', 'onsite', TRUE,
+   27.991609, -82.41403, 'street_interpolated', 'phone_intake', TRUE,
    '(813) 699-9131', 'info@oasisopportunities.org', 'https://www.oasisopportunities.org/our-programs',
    'unknown',
    FALSE, TRUE, TRUE, TRUE,
@@ -482,7 +497,7 @@ INSERT INTO resources (
    'Orange County Public Schools runs a central clothing closet and food pantry for eligible school-age students and their families. Access is coordinated by school staff — ask your child’s school counsellor, social worker or the district homeless-education office to set it up. The address below is district Student Services, not a walk-in store. Listing built from public information — call to confirm hours, eligibility, and what is in stock before you go.',
    'clothing', 'clothing_closet', 'clothing_closet',
    '{"street": "445 W Amelia St", "city": "Orlando", "state": "FL", "zip": "32801"}'::jsonb,
-   28.549474, -81.384842, 'street_interpolated', 'onsite', TRUE,
+   28.549474, -81.384842, 'street_interpolated', 'phone_intake', TRUE,
    '(407) 317-3394', 'helphomeless@ocps.net', 'https://www.ocps.net/89175_3',
    'unknown',
    FALSE, TRUE, TRUE, TRUE,
@@ -626,7 +641,7 @@ INSERT INTO resources (
    'The Shop provides clothing, shoes, backpacks, school supplies, toiletries and food to Miami-Dade students and families in need. Appointments are coordinated by a school employee or administrator — ask your child’s school counsellor or principal to make the referral rather than going to the district office. Listing built from public information — call to confirm hours, eligibility, and what is in stock before you go.',
    'clothing', 'clothing_closet', 'clothing_closet',
    '{"street": "1450 NE 2nd Ave, Suite 750", "city": "Miami", "state": "FL", "zip": "33132"}'::jsonb,
-   25.788882, -80.190728, 'street_interpolated', 'onsite', TRUE,
+   25.788882, -80.190728, 'street_interpolated', 'phone_intake', TRUE,
    '(305) 995-7312', 'info@mdcpsfoundation.org', 'https://mdcpsfoundation.org/community/students-families-and-schools-in-need/',
    'unknown',
    FALSE, TRUE, TRUE, TRUE,
@@ -644,7 +659,7 @@ INSERT INTO resources (
    'Supports Miami-Dade students whose families are experiencing housing instability, and may provide school uniforms and gift cards alongside enrolment and school-stability help. Start with your child’s school counsellor or the district homeless-education contact. Listing built from public information — call to confirm hours, eligibility, and what is in stock before you go.',
    'outreach', 'student_support', 'outreach_program',
    '{"street": "1450 NE 2nd Ave, Suite 750", "city": "Miami", "state": "FL", "zip": "33132"}'::jsonb,
-   25.788882, -80.190728, 'street_interpolated', 'onsite', TRUE,
+   25.788882, -80.190728, 'street_interpolated', 'phone_intake', TRUE,
    '(305) 995-7312', 'info@mdcpsfoundation.org', 'https://mdcpsfoundation.org/community/project-upstart/',
    'unknown',
    FALSE, TRUE, TRUE, TRUE,
@@ -718,6 +733,18 @@ ON CONFLICT (id) DO NOTHING;
 -- SELECT name FROM resources
 --  WHERE import_batch_id = 'student_clothing_batch_1' AND requires_referral
 --  ORDER BY name;
+
+-- Expect 0 — no referral-only row may still offer Directions. Their
+-- addresses are district offices, not service sites, so access_type must
+-- be 'phone_intake' for ResourceSheet to withhold the Directions action.
+-- SELECT name FROM resources
+--  WHERE import_batch_id = 'student_clothing_batch_1'
+--    AND requires_referral AND access_type = 'onsite';
+
+-- Expect 5 — the four above plus Caring for Miami's travelling Mobile Closet.
+-- SELECT name FROM resources
+--  WHERE import_batch_id = 'student_clothing_batch_1'
+--    AND access_type = 'phone_intake' ORDER BY name;
 
 -- Expect 2 (Mattie Williams, ECHO of Brandon) — the only rows that
 -- may ever satisfy the "Open right now" filter.
