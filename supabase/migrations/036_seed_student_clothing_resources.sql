@@ -306,24 +306,48 @@ ON CONFLICT (id) DO NOTHING;
 -- the provider, which is exactly why the original apply succeeded and hid this.
 --
 -- The row below reproduces live's record verbatim (verified 2026-08-18) so a
--- rebuilt database and live agree. It is a no-op on live: ON CONFLICT (id)
--- leaves the existing row untouched, including any edits an admin has made.
+-- rebuilt database and live agree, and leaves any existing row untouched —
+-- including edits an admin has made.
 --
--- Reviewers: any future migration that references an imported provider needs
--- the same treatment. Migration-seeded ids are safe; import-script ids are not.
+-- ── Why the guard tests TWO keys, not just the id ────────────────
+-- The id is only authoritative for databases that got their data FROM live.
+-- An environment where someone ran scripts/import-seed-candidates.ts
+-- independently has this provider under a DIFFERENT, randomly assigned id:
+-- the importer resolves providers by external_id and inserts without a fixed
+-- id, so the column default supplies a fresh gen_random_uuid().
+--
+-- There, an id-only guard admits the INSERT — and migration 009's
+-- `idx_providers_external_id` (UNIQUE on external_id WHERE external_id IS NOT
+-- NULL) rejects it, aborting the migration before a single student resource
+-- lands. `ON CONFLICT (id) DO NOTHING`, which this used to say, does not
+-- catch that: a conflict clause only handles the one index it infers.
+--
+-- So the guard tests both keys. external_id is the identity the importer
+-- actually keys on; the id is just how live happens to spell it.
+-- (Found by Codex review on PR #79.)
 
 INSERT INTO providers (
   id, user_id, organization_name, contact_name, contact_email,
   contact_phone, website, external_id, verification_status, role,
   claim_status, source_type
-) VALUES
-  ('28e81d11-d82a-49c1-8e5b-19879d204d2a', NULL,
-   'Christian Service Center for Central Florida',
-   'Christian Service Center for Central Florida',
-   'ob3-csc-001@placeholder.streetrise.org', NULL,
-   'https://www.christianservicecenter.org/', 'OB3-CSC-001',
-   'verified', 'provider', 'unclaimed', 'seeded')
-ON CONFLICT (id) DO NOTHING;
+)
+SELECT
+  '28e81d11-d82a-49c1-8e5b-19879d204d2a', NULL,
+  'Christian Service Center for Central Florida',
+  'Christian Service Center for Central Florida',
+  'ob3-csc-001@placeholder.streetrise.org', NULL,
+  'https://www.christianservicecenter.org/', 'OB3-CSC-001',
+  'verified', 'provider', 'unclaimed', 'seeded'
+WHERE NOT EXISTS (
+  SELECT 1 FROM providers
+   WHERE id = '28e81d11-d82a-49c1-8e5b-19879d204d2a'
+      OR external_id = 'OB3-CSC-001'
+);
+
+-- Reviewers: any future migration that references an imported provider needs
+-- BOTH halves of this treatment — the two-key guard above, and resolving the
+-- FK by external_id in section 2 rather than pinning live's id. Migration-
+-- seeded ids are safe to pin; import-script ids are not.
 
 
 
@@ -585,7 +609,15 @@ INSERT INTO resources (
    'ONEHEART-001-family-assistance', 'student_clothing_batch_1', 'migration_036', NOW(),
    35, 'pending', TRUE),
 
-  ('b6e7d89d-2c97-5eaa-8c0a-e952107b7c81', '28e81d11-d82a-49c1-8e5b-19879d204d2a',
+  -- provider_id is resolved by external_id, NOT pinned to live's uuid. See
+  -- section 1b: an environment that ran the OB3 importer itself holds this
+  -- provider under a different, randomly assigned id, and a pinned literal
+  -- would violate the NOT NULL FK there and abort the whole batch. Every
+  -- other row pins its provider id safely, because those ids are uuid5 values
+  -- this migration derives (or, for Mattie Williams, a literal migration 008
+  -- pins itself) — reproducible anywhere. This one is not.
+  ('b6e7d89d-2c97-5eaa-8c0a-e952107b7c81',
+   (SELECT id FROM providers WHERE external_id = 'OB3-CSC-001'),
    'Christian Service Center — Clothing Assistance',
    'Basic-needs assistance in downtown Orlando that includes clothing for adults and children. Program availability changes — call to confirm the clothing program is running and what a family needs to bring. Listing built from public information — call to confirm hours, eligibility, and what is in stock before you go.',
    'clothing', 'clothing_closet', 'clothing_closet',
@@ -720,7 +752,16 @@ ON CONFLICT (id) DO NOTHING;
 -- docs/apply-migration-036.md repeats them with more context.
 
 -- Expect 1 — the reused imported provider must exist before section 2.
--- SELECT count(*) FROM providers WHERE id = '28e81d11-d82a-49c1-8e5b-19879d204d2a';
+-- Keyed on external_id, not the id: an environment that ran the OB3 importer
+-- itself holds this provider under a different uuid, and an id-only check
+-- would report it missing when it is present. On live both spellings agree.
+-- SELECT count(*) FROM providers WHERE external_id = 'OB3-CSC-001';
+
+-- Expect 1 — and exactly 1. Two rows here means the provider got duplicated
+-- (one imported, one seeded), which the section 1b guard exists to prevent.
+-- SELECT count(*) FROM providers
+--  WHERE external_id = 'OB3-CSC-001'
+--     OR id = '28e81d11-d82a-49c1-8e5b-19879d204d2a';
 
 -- Expect 0 — no resource may reference a provider that does not exist.
 -- SELECT count(*) FROM resources r

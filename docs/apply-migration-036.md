@@ -66,12 +66,34 @@ one of them (Christian Service Center, `OB3-CSC-001`) only ever existed on live
 because the OB3 import script created it, and no migration replays that import.
 On live the apply succeeded and hid the problem — but on CI, staging, a review
 app, or a restore-from-migrations, the foreign key would abort section 2 and
-**not one of the 20 rows would land**. Section 1b now upserts that provider
+**not one of the 20 rows would land**. Section 1b now inserts that provider
 first, reproducing live's record verbatim; it is a proven no-op on live
-(row digest and provider count both unchanged after running it). Caught by
-Codex review on PR #79. Any future migration that references an *import-script*
-provider needs the same treatment — migration-seeded ids are safe, imported ids
-are not.
+(row digest and provider count both unchanged after running it).
+
+**An imported provider needs both halves of the treatment, not just the
+insert.** The first version of section 1b guarded with `ON CONFLICT (id) DO
+NOTHING` and section 2 pinned live's uuid — which still breaks in the one
+environment that matters most for this class: a database where someone ran
+`scripts/import-seed-candidates.ts` *itself*. The importer resolves providers
+by `external_id` and inserts with no fixed id, so the column default assigns a
+fresh `gen_random_uuid()`. That database holds the provider under a **different
+id but the same `external_id`**, and:
+
+1. an id-only guard admits the INSERT, which migration 009's
+   `idx_providers_external_id` (UNIQUE on `external_id`) then rejects — a
+   conflict clause only handles the one index it infers, so the migration
+   aborts; and
+2. even with that fixed, a pinned `provider_id` literal in section 2 points at
+   a uuid that database has never seen, and the `NOT NULL` FK aborts it anyway.
+
+So section 1b guards on **both keys** (`WHERE NOT EXISTS … id = … OR
+external_id = …`) and section 2 resolves the FK with
+`(SELECT id FROM providers WHERE external_id = 'OB3-CSC-001')`. Both are
+verified no-ops on live, where the two spellings resolve to the same row.
+
+Both findings came from Codex review on PR #79. The rule: **migration-seeded
+ids are safe to pin; import-script ids must be resolved by `external_id` at
+both ends** — the guard and the foreign key.
 
 **Coordinates and UUIDs must be copied, never retyped.** One provider UUID was
 reproduced from memory rather than from the file and landed wrong. It was
