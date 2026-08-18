@@ -16,8 +16,10 @@
 -- hours as day windows, and Caring for Miami is phone_intake so the map
 -- withholds directions to a base that is not a storefront.
 --
--- Re-running is safe. Every INSERT is ON CONFLICT (id) DO NOTHING and
--- the IDs are stable uuid5 values, so a second run is a no-op.
+-- Re-running is safe. The two bulk INSERTs are ON CONFLICT (id) DO NOTHING
+-- over stable uuid5 ids; section 1b instead guards with WHERE NOT EXISTS on
+-- BOTH its id and its external_id, because that one provider's id is not
+-- reproducible (see 1b). A second run is a no-op either way.
 --
 -- Adds the platform's FIRST clothing listings. Before this migration
 -- `SELECT count(*) FROM resources WHERE category = 'clothing'` returned

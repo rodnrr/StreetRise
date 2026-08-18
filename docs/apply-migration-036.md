@@ -108,8 +108,10 @@ family's clothing closet in the wrong neighbourhood.
 2. Paste the whole of `supabase/migrations/036_seed_student_clothing_resources.sql`.
 3. Run it once.
 
-Re-running is safe. Both `INSERT`s end in `ON CONFLICT (id) DO NOTHING` and
-every id is a stable `uuid5`, so a second run is a no-op.
+Re-running is safe. The two bulk `INSERT`s end in `ON CONFLICT (id) DO NOTHING`
+over stable `uuid5` ids; section 1b guards with `WHERE NOT EXISTS` on both its
+id and its `external_id`, since that provider's id is not reproducible. A second
+run is a no-op either way.
 
 ---
 
