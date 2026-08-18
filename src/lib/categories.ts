@@ -184,6 +184,16 @@ export async function fetchCategoryResources(mapLink: CategoryMapLink): Promise<
     .eq('is_active', true)
     .in('verification_status', ['verified', 'pending'])
     .eq('is_map_ready', true)
+    // The coordinate checks are part of the predicate, not belt-and-braces.
+    // `is_map_ready` is NOT NULL DEFAULT TRUE (migration 004), and
+    // ProviderListingEdit's schema has lat/lng optional+nullable, so a
+    // provider can save a listing with no coordinates and the default leaves
+    // it flagged map-ready. The map drops that row on these very checks; a
+    // category page without them would publish a listing the map it links
+    // into cannot show. Zero such rows exist on live today — this keeps the
+    // equivalence true rather than true-by-luck.
+    .not('lat', 'is', null)
+    .not('lng', 'is', null)
 
   if ('category' in mapLink) {
     if (mapLink.category === 'hygiene') {

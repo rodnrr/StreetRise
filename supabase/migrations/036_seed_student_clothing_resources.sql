@@ -810,8 +810,12 @@ ON CONFLICT (id) DO NOTHING;
 --  WHERE import_batch_id = 'student_clothing_batch_1'
 --    AND access_type = 'phone_intake' ORDER BY name;
 
--- Expect 2 (Mattie Williams, ECHO of Brandon) — the only rows that
--- may ever satisfy the "Open right now" filter.
+-- Expect 1 (ECHO of Brandon) — the ONLY row that may ever satisfy the
+-- "Open right now" filter. This said 2 and named Mattie Williams until
+-- e47ddc3; Mattie's day windows were removed earlier in this PR because
+-- they were the org's office hours, not the clothing room's, so its JSON
+-- now carries only summary / notes / source_url / basis. A successful
+-- apply returned 1 while the file demanded 2.
 -- SELECT name FROM resources
 --  WHERE import_batch_id = 'student_clothing_batch_1'
 --    AND hours_of_operation ? 'monday';

@@ -126,8 +126,26 @@ SELECT confidence_score, count(*) FROM resources GROUP BY 1 ORDER BY 1;
 -- (measured on live 2026-08-18; the exact split shifts as rows age,
 --  since the ladder is evaluated against NOW() at apply time)
 
--- Expect 0 — the backfill must not have manufactured freshness.
-SELECT count(*) FROM resources WHERE updated_at > NOW() - INTERVAL '5 minutes';
+-- Freshness: compare the timestamps to THEMSELVES across the apply.
+-- Run this BEFORE applying, and again after. Both values must match exactly.
+SELECT max(updated_at), count(*) FROM resources;
+```
+
+⚠️ **Do not test freshness with `updated_at > NOW() - INTERVAL '5 minutes'`.**
+That asks "was anything written recently", which is a different question, and
+it false-fails in both directions: on a rebuilt database the migrations right
+before this one have just inserted every row, and on live any unrelated admin
+edit inside the window trips it. Either way it reports a failure while the
+backfill behaved exactly as intended — and an operator who trusts it may roll
+back a correct apply.
+
+If you would rather not carry a value between two queries, snapshot and diff:
+
+```sql
+CREATE TEMP TABLE ts_before AS SELECT id, updated_at FROM resources;
+-- …apply the migration…
+SELECT count(*) FROM resources r JOIN ts_before b USING (id)
+ WHERE r.updated_at IS DISTINCT FROM b.updated_at;   -- expect 0
 ```
 
 ## Deliberately not fixed here

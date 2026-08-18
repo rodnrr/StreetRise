@@ -215,9 +215,25 @@ COMMIT;
 --      ELSE 90
 --    END);
 
--- Expect NO row stamped as freshly updated by this migration — the
--- backfill must not have manufactured freshness:
--- SELECT count(*) FROM resources WHERE updated_at > NOW() - INTERVAL '5 minutes';
+-- The backfill must not have manufactured freshness. Do NOT test this with
+-- `updated_at > NOW() - INTERVAL '5 minutes'` — that asks "was anything
+-- written recently", which is a different question and false-fails twice
+-- over: on a rebuilt database the preceding migrations have just inserted
+-- every row, and on live any unrelated admin edit in the last five minutes
+-- trips it. Both report failure while the backfill behaved perfectly.
+--
+-- Compare the timestamp to ITSELF across the apply instead. Run this BEFORE:
+-- SELECT max(updated_at), count(*) FROM resources;
+-- then again AFTER. Both values must be byte-identical. If the backfill had
+-- stamped anything, max(updated_at) would jump to the apply time — which is
+-- precisely and only what the DISABLE TRIGGER exists to prevent.
+--
+-- Fully self-contained alternative, if you would rather not hold a value
+-- between two queries — snapshot first, then diff:
+-- CREATE TEMP TABLE ts_before AS SELECT id, updated_at FROM resources;
+--   …apply the migration…
+-- SELECT count(*) FROM resources r JOIN ts_before b USING (id)
+--  WHERE r.updated_at IS DISTINCT FROM b.updated_at;   -- expect 0
 
 -- Score distribution. On live this MUST change — 66 rows move to 20.
 -- Measured 2026-08-18: before 20|95 35|55 50|20 70|32 90|15
