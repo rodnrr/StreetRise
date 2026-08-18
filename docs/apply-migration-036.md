@@ -26,11 +26,15 @@ no migration of its own.
 | Resources | 20 (19 `clothing` + 1 `outreach`) |
 | Metros | Tampa Bay (9), Orlando (7), Miami-Dade (4) |
 
-Two resources attach to providers that **already exist** on live and are not
-re-inserted:
+Two resources attach to providers that **already exist** rather than being
+duplicated:
 
-- Mattie Williams Neighborhood Family Center — `c41e73f2-…` (`MATTIE-001`)
-- Christian Service Center for Central Florida — `28e81d11-…` (`OB3-CSC-001`)
+- Mattie Williams Neighborhood Family Center — `c41e73f2-…` (`MATTIE-001`).
+  Seeded by migration 008, so any DB rebuilt from migrations has it.
+- Christian Service Center for Central Florida — `28e81d11-…` (`OB3-CSC-001`).
+  **Not created by any migration** — it entered live through
+  `scripts/import-seed-candidates.ts`. Section 1b of the migration upserts it
+  (see below).
 
 All 20 resources are seeded `verification_status = 'pending'` →
 they render the amber **Community Listed** badge, `confidence_score` 35 (the
@@ -54,6 +58,20 @@ registered and claimed it — false provenance, and a dead end, because a
 could never take ownership of its listing. All 122 pre-existing seeded
 providers are `unclaimed` / `seeded`; migration 027 exists because this went
 wrong once before. **Always set both columns explicitly when seeding.**
+
+**A referenced provider that no migration creates will abort the whole batch
+on a fresh database.** `resources.provider_id` is
+`NOT NULL REFERENCES providers(id)`. Section 2 reuses two existing providers;
+one of them (Christian Service Center, `OB3-CSC-001`) only ever existed on live
+because the OB3 import script created it, and no migration replays that import.
+On live the apply succeeded and hid the problem — but on CI, staging, a review
+app, or a restore-from-migrations, the foreign key would abort section 2 and
+**not one of the 20 rows would land**. Section 1b now upserts that provider
+first, reproducing live's record verbatim; it is a proven no-op on live
+(row digest and provider count both unchanged after running it). Caught by
+Codex review on PR #79. Any future migration that references an *import-script*
+provider needs the same treatment — migration-seeded ids are safe, imported ids
+are not.
 
 **Coordinates and UUIDs must be copied, never retyped.** One provider UUID was
 reproduced from memory rather than from the file and landed wrong. It was

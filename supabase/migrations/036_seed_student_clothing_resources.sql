@@ -20,11 +20,16 @@
 --
 --   15 providers  (verified, user_id NULL — same pattern as 008/020/032)
 --   20 resources  (19 clothing closets + 1 outreach program)
+--    1 provider backfill (see section 1b)
 --
 -- Two resources hang off providers that ALREADY EXIST on live and are
--- therefore NOT re-inserted here:
+-- therefore not duplicated:
 --   • Mattie Williams Neighborhood Family Center  c41e73f2-… (MATTIE-001)
+--     — seeded by migration 008, so a rebuilt DB has it.
 --   • Christian Service Center for Central FL     28e81d11-… (OB3-CSC-001)
+--     — NOT in any migration; it arrived via the OB3 import script. Section
+--     1b upserts it so this migration does not depend on a database that
+--     happens to have had that import run. See 1b for the full reasoning.
 --
 -- Coverage:
 --   Tampa Bay — Clearwater, St. Petersburg, Tampa, Safety Harbor,
@@ -211,6 +216,45 @@ INSERT INTO providers (
   ('39f3d646-b6db-579c-a645-69f0361be891', NULL, 'Caring for Miami', 'Mobile Closet',
    'contact@caring_for_miami.placeholder', '(786) 430-1051',
    'https://caringformiami.org/closet/', 'CFMIA-001', 'verified', 'provider', 'unclaimed', 'seeded')
+ON CONFLICT (id) DO NOTHING;
+
+
+-- ── 1b. Backfill for a reused provider that no migration creates ──
+--
+-- Section 2 hangs two resources off providers that already exist rather than
+-- duplicating them. Only ONE of the two is reproducible from this repo:
+--
+--   • Mattie Williams Neighborhood Family Center (c41e73f2-…) is seeded by
+--     migration 008, so it exists on any DB rebuilt from migrations. Fine.
+--   • Christian Service Center for Central Florida (28e81d11-…) is NOT. It
+--     entered live through scripts/import-seed-candidates.ts (the OB3- =
+--     "Orlando batch 3" import), which no migration replays, and its id is a
+--     random gen_random_uuid() rather than a derivable uuid5.
+--
+-- `resources.provider_id` is `NOT NULL REFERENCES providers(id)`
+-- (001_initial_schema.sql), so on a freshly rebuilt database — CI, staging, a
+-- review app, a disaster-recovery restore — section 2 would abort on that
+-- foreign key and NOT ONE of the 20 student rows would land. Live already has
+-- the provider, which is exactly why the original apply succeeded and hid this.
+--
+-- The row below reproduces live's record verbatim (verified 2026-08-18) so a
+-- rebuilt database and live agree. It is a no-op on live: ON CONFLICT (id)
+-- leaves the existing row untouched, including any edits an admin has made.
+--
+-- Reviewers: any future migration that references an imported provider needs
+-- the same treatment. Migration-seeded ids are safe; import-script ids are not.
+
+INSERT INTO providers (
+  id, user_id, organization_name, contact_name, contact_email,
+  contact_phone, website, external_id, verification_status, role,
+  claim_status, source_type
+) VALUES
+  ('28e81d11-d82a-49c1-8e5b-19879d204d2a', NULL,
+   'Christian Service Center for Central Florida',
+   'Christian Service Center for Central Florida',
+   'ob3-csc-001@placeholder.streetrise.org', NULL,
+   'https://www.christianservicecenter.org/', 'OB3-CSC-001',
+   'verified', 'provider', 'unclaimed', 'seeded')
 ON CONFLICT (id) DO NOTHING;
 
 
@@ -606,6 +650,14 @@ ON CONFLICT (id) DO NOTHING;
 -- ════════════════════════════════════════════════════════════════
 -- Run these after applying. Expected values are in the comments;
 -- docs/apply-migration-036.md repeats them with more context.
+
+-- Expect 1 — the reused imported provider must exist before section 2.
+-- SELECT count(*) FROM providers WHERE id = '28e81d11-d82a-49c1-8e5b-19879d204d2a';
+
+-- Expect 0 — no resource may reference a provider that does not exist.
+-- SELECT count(*) FROM resources r
+--  WHERE r.import_batch_id = 'student_clothing_batch_1'
+--    AND NOT EXISTS (SELECT 1 FROM providers p WHERE p.id = r.provider_id);
 
 -- Expect 15
 -- SELECT count(*) FROM providers WHERE external_id IN (
