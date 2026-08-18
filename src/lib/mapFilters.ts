@@ -373,19 +373,25 @@ const NEED_BY_QUICK_FILTER: Partial<Record<QuickFilterKey, NeedKey>> = {
 /**
  * Deep-link translation: a population_focus tag → the equivalent need chip.
  *
- * Several needs are nothing but a population tag, so a `?populationFocus=`
- * link that names exactly one of them is better expressed as the active need
- * chip than as a refinement: the predicate is identical, but the chip is what
- * the visitor can see and switch away from. Tags with no chip (seniors,
- * reentry, …) fall through and stay refinements.
+ * A `?populationFocus=` link that names one tag is better expressed as the
+ * active need chip than as a refinement — the chip is what the visitor can see
+ * and switch away from. But that swap is only honest when the need's predicate
+ * is *exactly* the tag test, because the URL is a contract about which set
+ * comes back.
+ *
+ * Only these four qualify. `families` and `youth` are deliberately absent:
+ * their predicates widen past the tag to `gender_policy === 'family_only'` and
+ * `'youth_only'` respectively, so translating them would return listings that
+ * do not carry the requested tag at all. There is already one live row that is
+ * `youth_only` without `young_adults`. Those tags fall through and stay
+ * `populationFocus` refinements, which match the link exactly — as do tags with
+ * no chip at all (seniors, reentry, …).
  */
 const NEED_BY_POPULATION_FOCUS: Partial<Record<string, NeedKey>> = {
   students: 'students',
-  families: 'families',
   veterans: 'veterans',
   domestic_violence: 'dv',
   lgbtq: 'lgbtq',
-  young_adults: 'youth',
 }
 
 export function needForCategory(category: string): NeedKey | undefined {

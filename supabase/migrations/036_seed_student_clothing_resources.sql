@@ -67,9 +67,23 @@
 -- published address, phone, and program page. Nothing here was
 -- confirmed by phone, so every resource is seeded
 -- verification_status = 'pending' → the amber "Community Listed"
--- badge, confidence_score 35 (same as the 032 South Florida batch).
--- Staff flips a row to 'verified' in AdminResources only after an
--- actual phone check.
+-- badge. Staff flips a row to 'verified' in AdminResources only after
+-- an actual phone check.
+--
+-- `confidence_score` 35 below is DOCUMENTATION, not control. Two BEFORE
+-- INSERT OR UPDATE triggers own that column and both fire on this
+-- INSERT, in alphabetical order by trigger name:
+--   1. resources_confidence_score → compute_confidence_score() (010),
+--      an additive formula that scores these rows 80.
+--   2. trg_resource_confidence    → fn_update_resource_confidence(),
+--      which runs second ('t' > 'r') and hard-overwrites to 35 for any
+--      row whose verification_status is 'pending'.
+-- The stored result is therefore 35 whatever this literal says — which
+-- is what live shows for all 20 rows, and why the 032 batch is also 35.
+-- Do NOT "correct" the number here expecting it to take effect, and do
+-- not read 35 as a per-batch calibration choice: it is what `pending`
+-- means. A row only leaves 35 when staff verifies it. 35 clears the
+-- map's MIN_CONFIDENCE_SCORE of 20, so these rows stay visible.
 --
 -- Four organisations from the source directory are deliberately NOT
 -- seeded as public resources, because they are partnership / donation-
