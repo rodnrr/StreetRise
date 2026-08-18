@@ -45,11 +45,24 @@ old rule, so the migration recomputes them. Measured on live 2026-08-18:
 
 | rows | now | after | why |
 |---|---|---|---|
-| pending (all) | 35 | 35 | unchanged |
+| pending (all) | 35 | 35 | unchanged — 55 rows |
 | verified | 70 | **20** | 31 rows, past `stale_after_days` |
 | verified | 50 | **20** | 20 rows, past `stale_after_days` |
 | verified | 90 | **20** | 15 rows, past `stale_after_days` |
 | rejected / suspended | — | — | none exist |
+
+Whole-table distribution, measured on live 2026-08-18:
+
+| score | before | after |
+|---|---|---|
+| 20 | 95 | **161** |
+| 35 | 55 | 55 |
+| 50 | 20 | — |
+| 70 | 32 | **1** |
+| 90 | 15 | — |
+
+The exact split shifts as rows age — the ladder is evaluated against `NOW()` at
+apply time, so re-measure rather than treating these as fixed.
 
 Those 66 are not being damaged. `fn_update_resource_confidence()` scores by
 staleness, and their values were frozen whenever each row was last written —
@@ -77,11 +90,15 @@ problem it fixes only bites a rebuilt database.
 It reproduces both objects exactly as live defines them (read back with
 `pg_get_functiondef` / `pg_get_triggerdef` on 2026-08-18, and diffed against the
 file). `CREATE OR REPLACE` on an identical body plus `DROP TRIGGER IF EXISTS`
-before `CREATE TRIGGER` makes it idempotent. **No stored `confidence_score`
-changes on live.**
+before `CREATE TRIGGER` makes the DDL idempotent, and the backfill converges on
+re-run.
 
-There is no urgency for live. It matters the moment anyone builds a database
-from migrations.
+⚠️ **The backfill rewrites stored scores.** Expect the distribution to change as
+in the table below — 66 rows move to 20. If you run this and the numbers do
+*not* move, something went wrong: check that both triggers exist and fired.
+
+There is no urgency for live. The parity problem only matters the moment anyone
+builds a database from migrations.
 
 ## Verify
 
@@ -98,8 +115,19 @@ SELECT tgname FROM pg_trigger
 SELECT count(*) FROM resources
  WHERE verification_status = 'pending' AND confidence_score <> 35;
 
--- Expect unchanged on live — this migration rewrites no rows
+-- Score distribution. On live this MUST change: 66 rows move to 20.
 SELECT confidence_score, count(*) FROM resources GROUP BY 1 ORDER BY 1;
+--   before          after
+--   20 |  95         20 | 161
+--   35 |  55         35 |  55
+--   50 |  20         70 |   1
+--   70 |  32
+--   90 |  15
+-- (measured on live 2026-08-18; the exact split shifts as rows age,
+--  since the ladder is evaluated against NOW() at apply time)
+
+-- Expect 0 — the backfill must not have manufactured freshness.
+SELECT count(*) FROM resources WHERE updated_at > NOW() - INTERVAL '5 minutes';
 ```
 
 ## Deliberately not fixed here

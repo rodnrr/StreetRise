@@ -219,5 +219,9 @@ COMMIT;
 -- backfill must not have manufactured freshness:
 -- SELECT count(*) FROM resources WHERE updated_at > NOW() - INTERVAL '5 minutes';
 
--- Score distribution after the backfill, for the record:
+-- Score distribution. On live this MUST change — 66 rows move to 20.
+-- Measured 2026-08-18: before 20|95 35|55 50|20 70|32 90|15
+--                      after  20|161 35|55 70|1
+-- The split shifts as rows age, since the ladder is evaluated against
+-- NOW() at apply time. If nothing moves, the triggers did not fire.
 -- SELECT confidence_score, count(*) FROM resources GROUP BY 1 ORDER BY 1;
