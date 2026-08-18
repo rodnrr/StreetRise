@@ -23,6 +23,7 @@ const CATEGORIES = [
   { label: 'Hygiene',         emoji: '🚿', to: '/hygiene' },
   { label: 'Medical',         emoji: '⚕️', to: '/medical' },
   { label: 'Employment',      emoji: '💼', to: '/employment' },
+  { label: 'Students',        emoji: '🎒', to: '/students' },
   { label: 'Mental Health',   emoji: '💙', to: '/map?category=mental_health' },
   { label: 'Legal Help',      emoji: '⚖️', to: '/legal' },
   { label: 'Parks & Day Use', emoji: '🌳', to: '/map?category=outdoor_space' },

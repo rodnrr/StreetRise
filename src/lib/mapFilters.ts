@@ -119,6 +119,7 @@ export const POPULATION_FOCUS_LABEL: Record<string, string> = {
   lgbtq:             'LGBTQ+',
   domestic_violence: 'Domestic Violence',
   families:          'Families',
+  students:          'Students',
   seniors:           'Seniors',
   young_adults:      'Young Adults',
   pregnant_women:    'Pregnant Women',
@@ -290,6 +291,17 @@ export const NEED_DEFS: Record<NeedKey, NeedDef> = {
     hint: 'Serves families with children',
     match: (r) => hasPopulation(r, 'families') || r.gender_policy === 'family_only',
   },
+  students: {
+    label: 'Students',
+    icon: '🎒',
+    hint: 'School clothing, uniforms and student support',
+    // Tag-driven only, exactly like `veterans`. A clothing closet that serves
+    // adults on the street is not a student resource, so this deliberately does
+    // NOT widen to `category === 'clothing'`. As student-facing resources land
+    // in other categories — a school-based pantry, a homeless-liaison program —
+    // they join this chip by carrying the tag, with no change here.
+    match: (r) => hasPopulation(r, 'students'),
+  },
   veterans: {
     label: 'Veterans',
     icon: '🎖️',
@@ -321,7 +333,7 @@ export const NEED_ORDER: NeedKey[] = [
   'shelter', 'food', 'hygiene', 'daytime',
   'medical', 'mental_health', 'recovery', 'legal', 'work',
   'clothing', 'transportation', 'childcare', 'outreach',
-  'families', 'veterans', 'youth', 'dv', 'lgbtq',
+  'families', 'students', 'veterans', 'youth', 'dv', 'lgbtq',
 ]
 
 /** Deep-link translation: a marketing category slug → the equivalent need chip. */
@@ -358,8 +370,30 @@ const NEED_BY_QUICK_FILTER: Partial<Record<QuickFilterKey, NeedKey>> = {
   dv_support: 'dv',
 }
 
+/**
+ * Deep-link translation: a population_focus tag → the equivalent need chip.
+ *
+ * Several needs are nothing but a population tag, so a `?populationFocus=`
+ * link that names exactly one of them is better expressed as the active need
+ * chip than as a refinement: the predicate is identical, but the chip is what
+ * the visitor can see and switch away from. Tags with no chip (seniors,
+ * reentry, …) fall through and stay refinements.
+ */
+const NEED_BY_POPULATION_FOCUS: Partial<Record<string, NeedKey>> = {
+  students: 'students',
+  families: 'families',
+  veterans: 'veterans',
+  domestic_violence: 'dv',
+  lgbtq: 'lgbtq',
+  young_adults: 'youth',
+}
+
 export function needForCategory(category: string): NeedKey | undefined {
   return NEED_BY_CATEGORY[category]
+}
+
+export function needForPopulationFocus(tags: string[]): NeedKey | undefined {
+  return tags.length === 1 ? NEED_BY_POPULATION_FOCUS[tags[0]] : undefined
 }
 
 export function needForQuickFilter(key: QuickFilterKey): NeedKey | undefined {

@@ -121,6 +121,7 @@ export default function App() {
           <Route path="legal"         element={<CategoryPage slug="legal" />} />
           <Route path="veterans"      element={<CategoryPage slug="veterans" />} />
           <Route path="youth"         element={<CategoryPage slug="youth" />} />
+          <Route path="students"      element={<CategoryPage slug="students" />} />
           <Route path="families"      element={<CategoryPage slug="families" />} />
 
           <Route path="404"        element={<NotFoundPage />} />

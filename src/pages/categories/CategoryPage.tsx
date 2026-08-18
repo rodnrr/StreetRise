@@ -62,7 +62,7 @@ export default function CategoryPage({ slug }: Props) {
             <EmptyState
               icon={SearchX}
               title="Nothing listed here yet"
-              description="No verified resources currently match this need. Check the full map — new listings are added regularly."
+              description="Nothing currently matches this need. Check the full map — new listings are added regularly."
               action={<Button to="/map">View Full Map</Button>}
             />
           )}
@@ -81,6 +81,18 @@ export default function CategoryPage({ slug }: Props) {
                         {r.description}
                       </p>
                     )}
+                    {/* These pages show the same public set as the map, which
+                        includes community-listed rows. The badge is what keeps
+                        that honest, and the referral note stops someone reading
+                        an address as an invitation to turn up. */}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className={r.verification_status === 'verified' ? 'badge-verified' : 'badge-pending'}>
+                        {r.verification_status === 'verified' ? 'Staff Verified' : 'Community Listed'}
+                      </span>
+                      {r.requires_referral && (
+                        <span className="badge bg-amber-50 text-amber-700">Referral needed</span>
+                      )}
+                    </div>
                   </Card>
                 ))}
               </div>

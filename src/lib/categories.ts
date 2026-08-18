@@ -19,6 +19,11 @@ export type CategoryMapLink =
   | { quickFilter: QuickFilterKey }
   | { hasShowers: true }
   | { subcategory: string[] }
+  // Who a resource serves, not what it is — `population_focus` array overlap.
+  // Still presentation-only: it reuses the map's existing populationFocus
+  // facet and introduces no category value (migration 036 added the
+  // `students` tag itself).
+  | { populationFocus: string[] }
 
 export interface CategoryPageConfig {
   slug: string
@@ -127,6 +132,19 @@ export const CATEGORY_PAGES: CategoryPageConfig[] = [
     liveResourceCountSnapshot: 1,
   },
   {
+    slug: 'students',
+    displayName: 'Students & School Support',
+    emoji: '🎒',
+    // 'live' from the moment migration 036 is applied: 20 seeded rows, every
+    // one tagged population_focus ∋ 'students'. Until then this page renders
+    // its static copy rather than an empty list.
+    mode: 'live',
+    mapLink: { populationFocus: ['students'] },
+    description:
+      'Free school clothing, uniforms, shoes and student support for families in Tampa Bay, Orlando, and Miami. Some are walk-in; some are arranged through your school counsellor or social worker.',
+    liveResourceCountSnapshot: 20,
+  },
+  {
     slug: 'families',
     displayName: 'Families',
     emoji: '👨‍👩‍👧',
@@ -154,8 +172,17 @@ export function getCategoryPage(slug: string): CategoryPageConfig | undefined {
 export async function fetchCategoryResources(mapLink: CategoryMapLink): Promise<Resource[]> {
   let query = db.resources()
     .select('*')
+    // Same public visibility predicate the map uses (fetchMapResources).
+    // This previously read `verification_status = 'verified'` only, which
+    // silently gave a category page a smaller world than the map it links
+    // into — /shelters listed 23 while the map showed 34 of the same rows,
+    // and an entire seed batch could be invisible here while being live on
+    // the map. These pages are documented as presentation-only aliases over
+    // the map's filters, so they have to agree on what is public. The cards
+    // carry the Staff Verified / Community Listed badge so the distinction
+    // stays visible rather than disappearing.
     .eq('is_active', true)
-    .eq('verification_status', 'verified')
+    .in('verification_status', ['verified', 'pending'])
     .eq('is_map_ready', true)
 
   if ('category' in mapLink) {
@@ -169,6 +196,10 @@ export async function fetchCategoryResources(mapLink: CategoryMapLink): Promise<
     query = query.eq('has_showers', true)
   } else if ('subcategory' in mapLink) {
     query = query.in('subcategory', mapLink.subcategory)
+  } else if ('populationFocus' in mapLink) {
+    // Array overlap — matches the map's populationFocus facet, which is an
+    // "any of these tags" test, not "all of them".
+    query = query.overlaps('population_focus', mapLink.populationFocus)
   } else if ('quickFilter' in mapLink && mapLink.quickFilter === 'veteran_support') {
     query = query.contains('population_focus', ['veterans'])
   }
@@ -183,6 +214,7 @@ export function categoryMapLinkToSearch(mapLink: CategoryMapLink): string {
   if ('category' in mapLink) return `?category=${mapLink.category}`
   if ('quickFilter' in mapLink) return `?quickFilter=${mapLink.quickFilter}`
   if ('subcategory' in mapLink) return `?subcategory=${mapLink.subcategory.join(',')}`
+  if ('populationFocus' in mapLink) return `?populationFocus=${mapLink.populationFocus.join(',')}`
   if ('hasShowers' in mapLink) return '?hasShowers=true'
   return ''
 }
