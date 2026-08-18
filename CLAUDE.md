@@ -17,6 +17,7 @@ The pre-debut launch review described in earlier versions of this file is **done
 Known open items (verified 2026-07-31; migration 036 added 2026-08-18):
 
 - **Migration 036 (student clothing seed) APPLIED to live 2026-08-18.** Runbook + verification: `docs/apply-migration-036.md`. Added the platform's first `clothing` listings (20 resources, 15 providers) and the `students` population-focus tag; public map total 146 → 166. Partnership leads deliberately kept off the public map are in `docs/student-resources-outreach.md`.
+- **Migration 037 (confidence trigger parity) is NOT applied, and needs a decision.** Its DDL is a no-op on live — live already has both triggers; the repo did not, so a rebuilt database scored `pending` rows ~80 instead of 35. But its **backfill is a real production data change**: it re-scores 66 stale `verified` rows to 20 (measured 2026-08-18). Nothing leaves the map (`MIN_CONFIDENCE_SCORE` is 20, tested `>=`) and `updated_at` is untouched, so no listing gains false freshness. Unhurried — the parity gap only bites a rebuilt database. Read `docs/apply-migration-037.md` before running it.
 - **Migration 030 was not yet applied to live** as of 2026-07-29 (`docs/apply-migration-030.md`). Until it is, chat unread indicators can never clear — `markConversationRead()` writes to columns that don't exist and silently no-ops.
 - **`npm run lint`, `npm run typecheck`, and `npm run build` are all clean** (re-verified 2026-08-06). The previously documented lint error on `supabase.from('bookings') as any` is gone — `src/lib/supabase.ts` now carries an `eslint-disable-next-line` for it, so the cast itself is still lint debt to unwind when `database.types.ts` is regenerated.
 - **`BlogPostPage` does not render markdown** — `body_markdown` is shown in a `whitespace-pre-wrap` div. `cover_image_url` now renders (hero on `BlogPostPage`, thumbnail on `BlogIndexPage`, og:image) when set; images are hosted in the R2 bucket `assets-streetrise` — upload + DB-update runbook in `docs/r2-blog-images.md`.
@@ -164,7 +165,8 @@ docs/
   apply-migration-030.md    # Hand-apply runbook (030 = conversation read tracking)
   apply-migration-035.md    # Hand-apply runbook (035 = work exchange agent)
   apply-migration-036.md    # Hand-apply runbook (036 = student clothing seed)
-  apply-migration-037.md    # Hand-apply runbook (037 = confidence trigger parity; no-op on live)
+  apply-migration-037.md    # Hand-apply runbook (037 = confidence trigger parity; DDL is a
+                            # no-op on live, but its backfill re-scores 66 rows — read first)
   student-resources-outreach.md  # Partnership leads deliberately NOT on the public map
   work-exchange-agent.md    # What the agent does, how to run it, review workflow
   data-dictionary.md
