@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { db, supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
+import { currentIdentity } from '@/lib/claims'
 
 /**
  * Auth helpers shared by the login, password-reset, and OAuth-callback pages.
@@ -124,4 +125,85 @@ export async function applySessionAndResolveDestination(
   // never hijacks someone on their way to claim an existing org.
   if (!provider) return '/portal/onboarding'
   return '/portal/dashboard'
+}
+
+/**
+ * The signed-in account's `providers.id`, resolved from the Supabase session
+ * rather than from `useAuthStore`.
+ *
+ * `streetrise-auth` is plain localStorage and outlives the session it
+ * describes. Writes that take their id from it go out as `anon` once the
+ * refresh token is gone, `auth.uid()` comes back NULL, and every RLS policy
+ * built on `my_provider_id()` rejects the row — the user sees a raw
+ * "new row violates row-level security policy" toast for a problem that is
+ * really just an expired session. `ProviderOnboarding` and the claim flow
+ * already guard their writes this way; this is the same guard, shared.
+ *
+ * `getUser()` (inside `currentIdentity`) validates the JWT against the auth
+ * server and refreshes it when it can, so a null here means the next write
+ * genuinely would be unauthenticated.
+ *
+ * Returns null when there is no usable session, or when the account has no
+ * providers row yet (signed up but never finished onboarding).
+ */
+export async function currentProviderId(): Promise<string | null> {
+  const me = await currentIdentity()
+  if (!me) return null
+
+  // The store's userId and providerId are always written together from one
+  // query, so when the session still belongs to that user the cached id is
+  // good and costs no round trip.
+  const cached = useAuthStore.getState()
+  if (cached.userId === me.userId && cached.providerId) return cached.providerId
+
+  // Store is empty or describes a different account (hydrated from an older
+  // session, or someone signed in as someone else in this browser). Re-read
+  // the row and repair the store so the rest of the app stops disagreeing
+  // with the session.
+  const { data: provider } = await db.providers()
+    .select('id, role, verification_status')
+    .eq('user_id', me.userId)
+    .maybeSingle()
+  if (!provider) return null
+
+  useAuthStore.getState().setAuth({
+    userId:             me.userId,
+    userEmail:          me.email,
+    role:               (provider.role as 'provider' | 'admin' | 'super_admin') ?? 'provider',
+    providerId:         provider.id,
+    verificationStatus: provider.verification_status as
+      'pending' | 'verified' | 'rejected' | 'suspended',
+  })
+  return provider.id
+}
+
+export const SESSION_EXPIRED_MESSAGE =
+  'Your session has expired. Sign in again and re-send your message.'
+
+/** Thrown by the messaging mutations when the session is gone. */
+export class SessionExpiredError extends Error {
+  constructor() {
+    super(SESSION_EXPIRED_MESSAGE)
+    this.name = 'SessionExpiredError'
+  }
+}
+
+/** `currentProviderId()` or a typed failure the chat pages know how to render. */
+export async function requireProviderId(): Promise<string> {
+  const id = await currentProviderId()
+  if (!id) throw new SessionExpiredError()
+  return id
+}
+
+/**
+ * Turns a failed messaging write into copy a person can act on.
+ *
+ * 42501 is the RLS rejection. By the time a write reaches PostgREST we have
+ * already confirmed the session, so a 42501 here means the token expired
+ * between the check and the insert — still an expired session, never a
+ * permissions problem the user can do anything about.
+ */
+export function messagingErrorMessage(error: { code?: string }): string {
+  if (error.code === '42501') return SESSION_EXPIRED_MESSAGE
+  return 'We couldn’t send that message. Please try again in a moment.'
 }
