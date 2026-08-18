@@ -125,12 +125,26 @@ SELECT name FROM resources
  WHERE import_batch_id = 'student_clothing_batch_1' AND requires_referral
  ORDER BY name;
 
--- 7. Rows that publish per-day hours: expect exactly 2
---    (Mattie Williams, ECHO of Brandon). These are the only ones that can
---    ever satisfy "Open right now" — see the note below.
+-- 7. Rows that publish per-day hours: expect exactly 1 (ECHO of Brandon).
+--    It is the only listing in this batch that can ever satisfy
+--    "Open right now" — see the note below.
 SELECT name FROM resources
  WHERE import_batch_id = 'student_clothing_batch_1'
    AND hours_of_operation ? 'monday';
+
+-- 8. Rows claiming walk-in access: expect 11, and none of them may be
+--    appointment-based. A row whose description says "book an appointment"
+--    must not also advertise "Walk-ins OK".
+SELECT name FROM resources
+ WHERE import_batch_id = 'student_clothing_batch_1'
+   AND walk_ins_accepted
+   AND (description ILIKE '%appointment%'
+        OR hours_of_operation::text ILIKE '%appointment%');
+--    ^ expect ZERO rows.
+
+-- 9. Caring for Miami must stay phone_intake so ResourceSheet withholds
+--    Directions to a base that is not a storefront: expect 'phone_intake'.
+SELECT access_type FROM resources WHERE external_id = 'CFMIA-001-mobile-closet';
 ```
 
 Then check the app:
@@ -143,21 +157,39 @@ Then check the app:
 
 ---
 
-## Two judgement calls worth knowing about
+## Judgement calls worth knowing about
 
-**Only 2 of 20 rows publish per-day hours.** That is deliberate, not missing
+**Only 1 of 20 rows publishes per-day hours.** That is deliberate, not missing
 data. "Open right now" is the one filter that fails *closed* because it makes a
-positive claim, and for most of these listings we genuinely do not know: the
-source says "verify hours", or the published hours are the org's *office* rather
-than its clothing room (Mercy Keepers, Overtown Youth Center), or access is by
-referral so "open" is meaningless to a family who has not been referred yet.
-Adding hours you have not confirmed would send a parent on a wasted trip. If you
+positive claim, and for these listings we genuinely do not know: the source says
+"verify hours", or the published hours are the org's *office* rather than its
+clothing room (Mattie Williams, Mercy Keepers, Overtown Youth Center), or access
+is by referral so "open" is meaningless to a family who has not been referred
+yet. Adding hours you have not confirmed sends a parent on a wasted trip. If you
 phone an org and confirm real distribution hours, add them in
 `/admin/resources` — the row starts appearing under "Open right now" immediately.
 
-ECHO of Brandon runs Mon–Fri 9–1 **and** Tue 5–7 PM. The Tuesday window stores
-only `09:00–13:00`, under-claiming per the house rule; the evening session lives
-in `summary` and `notes`.
+ECHO of Brandon is the exception because its posted Mon–Fri 9–1 **are** its
+client-service hours. It also opens Tue 5–7 PM; the Tuesday window stores only
+`09:00–13:00`, under-claiming per the house rule, with the evening session in
+`summary` and `notes`.
+
+Mattie Williams originally stored its *office* hours as day windows plus a note
+saying clothing might not be available during them — the rule stated and broken
+in the same row. Windows removed; the schedule now lives in `summary` only.
+
+**Appointment-based means `walk_ins_accepted = FALSE`.** The column is
+`NOT NULL DEFAULT TRUE` and `ResourceCard` renders it as a public "Walk-ins OK"
+line, so leaving the default is an affirmative claim, not a silence. The three
+Clothes To Kids rows shipped `TRUE` while their own descriptions said to book an
+appointment — the card contradicted the listing it sat on. Verification query 8
+above exists to stop that recurring.
+
+**Caring for Miami is `phone_intake`, not `onsite`.** The Mobile Closet travels;
+8900 SW 168th St is the ministry base. `phone_intake` makes `ResourceSheet`
+withhold the Directions action and `ResourceCard` show "Call for location", while
+the address still renders for context. Do not "fix" it to `onsite` — that would
+offer turn-by-turn routing to somewhere the program may not be that day.
 
 **Four rows are referral-only** (`requires_referral = TRUE`,
 `walk_ins_accepted = FALSE`). Their addresses are district or program offices,

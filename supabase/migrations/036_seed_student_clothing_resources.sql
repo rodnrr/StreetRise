@@ -86,20 +86,46 @@
 -- sentences. The map already renders a "Referral needed" badge for
 -- these; this migration is what finally makes that badge carry weight.
 --
--- ── Hours: why so many rows publish none ─────────────────────
--- Only TWO rows (Mattie Williams, ECHO of Brandon) carry per-day
--- windows. Every other row stores a `summary` and no day windows, on
--- purpose. "Open right now" is the one filter that fails CLOSED
--- (mapFilters.ts) precisely because it makes a positive claim, and for
--- these listings the honest position is that we do not know:
+-- ── Hours: why only ONE row publishes any ────────────────────
+-- Exactly ONE row (ECHO of Brandon) carries per-day windows, so it is
+-- the only listing in this batch that can ever satisfy "Open right
+-- now". Every other row stores a `summary` (and sometimes `notes`) with
+-- no day windows, on purpose. That filter is the one place that fails
+-- CLOSED (mapFilters.ts) precisely because it makes a positive claim,
+-- and for these listings the honest position is that we do not know:
 --   • the source says "verify hours" or publishes none at all, or
 --   • the published hours are the ORG OFFICE, not the clothing room
---     (Mercy Keepers, Overtown Youth Center), or
+--     (Mattie Williams, Mercy Keepers, Overtown Youth Center), or
 --   • access is by referral, so "open" would be meaningless to a
 --     family who has not been referred yet.
 -- ECHO of Brandon runs Mon-Fri 9-1 AND Tue 5-7 PM; the Tuesday window
 -- stores only 09:00-13:00, under-claiming per the house rule, with the
--- evening session carried in `notes` and `summary`.
+-- evening session carried in `notes` and `summary`. Its posted hours
+-- are its actual client-service hours, which is what earns it windows.
+--
+-- Mattie Williams originally stored its office hours as day windows
+-- with a note saying clothing might not be available during them. That
+-- was the rule above being stated and then broken in the same row:
+-- "Open right now" would have asserted the clothing service was open
+-- on the strength of office hours. Windows removed (Codex review, PR #79).
+--
+-- ── Walk-ins vs appointments ─────────────────────────────────
+-- `walk_ins_accepted` is NOT NULL DEFAULT TRUE, and ResourceCard turns
+-- it into a public "Walk-ins OK" line, so leaving it at the default is
+-- an affirmative claim rather than a silence. The three Clothes To Kids
+-- rows shipped with TRUE while their own descriptions said to book an
+-- appointment — the card contradicted the listing it belonged to. All
+-- three are now FALSE, matching Cornerstone Connections and The Shop,
+-- which are also appointment-based (Codex review, PR #79).
+--
+-- ── Caring for Miami: a base, not a storefront ───────────────
+-- The Mobile Closet travels; 8900 SW 168th St is the ministry base. It
+-- carries access_type = 'phone_intake' rather than 'onsite' so
+-- ResourceSheet suppresses the Directions action and ResourceCard shows
+-- "Call for location". The address still renders for context — only
+-- turn-by-turn routing to a non-storefront is withheld. Same reasoning
+-- as the existing rule against offering directions to call-only
+-- listings (Codex review, PR #79).
 --
 -- ── Geocoding ────────────────────────────────────────────────
 -- All coordinates from the US Census Bureau geocoder (Public_AR_Current
@@ -291,7 +317,7 @@ INSERT INTO resources (
    27.975495, -82.754533, 'street_interpolated', 'onsite', TRUE,
    '(727) 441-5050', 'inspire@clothestokids.org', 'https://clothestokids.org/',
    'unknown',
-   TRUE, TRUE, FALSE, TRUE,
+   FALSE, TRUE, FALSE, TRUE,
    'gender_inclusive', '{"students","families"}',
    FALSE, FALSE, FALSE, FALSE,
    FALSE, FALSE, FALSE,
@@ -309,7 +335,7 @@ INSERT INTO resources (
    27.748747, -82.679261, 'street_interpolated', 'onsite', TRUE,
    '(727) 441-5050', 'inspire@clothestokids.org', 'https://clothestokids.org/',
    'unknown',
-   TRUE, TRUE, FALSE, TRUE,
+   FALSE, TRUE, FALSE, TRUE,
    'gender_inclusive', '{"students","families"}',
    FALSE, FALSE, FALSE, FALSE,
    FALSE, FALSE, FALSE,
@@ -327,7 +353,7 @@ INSERT INTO resources (
    27.996219, -82.527485, 'street_interpolated', 'onsite', TRUE,
    '(813) 616-6430', 'inspire@clothestokids.org', 'https://clothestokids.org/',
    'unknown',
-   TRUE, TRUE, FALSE, TRUE,
+   FALSE, TRUE, FALSE, TRUE,
    'gender_inclusive', '{"students","families"}',
    FALSE, FALSE, FALSE, FALSE,
    FALSE, FALSE, FALSE,
@@ -367,7 +393,7 @@ INSERT INTO resources (
    'gender_inclusive', '{"students","families"}',
    FALSE, FALSE, FALSE, FALSE,
    FALSE, FALSE, FALSE,
-   '{"monday": {"open": "08:30", "close": "17:00", "closed": false}, "tuesday": {"open": "08:30", "close": "17:00", "closed": false}, "wednesday": {"open": "08:30", "close": "17:00", "closed": false}, "thursday": {"open": "08:30", "close": "18:00", "closed": false}, "friday": {"open": "08:30", "close": "12:00", "closed": false}, "saturday": {"closed": true}, "sunday": {"closed": true}, "summary": "Mon-Wed 8:30 AM-5 PM, Thu 8:30 AM-6 PM, Fri 8:30 AM-12 PM — call to confirm clothing days", "notes": "Hours shown are the family centre office. Clothing is not necessarily distributed during every open hour — call first.", "source_url": "https://mattiecenter.org/", "basis": "org_website"}'::jsonb,
+   '{"summary": "Family centre office Mon-Wed 8:30 AM-5 PM, Thu to 6 PM, Fri to 12 PM; clothing distribution days differ — call first", "notes": "The published schedule is the family centre OFFICE, not the clothing room. No per-day windows are stored, so this listing never satisfies \"Open right now\" — asserting the clothing service is open on office hours would be a claim we cannot support. Add real distribution hours once confirmed by phone.", "source_url": "https://mattiecenter.org/", "basis": "org_website"}'::jsonb,
    '{"English","Spanish"}',
    '{"clothing","family support","students","north pinellas"}',
    'MATTIE-001-clothing-assistance', 'student_clothing_batch_1', 'migration_036', NOW(),
@@ -630,7 +656,7 @@ INSERT INTO resources (
    'A mobile clothing program that brings clothing — including khaki uniform bottoms and plain uniform polos — out to south Miami-Dade neighbourhoods and school communities. Because it travels, the address below is the ministry base rather than a storefront: call or check the website for the current Mobile Closet schedule before setting out. Listing built from public information — call to confirm hours, eligibility, and what is in stock before you go.',
    'clothing', 'clothing_closet', 'clothing_closet',
    '{"street": "8900 SW 168th St", "city": "Miami", "state": "FL", "zip": "33157"}'::jsonb,
-   25.614206, -80.336871, 'street_block', 'onsite', TRUE,
+   25.614206, -80.336871, 'street_block', 'phone_intake', TRUE,
    '(786) 430-1051', NULL, 'https://caringformiami.org/closet/',
    'unknown',
    FALSE, FALSE, FALSE, TRUE,
