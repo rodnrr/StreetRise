@@ -119,6 +119,7 @@ export const POPULATION_FOCUS_LABEL: Record<string, string> = {
   lgbtq:             'LGBTQ+',
   domestic_violence: 'Domestic Violence',
   families:          'Families',
+  students:          'Students',
   seniors:           'Seniors',
   young_adults:      'Young Adults',
   pregnant_women:    'Pregnant Women',
@@ -290,6 +291,17 @@ export const NEED_DEFS: Record<NeedKey, NeedDef> = {
     hint: 'Serves families with children',
     match: (r) => hasPopulation(r, 'families') || r.gender_policy === 'family_only',
   },
+  students: {
+    label: 'Students',
+    icon: '🎒',
+    hint: 'School clothing, uniforms and student support',
+    // Tag-driven only, exactly like `veterans`. A clothing closet that serves
+    // adults on the street is not a student resource, so this deliberately does
+    // NOT widen to `category === 'clothing'`. As student-facing resources land
+    // in other categories — a school-based pantry, a homeless-liaison program —
+    // they join this chip by carrying the tag, with no change here.
+    match: (r) => hasPopulation(r, 'students'),
+  },
   veterans: {
     label: 'Veterans',
     icon: '🎖️',
@@ -321,7 +333,7 @@ export const NEED_ORDER: NeedKey[] = [
   'shelter', 'food', 'hygiene', 'daytime',
   'medical', 'mental_health', 'recovery', 'legal', 'work',
   'clothing', 'transportation', 'childcare', 'outreach',
-  'families', 'veterans', 'youth', 'dv', 'lgbtq',
+  'families', 'students', 'veterans', 'youth', 'dv', 'lgbtq',
 ]
 
 /** Deep-link translation: a marketing category slug → the equivalent need chip. */
@@ -358,8 +370,36 @@ const NEED_BY_QUICK_FILTER: Partial<Record<QuickFilterKey, NeedKey>> = {
   dv_support: 'dv',
 }
 
+/**
+ * Deep-link translation: a population_focus tag → the equivalent need chip.
+ *
+ * A `?populationFocus=` link that names one tag is better expressed as the
+ * active need chip than as a refinement — the chip is what the visitor can see
+ * and switch away from. But that swap is only honest when the need's predicate
+ * is *exactly* the tag test, because the URL is a contract about which set
+ * comes back.
+ *
+ * Only these four qualify. `families` and `youth` are deliberately absent:
+ * their predicates widen past the tag to `gender_policy === 'family_only'` and
+ * `'youth_only'` respectively, so translating them would return listings that
+ * do not carry the requested tag at all. There is already one live row that is
+ * `youth_only` without `young_adults`. Those tags fall through and stay
+ * `populationFocus` refinements, which match the link exactly — as do tags with
+ * no chip at all (seniors, reentry, …).
+ */
+const NEED_BY_POPULATION_FOCUS: Partial<Record<string, NeedKey>> = {
+  students: 'students',
+  veterans: 'veterans',
+  domestic_violence: 'dv',
+  lgbtq: 'lgbtq',
+}
+
 export function needForCategory(category: string): NeedKey | undefined {
   return NEED_BY_CATEGORY[category]
+}
+
+export function needForPopulationFocus(tags: string[]): NeedKey | undefined {
+  return tags.length === 1 ? NEED_BY_POPULATION_FOCUS[tags[0]] : undefined
 }
 
 export function needForQuickFilter(key: QuickFilterKey): NeedKey | undefined {

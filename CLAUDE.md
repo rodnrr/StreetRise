@@ -14,13 +14,16 @@ The pre-debut launch review described in earlier versions of this file is **done
 - `BRANCH_FRESHNESS_AUDIT.md` — runbook for cleaning up stale AI session branches
 - `LAUNCH_REVIEW.md` — the completed launch assessment, kept for reference
 
-Known open items (verified 2026-07-31):
+Known open items (verified 2026-07-31; migration 036 added 2026-08-18):
 
+- **Migration 036 (student clothing seed) APPLIED to live 2026-08-18.** Runbook + verification: `docs/apply-migration-036.md`. Added the platform's first `clothing` listings (20 resources, 15 providers) and the `students` population-focus tag; public map total 146 → 166. Partnership leads deliberately kept off the public map are in `docs/student-resources-outreach.md`.
+- **Migration 037 (confidence trigger parity) is NOT applied, and needs a decision.** Its DDL is a no-op on live — live already has both triggers; the repo did not, so a rebuilt database scored `pending` rows ~80 instead of 35. But its **backfill is a real production data change**: it re-scores 66 stale `verified` rows to 20 (measured 2026-08-18). Nothing leaves the map (`MIN_CONFIDENCE_SCORE` is 20, tested `>=`) and `updated_at` is untouched, so no listing gains false freshness. Unhurried — the parity gap only bites a rebuilt database. Read `docs/apply-migration-037.md` before running it.
 - **Migration 030 was not yet applied to live** as of 2026-07-29 (`docs/apply-migration-030.md`). Until it is, chat unread indicators can never clear — `markConversationRead()` writes to columns that don't exist and silently no-ops.
 - **`npm run lint`, `npm run typecheck`, and `npm run build` are all clean** (re-verified 2026-08-06). The previously documented lint error on `supabase.from('bookings') as any` is gone — `src/lib/supabase.ts` now carries an `eslint-disable-next-line` for it, so the cast itself is still lint debt to unwind when `database.types.ts` is regenerated.
 - **`BlogPostPage` does not render markdown** — `body_markdown` is shown in a `whitespace-pre-wrap` div. `cover_image_url` now renders (hero on `BlogPostPage`, thumbnail on `BlogIndexPage`, og:image) when set; images are hosted in the R2 bucket `assets-streetrise` — upload + DB-update runbook in `docs/r2-blog-images.md`.
 - **Internal tags leak on `ResourceDetailPage`** — tags with `subcategory:`, `service_area:`, `import:`, `access_src:` prefixes render as public badges. Recommended fix (a `publicTags()` filter) is written up in `docs/OPEN_ITEMS.md`.
 - **Provider signup depends on two column defaults.** `providers_insert_self` (tightened by migration 023) requires `claim_status='claimed'` and `source_type='self_registered'`, but `ProviderOnboarding.tsx` sets neither — the column defaults supply both before `WITH CHECK` runs. Drop or change those defaults and provider signup starts failing RLS.
+- **Therefore: a seed migration MUST set `claim_status='unclaimed'` and `source_type='seeded'` explicitly.** Those column defaults exist for the signup path above, so an INSERT that omits them marks a seeded org as though a person had registered and claimed it — false provenance, and a dead end, because a `claimed` org can never be claimed at `/claim`. Migration 027 exists because this went wrong once; it happened again while applying 036 and was caught by diffing live against the migration file. Every seeded provider on live should be `unclaimed`/`seeded` with `user_id IS NULL`.
 - ~~Claiming an org hides it from `/work`~~ — **fixed by migration 033**, which adds `providers_pending_claim_read` so a mid-claim org stays publicly visible.
 - ~~Default map center still points at Tampa Bay~~ — **mitigated by the map revamp (2026-08-17)**. `useMapStore` still opens at `{ lat: 28.2, lng: -81.9 }` zoom 9, but `MapPage` now auto-fits the map to the current result set on load and whenever the need chip or search changes, so a Miami visitor who grants nothing still lands on a view containing pins. The stored centre follows the fit, so distances are measured from where the map actually is. Changing the literal default is no longer urgent.
 
@@ -161,6 +164,10 @@ docs/
   apply-migration-029.md    # Hand-apply runbook (029 = blog_posts)
   apply-migration-030.md    # Hand-apply runbook (030 = conversation read tracking)
   apply-migration-035.md    # Hand-apply runbook (035 = work exchange agent)
+  apply-migration-036.md    # Hand-apply runbook (036 = student clothing seed)
+  apply-migration-037.md    # Hand-apply runbook (037 = confidence trigger parity; DDL is a
+                            # no-op on live, but its backfill re-scores 66 rows — read first)
+  student-resources-outreach.md  # Partnership leads deliberately NOT on the public map
   work-exchange-agent.md    # What the agent does, how to run it, review workflow
   data-dictionary.md
   import-seed-candidates.md
@@ -171,7 +178,7 @@ scripts/
   work-exchange-agent.ts    # Re-verifies /work listings + drafts new ones into a review queue.
                             # Needs SUPABASE_SERVICE_ROLE_KEY + ANTHROPIC_API_KEY. Never publishes.
 
-supabase/migrations/        # 001–035 with gaps: NO 012, 013, or 021 exist.
+supabase/migrations/        # 001–037 with gaps: NO 012, 013, or 021 exist.
                             # See Migrations section — applied to live BY HAND.
 
 public/
@@ -204,12 +211,12 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/claim/:id` | `ClaimDetailPage` | Lazy; claim submission (auth required to submit) |
 | `/about`, `/contact`, `/partner-with-us`, `/privacy`, `/terms`, `/accessibility` | marketing pages | Lazy |
 | `/blog`, `/blog/:slug` | blog pages | Lazy; backed by `blog_posts` |
-| `/food-pantries`, `/shelters`, `/medical`, `/employment`, `/hygiene`, `/showers`, `/legal`, `/veterans`, `/youth`, `/families` | `CategoryPage` | Presentation-only aliases over existing `/map` filters via `lib/categories.ts` — never introduce new category values here |
+| `/food-pantries`, `/shelters`, `/medical`, `/employment`, `/hygiene`, `/showers`, `/legal`, `/veterans`, `/youth`, `/families`, `/students` | `CategoryPage` | Presentation-only aliases over existing `/map` filters via `lib/categories.ts` — never introduce new category values here |
 | `/404` | `NotFoundPage` | Wildcard `*` redirects here |
 | `/portal/*` | Provider portal | Auth-gated; dashboard, onboarding, listings, bookings, messages, work |
 | `/admin/*` | Admin portal | Auth-gated; dashboard, providers, resources (+new), bookings, work-exchange, messages, faq, blog |
 
-**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/claim`, `/work`, `/donate`, `/faq`, the 10 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, `/portal/*`, `/admin/*`, or individual `/claim/:id` pages.
+**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/claim`, `/work`, `/donate`, `/faq`, the 11 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, `/portal/*`, `/admin/*`, or individual `/claim/:id` pages.
 **robots.txt disallows:** `/portal/`, `/admin/`
 
 ---
@@ -240,7 +247,7 @@ Individual service listings owned by a provider.
 - `category`: `shelter | food | work_exchange | mental_health | medical | legal | hygiene | clothing | childcare | transportation | outdoor_space | day_space | substance_recovery | legal_aid | employment | outreach | hotline | healthcare | other`
 - `resource_type` — **live differs from migration 011.** The live `resources_resource_type_check` constraint (verified 2026-08-06) accepts: `emergency_shelter | transitional_housing | food_pantry | hot_meal | shower_facility | restroom_access | day_use_park | warming_cooling_center | domestic_violence_shelter | veteran_housing | youth_shelter | work_exchange | crisis_hotline | job_training | legal_services | medical_clinic | mental_health_clinic | substance_recovery_program | clothing_closet | hygiene_supplies | laundry_facility | childcare_services | transportation_assistance | outreach_program | other`. Write against this list, not 011's — values like `primary_care`, `free_clinic`, `soup_kitchen`, and `legal_aid` will fail the check on live.
 - `gender_policy`: `gender_inclusive | men_only | women_only | family_only | couples_only | youth_only | unknown`
-- `population_focus`: text array (veterans, lgbtq, domestic_violence, families, seniors, young_adults, pregnant_women, substance_recovery, mental_health, reentry, hiv_aids)
+- `population_focus`: text array (veterans, lgbtq, domestic_violence, families, **students**, seniors, young_adults, pregnant_women, substance_recovery, mental_health, reentry, hiv_aids). Unconstrained `TEXT[]` on live — adding a tag needs no DDL. **`students` (migration 036) is the axis for school-age support**: `category` says what a service *is*, `population_focus` says who it *serves*, so a school clothing closet is `clothing` + `{students}` and a school-based pantry would be `food` + `{students}`. Never add a `students`/`education` category value — it would force an either/or with the real category.
 - `access_type`: `onsite | phone_intake | web_intake | confidential_address | not_map_ready`
 - `is_map_ready`: `false` when lat/lng are null or address is incomplete
 - `availability_status`: `available | limited | full | unknown | closed`
@@ -390,7 +397,7 @@ Font: Inter (via `@fontsource/inter`). Dark-mode variants exist on most componen
 - **Path alias**: `@/` resolves to `src/`. Always use `@/` for internal imports.
 - **No test suite** — verify via `npm run typecheck` and `npm run lint`.
 - **Lazy loading**: All pages except `HomePage` are `React.lazy()` split by route.
-- **Category pages are presentation-only**: `lib/categories.ts` maps public slugs to existing map filters. Never introduce a new category value or alter `/map` filtering from there.
+- **Category pages are presentation-only**: `lib/categories.ts` maps public slugs to existing map filters. Never introduce a new category value or alter `/map` filtering from there. `fetchCategoryResources()` applies the **same public visibility predicate as the map** (`verification_status IN ('verified','pending')`) — if a category page ever shows a smaller set than the map it links into, that is a bug. `CategoryPage` cards carry the Staff Verified / Community Listed badge so pending rows stay honest.
 - **The map fetches once and filters in the browser.** `fetchMapResources()` applies only the public visibility predicate; every facet is a predicate in `mapFilters.ts`. This is what lets each option show the number of results it would return. Adding a filter means adding a `NEED_DEFS` entry or a `TOGGLE_DEFS` row — not a new Supabase query.
 - **Filter options prune themselves.** `isUsefulOption(count, base)` hides any option matching nothing or matching everything, so filters the data can't support (nothing is tagged pet-friendly; every row says no call is needed) disappear until providers fill the field in. Never hard-code a filter's visibility.
 - **Unknown means "maybe", not "no".** `overnight_allowed` is null on most rows and `gender_policy` is often `unknown`; these fail *open* so a real bed is never hidden from someone who needs it. Only an explicit `false`/mismatch excludes a listing.
@@ -408,13 +415,15 @@ Font: Inter (via `@fontsource/inter`). Dark-mode variants exist on most componen
 
 ## Database Migrations — READ THIS BEFORE TOUCHING THE SCHEMA
 
-Migrations live in `supabase/migrations/`, numbered 001–035 **with gaps: 012, 013, and 021 do not exist** (023 and 027 were renumbered from 010/021 to resolve collisions — see their headers).
+Migrations live in `supabase/migrations/`, numbered 001–037 **with gaps: 012, 013, and 021 do not exist** (023 and 027 were renumbered from 010/021 to resolve collisions — see their headers).
 
 **How they are actually applied:** by hand, in the Supabase SQL editor, against live project `mldatfcwnmvrmxumzxyb`. NOT by the deploy pipeline and not reliably by `supabase db push` — filenames have no timestamp prefixes, so repo and live migration history **drift**. Treat live as a separate source of truth; verify actual live state with read-only SQL before assuming a migration's effect exists. Runbooks for the most recent applies are in `docs/apply-migration-032.md`, `docs/apply-migrations-023-027.md`, and `docs/claim-flow.md` (033/034).
 
 **Do not regenerate `src/lib/database.types.ts` from the CLI** unless you have confirmed live has every migration the code depends on — the `blog_posts` block and the two conversation read columns were hand-written to match intended state, and a regen against a lagging DB would delete them.
 
-Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage, 032 South Florida seed, 033/034 claim submissions + notification fields, 035 work exchange provenance + agent review queue.
+Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage, 032 South Florida seed, 033/034 claim submissions + notification fields, 035 work exchange provenance + agent review queue, 036 student clothing seed + `students` population tag, 037 confidence-trigger parity.
+
+**Live carries schema objects that no migration creates.** Two were found on PR #79: the `trg_resource_confidence` trigger + `fn_update_resource_confidence()` function (captured by migration 037) and the Christian Service Center provider row created by the OB3 import script (captured by 036 section 1b). Verifying a change against live cannot detect this class by construction — live is the environment that hides it. Before writing a migration that depends on a trigger, function, policy or row, confirm a migration actually creates it.
 
 ---
 

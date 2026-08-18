@@ -66,6 +66,12 @@ export type PopulationFocus =
   | 'lgbtq'
   | 'domestic_violence'
   | 'families'
+  // Students in PreK-12 and their families. This is a population tag rather
+  // than a category because what a school clothing closet *is* is a clothing
+  // resource — serving students is who it is for. Keeping the two axes apart
+  // is what lets a school-based food pantry or a homeless-liaison program
+  // carry the tag without fighting its own category (migration 036).
+  | 'students'
   | 'seniors'
   | 'young_adults'
   | 'pregnant_women'
@@ -483,7 +489,7 @@ export interface FaqItem {
 export type NeedKey =
   | 'shelter' | 'food' | 'hygiene' | 'daytime' | 'medical' | 'mental_health'
   | 'recovery' | 'legal' | 'work' | 'clothing' | 'transportation' | 'childcare'
-  | 'outreach' | 'families' | 'veterans' | 'dv' | 'youth' | 'lgbtq'
+  | 'outreach' | 'families' | 'students' | 'veterans' | 'dv' | 'youth' | 'lgbtq'
 
 export interface MapFilters {
   // Active need chip

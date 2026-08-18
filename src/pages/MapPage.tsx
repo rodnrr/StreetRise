@@ -19,6 +19,7 @@ import {
   isUsefulOption,
   hasKnownHours,
   needForCategory,
+  needForPopulationFocus,
   quickFilterToFilters,
   filterSignature,
   NEED_DEFS,
@@ -149,6 +150,7 @@ export default function MapPage() {
     const category = searchParams.get('category')
     const quick = searchParams.get('quickFilter') as QuickFilterKey | null
     const subcategory = searchParams.get('subcategory')
+    const populationFocus = searchParams.get('populationFocus')
 
     if (category) {
       const resolved = CATEGORY_SLUG_MAP[category]
@@ -168,6 +170,17 @@ export default function MapPage() {
     if (subcategory) {
       clearFilters()
       setFilters({ subcategory: subcategory.split(',') })
+      return
+    }
+    if (populationFocus) {
+      const tags = populationFocus.split(',').filter(Boolean)
+      clearFilters()
+      // Several needs *are* a population tag (Students, Veterans, Families…).
+      // When the link names exactly one of them, set the need chip instead of
+      // the refinement: same predicate, but the visitor can see what is active
+      // and switch away from it.
+      const need = needForPopulationFocus(tags)
+      setFilters(need ? { need } : { populationFocus: tags })
       return
     }
     if (searchParams.get('hasShowers') === 'true') {

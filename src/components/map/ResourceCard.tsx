@@ -78,13 +78,34 @@ export default function ResourceCard({ resource: r, distanceKm, isSelected, onCl
           {r.walk_ins_accepted && (
             <span className="text-xs text-gray-500">Walk-ins OK</span>
           )}
+          {/* The row already promised "Walk-ins OK" but said nothing about the
+              opposite case, so a referral-only listing — a school clothing
+              closet reached through a counsellor, a shelter entered through a
+              coordinated-entry line — read as somewhere you could just turn up
+              to. This is the list's counterpart to the sheet's badge. */}
+          {r.requires_referral && (
+            <span className="text-xs font-medium text-amber-700">Referral needed</span>
+          )}
+          {/* Same reasoning, second condition: "Walk-ins OK" and "you must ring
+              ahead" are both true of plenty of listings, and showing only the
+              first reads as an invitation to just turn up. This was previously
+              invisible on the card — the "Call first" below is gated on
+              staleness, a different claim entirely, so a fresh listing that
+              requires a call showed nothing at all. */}
+          {r.phone_required_before_arrival && (
+            <span className="text-xs font-medium text-amber-700">Call first</span>
+          )}
           {r.phone && (
             <span className="text-xs text-gray-400 inline-flex items-center gap-0.5">
               <Phone size={10} /> Phone
             </span>
           )}
+          {/* Staleness, not a requirement — worded to match getTrustInfo's own
+              "May be outdated" label. It used to say "Call first" too, which
+              collided with the real requirement above and made one string mean
+              two different things. */}
           {trust.level === 'stale' && (
-            <span className="text-xs text-red-600">Call first</span>
+            <span className="text-xs text-red-600">May be outdated</span>
           )}
           {(r.access_type === 'confidential_address' || r.access_type === 'phone_intake') && (
             <span className="text-xs text-gray-400 inline-flex items-center gap-0.5">
