@@ -1,11 +1,16 @@
 # Applying Migration 036 — Student Clothing & School-Support Seed
 
-**Status: NOT YET APPLIED to live (`mldatfcwnmvrmxumzxyb`).**
+**Status: APPLIED to live 2026-08-18 (`mldatfcwnmvrmxumzxyb`).**
 
-Migration 036 is the platform's first `clothing` data. Until it is applied, the
-new **Students** need chip and the `/students` page have nothing to show — the
-chip hides itself (`isUsefulOption`) and `/students` renders its empty state.
-The code ships safely without it; it just does nothing.
+Every verification query below was run after the apply and returned its
+expected value. The public map total went 146 → 166. This document is kept as
+the record of what was applied, and as the procedure if the project is ever
+rebuilt from migrations.
+
+Migration 036 is the platform's first `clothing` data. The **Students** need
+chip and the `/students` page have nothing to show without it — the chip hides
+itself (`isUsefulOption`) and `/students` renders its empty state — so the app
+code is safe to deploy independently in either order.
 
 Everything here is data-only: **no DDL, no schema change, no RLS change.**
 `population_focus` is an unconstrained `TEXT[]`, so the new `students` tag needs
@@ -34,6 +39,28 @@ Nothing here was confirmed by phone. Flip a row to `verified` in
 `/admin/resources` only after an actual phone check.
 
 ---
+
+## Two things that went wrong on the first apply
+
+Both are fixed in the migration file, so a clean re-run does the right thing.
+They are recorded because either could recur in the next seed batch.
+
+**`claim_status` / `source_type` defaults are the wrong ones for seeding.**
+The live defaults are `claimed` / `self_registered`, chosen so the provider
+*signup* path satisfies the `providers_insert_self` WITH CHECK (see CLAUDE.md).
+An INSERT that omits them marks a seeded org as though a real person had
+registered and claimed it — false provenance, and a dead end, because a
+`claimed` org can never be claimed at `/claim`, so the actual organisation
+could never take ownership of its listing. All 122 pre-existing seeded
+providers are `unclaimed` / `seeded`; migration 027 exists because this went
+wrong once before. **Always set both columns explicitly when seeding.**
+
+**Coordinates and UUIDs must be copied, never retyped.** One provider UUID was
+reproduced from memory rather than from the file and landed wrong. It was
+caught by diffing every stored field back against the migration file after the
+apply, and corrected before anything referenced it. Do that diff every time —
+a wrong digit in a description is cosmetic, a wrong digit in a `lat` puts a
+family's clothing closet in the wrong neighbourhood.
 
 ## How to apply
 

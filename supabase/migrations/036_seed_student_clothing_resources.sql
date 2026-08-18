@@ -1,7 +1,14 @@
 -- ================================================================
 -- StreetRise — Migration 036: Student Clothing & School-Support Seed
 --
--- NOT YET APPLIED TO LIVE. Runbook: docs/apply-migration-036.md
+-- APPLIED TO LIVE 2026-08-18 (project mldatfcwnmvrmxumzxyb).
+-- Runbook + verification queries: docs/apply-migration-036.md
+--
+-- Verified after apply: 15 providers, 20 resources, all 20 publicly
+-- visible, all 20 tagged population_focus ∋ 'students', 19 clothing +
+-- 1 outreach, 4 requires_referral, 2 carrying per-day hours, and all 20
+-- readable by the anon role through RLS. Public map total 146 → 166.
+-- Every stored field was diffed back against this file after the apply.
 --
 -- Re-running is safe. Every INSERT is ON CONFLICT (id) DO NOTHING and
 -- the IDs are stable uuid5 values, so a second run is a no-op.
@@ -120,9 +127,17 @@
 -- ════════════════════════════════════════════════════════════════
 -- Seeded 'verified' because public RLS only exposes verified providers and
 -- the resource detail page joins the provider to render the org name. This
--- mirrors migrations 008 / 020 / 032. `claim_status` and `source_type` are
--- left to their column defaults ('unclaimed' / 'seeded'), which is what makes
--- these orgs claimable at /claim.
+-- mirrors migrations 008 / 020 / 032.
+--
+-- `claim_status` and `source_type` are set EXPLICITLY, and must stay that way.
+-- Their live column defaults are 'claimed' / 'self_registered' — chosen to
+-- satisfy the `providers_insert_self` WITH CHECK on the provider *signup*
+-- path (see CLAUDE.md), not for seeding. Relying on the defaults here marks
+-- a seeded org as though a real person had registered and claimed it, which
+-- is both false provenance and a dead end: a `claimed` org can never be
+-- claimed at /claim, so the actual organisation could never take ownership
+-- of its own listing. Migration 027 exists because this went wrong once
+-- before. All 122 pre-existing seeded providers are 'unclaimed' / 'seeded'.
 --
 -- `contact_email` is NOT NULL. Where the org publishes no general inbox we use
 -- the `*.placeholder` convention migration 020 established rather than
@@ -133,68 +148,69 @@
 
 INSERT INTO providers (
   id, user_id, organization_name, contact_name, contact_email,
-  contact_phone, website, external_id, verification_status, role
+  contact_phone, website, external_id, verification_status, role,
+  claim_status, source_type
 ) VALUES
 
   ('db59428d-d65d-5cf0-80c6-9ba17ad5133c', NULL, 'Clothes To Kids', 'Client Services',
    'inspire@clothestokids.org', '(727) 441-5050',
-   'https://clothestokids.org/', 'CTK-001', 'verified', 'provider'),
+   'https://clothestokids.org/', 'CTK-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('bdff8458-a8e7-58cc-a92f-0baa74dcb913', NULL, 'OASIS Opportunities', 'School Partnerships',
    'info@oasisopportunities.org', '(813) 699-9131',
-   'https://www.oasisopportunities.org/our-programs', 'OASISOPP-001', 'verified', 'provider'),
+   'https://www.oasisopportunities.org/our-programs', 'OASISOPP-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('10bba6eb-2dff-50fd-a7eb-528de1f3f02a', NULL, 'Hands Across the Bay', 'Client Services',
    'contact@hands_across_the_bay.placeholder', '(727) 573-7720',
-   'https://handsacrossthebay.org/', 'HATB-001', 'verified', 'provider'),
+   'https://handsacrossthebay.org/', 'HATB-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('2e5eaa04-5320-5408-a28d-398c750c42bc', NULL, 'Mercy Keepers', 'Clothing Bank',
    'contact@mercy_keepers.placeholder', '(727) 823-8795',
-   'https://mercykeepers.org/', 'MERCYK-001', 'verified', 'provider'),
+   'https://mercykeepers.org/', 'MERCYK-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('0fcc2bb3-4ce1-5d95-99ba-c3bb8ff98b22', NULL, 'ECHO of Brandon', 'Client Services',
    'contact@echo_of_brandon.placeholder', '(813) 685-0935',
-   'https://echofl.org/', 'ECHOBR-001', 'verified', 'provider'),
+   'https://echofl.org/', 'ECHOBR-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('fe82820f-6e0e-5e14-9aff-a43d2a9cddac', NULL, 'First Baptist Church of Progress Village', 'Clothes & More Ministry',
    'church@fbcopv.org', '(813) 677-1948',
-   'https://www.fbcopv.org/clothes-more-ministry', 'FBCPV-001', 'verified', 'provider'),
+   'https://www.fbcopv.org/clothes-more-ministry', 'FBCPV-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('660d2bab-b169-5b60-8a51-d3dfc752ff1f', NULL, 'Orange County Public Schools — Student Services', 'Homeless Education Services',
    'helphomeless@ocps.net', '(407) 317-3394',
-   'https://www.ocps.net/89175_3', 'OCPS-001', 'verified', 'provider'),
+   'https://www.ocps.net/89175_3', 'OCPS-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('d02cad5f-8602-5ec9-ad6b-4aa7f70816ef', NULL, 'The Bridges of Light Foundation', 'Closet of Care',
    'contact@bridges_of_light.placeholder', '(407) 490-3290',
-   'https://www.thebridgesoflightfoundation.org/', 'BOLF-001', 'verified', 'provider'),
+   'https://www.thebridgesoflightfoundation.org/', 'BOLF-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('fd21257c-d789-5b43-ab27-a24c4fd8ebd5', NULL, 'Cornerstone Connections', 'Clothing Closet',
    'contact@cornerstone_connections.placeholder', '(888) 306-4477',
-   'https://cornerstoneconnections.org/', 'CORNSTN-001', 'verified', 'provider'),
+   'https://cornerstoneconnections.org/', 'CORNSTN-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('67ebb992-0961-5901-85a7-9118d156cb55', NULL, 'One Heart for Women & Children', 'Family Services',
    'contact@one_heart_orlando.placeholder', '(407) 233-4718',
-   'https://oneheartforwomen.org/', 'ONEHEART-001', 'verified', 'provider'),
+   'https://oneheartforwomen.org/', 'ONEHEART-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('18f0b84c-54bd-59fe-8412-447a2e9400a4', NULL, 'Samaritan Resource Center', 'Client Services',
    'contact@samaritan_resource.placeholder', '(407) 482-0600',
-   'https://www.samaritanresourcecenter.org/', 'SAMARES-001', 'verified', 'provider'),
+   'https://www.samaritanresourcecenter.org/', 'SAMARES-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('9cc50ff8-f618-5a6a-bdd4-f428431a4bed', NULL, 'Lighthouse Resource Center', 'Threads of Light',
    'contact@lighthouse_resource_center.placeholder', '(321) 804-4352',
-   'https://lighthouseresourcecenter.org/', 'LRCORL-001', 'verified', 'provider'),
+   'https://lighthouseresourcecenter.org/', 'LRCORL-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('d9b411a8-4ee4-51f9-9af7-8a171548251b', NULL, 'Overtown Youth Center', 'Family Services',
    'info@oycmiami.org', '(305) 349-1204',
-   'https://oycmiami.org/programs/family-services/neat-stuff/', 'OYCMIA-001', 'verified', 'provider'),
+   'https://oycmiami.org/programs/family-services/neat-stuff/', 'OYCMIA-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('97a6e84f-5781-52c6-a21d-d722d91f37ab', NULL, 'The Foundation for New Education Initiatives (M-DCPS Foundation)', 'Student & Family Services',
    'info@mdcpsfoundation.org', '(305) 995-7312',
-   'https://mdcpsfoundation.org/', 'MDCPSF-001', 'verified', 'provider'),
+   'https://mdcpsfoundation.org/', 'MDCPSF-001', 'verified', 'provider', 'unclaimed', 'seeded'),
 
   ('39f3d646-b6db-579c-a645-69f0361be891', NULL, 'Caring for Miami', 'Mobile Closet',
    'contact@caring_for_miami.placeholder', '(786) 430-1051',
-   'https://caringformiami.org/closet/', 'CFMIA-001', 'verified', 'provider')
+   'https://caringformiami.org/closet/', 'CFMIA-001', 'verified', 'provider', 'unclaimed', 'seeded')
 ON CONFLICT (id) DO NOTHING;
 
 
