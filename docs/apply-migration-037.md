@@ -1,7 +1,13 @@
 # Applying Migration 037 — Confidence Trigger Parity
 
-**Status: NOT APPLIED. It is a no-op on live**, which already has both objects.
-That is the point: live has them, the repository did not.
+**Status: NOT APPLIED.** Live already has both objects — that is the point: live
+has them, the repository did not. The DDL is a no-op there.
+
+⚠️ **The backfill is not a no-op on live.** It re-scores **66 stale verified
+rows to 20**. Read [What applying it does to live](#what-applying-it-does-to-live)
+before running this against production. Nothing disappears from the map and no
+listing gains false freshness, but it is a real data change and deserves a
+deliberate decision.
 
 ## Why it exists
 
@@ -30,6 +36,37 @@ Found by Codex review on PR #79. It is the **second** finding of that exact
 shape on that PR: live carrying state no migration reproduces, which verifying
 against live cannot detect by construction. The first was an imported provider
 row (migration 036 section 1b).
+
+## What applying it does to live
+
+The DDL changes nothing. The backfill does, because a trigger only fires on
+writes — every row written before this migration still holds a score from the
+old rule, so the migration recomputes them. Measured on live 2026-08-18:
+
+| rows | now | after | why |
+|---|---|---|---|
+| pending (all) | 35 | 35 | unchanged |
+| verified | 70 | **20** | 31 rows, past `stale_after_days` |
+| verified | 50 | **20** | 20 rows, past `stale_after_days` |
+| verified | 90 | **20** | 15 rows, past `stale_after_days` |
+| rejected / suspended | — | — | none exist |
+
+Those 66 are not being damaged. `fn_update_resource_confidence()` scores by
+staleness, and their values were frozen whenever each row was last written —
+long enough ago that `days_since` now exceeds the threshold. 20 is what the rule
+already says they are worth; they had simply never been recomputed.
+
+**Nothing disappears from the map.** `mapFilters.ts` uses
+`MIN_CONFIDENCE_SCORE = 20` with a `>=` test, so exactly 20 still passes.
+
+**No listing gains false freshness.** The recompute is a no-op `UPDATE`, which
+would normally fire `resources_updated_at` and stamp all ~197 listings as
+updated today — and `getTrustInfo()` reads `updated_at` for the "Updated Xd ago"
+and stale warnings. That trigger is disabled for the duration of the backfill
+and restored immediately, inside one transaction.
+
+Because of this, applying 037 to live is **optional and unhurried**. The parity
+problem it fixes only bites a rebuilt database.
 
 ## How to apply
 
