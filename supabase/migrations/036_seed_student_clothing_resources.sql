@@ -6,9 +6,15 @@
 --
 -- Verified after apply: 15 providers, 20 resources, all 20 publicly
 -- visible, all 20 tagged population_focus ∋ 'students', 19 clothing +
--- 1 outreach, 4 requires_referral, 2 carrying per-day hours, and all 20
+-- 1 outreach, 4 requires_referral, 1 carrying per-day hours, and all 20
 -- readable by the anon role through RLS. Public map total 146 → 166.
 -- Every stored field was diffed back against this file after the apply.
+--
+-- Three follow-up corrections landed after the first apply (Codex review,
+-- PR #79) and are reflected throughout: Clothes To Kids is appointment-only
+-- so no longer claims walk-ins, Mattie Williams no longer publishes office
+-- hours as day windows, and Caring for Miami is phone_intake so the map
+-- withholds directions to a base that is not a storefront.
 --
 -- Re-running is safe. Every INSERT is ON CONFLICT (id) DO NOTHING and
 -- the IDs are stable uuid5 values, so a second run is a no-op.
