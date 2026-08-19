@@ -67,6 +67,14 @@ exactly one error — `supabase.from('bookings') as any` at `supabase.ts:29` —
   admin editor labels this honestly. Needs a renderer to be real.
 - **`CLAUDE.md` is stale on `booking_status`.** Live enum also includes
   `needs_info, contacted, no_response, closed` beyond the documented set.
+- **Sending a message marks the thread unread for the sender.** Now that 030 is
+  applied this is visible: `bump_conversation_on_message()` advances
+  `last_message_at`, but neither `AdminChat` nor `ProviderChat` calls
+  `markConversationRead()` on send success, and the mark-read effect is keyed on
+  `selectedConversationId` so it does not re-run while the thread stays open.
+  `isConversationUnread()` therefore flags the sender's own thread. Live example:
+  conversation "Rod af" had `admin_last_read_at` 22:37:30 and the admin's own
+  message at 22:37:41. Fix is to mark read after a successful send on both sides.
 - **`conversations_update` RLS is column-agnostic.** A provider can update any
   column on their own conversation, including `status` and `admin_id`, not just
   their read timestamp. Pre-existing; low severity; worth tightening eventually.
