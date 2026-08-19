@@ -1,0 +1,248 @@
+# Applying Migration 036 — Student Clothing & School-Support Seed
+
+**Status: APPLIED to live 2026-08-18 (`mldatfcwnmvrmxumzxyb`).**
+
+Every verification query below was run after the apply and returned its
+expected value. The public map total went 146 → 166. This document is kept as
+the record of what was applied, and as the procedure if the project is ever
+rebuilt from migrations.
+
+Migration 036 is the platform's first `clothing` data. The **Students** need
+chip and the `/students` page have nothing to show without it — the chip hides
+itself (`isUsefulOption`) and `/students` renders its empty state — so the app
+code is safe to deploy independently in either order.
+
+Everything here is data-only: **no DDL, no schema change, no RLS change.**
+`population_focus` is an unconstrained `TEXT[]`, so the new `students` tag needs
+no migration of its own.
+
+---
+
+## What it adds
+
+| | Count |
+|---|---|
+| Providers | 15 new (`verified`, `user_id` NULL, claimable) |
+| Resources | 20 (19 `clothing` + 1 `outreach`) |
+| Metros | Tampa Bay (9), Orlando (7), Miami-Dade (4) |
+
+Two resources attach to providers that **already exist** rather than being
+duplicated:
+
+- Mattie Williams Neighborhood Family Center — `c41e73f2-…` (`MATTIE-001`).
+  Seeded by migration 008, so any DB rebuilt from migrations has it.
+- Christian Service Center for Central Florida — `28e81d11-…` (`OB3-CSC-001`).
+  **Not created by any migration** — it entered live through
+  `scripts/import-seed-candidates.ts`. Section 1b of the migration upserts it
+  (see below).
+
+All 20 resources are seeded `verification_status = 'pending'` →
+they render the amber **Community Listed** badge, `confidence_score` 35 (the
+same value migration 032 used for its public-source South Florida batch).
+Nothing here was confirmed by phone. Flip a row to `verified` in
+`/admin/resources` only after an actual phone check.
+
+---
+
+## Two things that went wrong on the first apply
+
+Both are fixed in the migration file, so a clean re-run does the right thing.
+They are recorded because either could recur in the next seed batch.
+
+**`claim_status` / `source_type` defaults are the wrong ones for seeding.**
+The live defaults are `claimed` / `self_registered`, chosen so the provider
+*signup* path satisfies the `providers_insert_self` WITH CHECK (see CLAUDE.md).
+An INSERT that omits them marks a seeded org as though a real person had
+registered and claimed it — false provenance, and a dead end, because a
+`claimed` org can never be claimed at `/claim`, so the actual organisation
+could never take ownership of its listing. All 122 pre-existing seeded
+providers are `unclaimed` / `seeded`; migration 027 exists because this went
+wrong once before. **Always set both columns explicitly when seeding.**
+
+**A referenced provider that no migration creates will abort the whole batch
+on a fresh database.** `resources.provider_id` is
+`NOT NULL REFERENCES providers(id)`. Section 2 reuses two existing providers;
+one of them (Christian Service Center, `OB3-CSC-001`) only ever existed on live
+because the OB3 import script created it, and no migration replays that import.
+On live the apply succeeded and hid the problem — but on CI, staging, a review
+app, or a restore-from-migrations, the foreign key would abort section 2 and
+**not one of the 20 rows would land**. Section 1b now inserts that provider
+first, reproducing live's record verbatim; it is a proven no-op on live
+(row digest and provider count both unchanged after running it).
+
+**An imported provider needs both halves of the treatment, not just the
+insert.** The first version of section 1b guarded with `ON CONFLICT (id) DO
+NOTHING` and section 2 pinned live's uuid — which still breaks in the one
+environment that matters most for this class: a database where someone ran
+`scripts/import-seed-candidates.ts` *itself*. The importer resolves providers
+by `external_id` and inserts with no fixed id, so the column default assigns a
+fresh `gen_random_uuid()`. That database holds the provider under a **different
+id but the same `external_id`**, and:
+
+1. an id-only guard admits the INSERT, which migration 009's
+   `idx_providers_external_id` (UNIQUE on `external_id`) then rejects — a
+   conflict clause only handles the one index it infers, so the migration
+   aborts; and
+2. even with that fixed, a pinned `provider_id` literal in section 2 points at
+   a uuid that database has never seen, and the `NOT NULL` FK aborts it anyway.
+
+So section 1b guards on **both keys** (`WHERE NOT EXISTS … id = … OR
+external_id = …`) and section 2 resolves the FK with
+`(SELECT id FROM providers WHERE external_id = 'OB3-CSC-001')`. Both are
+verified no-ops on live, where the two spellings resolve to the same row.
+
+Both findings came from Codex review on PR #79. The rule: **migration-seeded
+ids are safe to pin; import-script ids must be resolved by `external_id` at
+both ends** — the guard and the foreign key.
+
+**Coordinates and UUIDs must be copied, never retyped.** One provider UUID was
+reproduced from memory rather than from the file and landed wrong. It was
+caught by diffing every stored field back against the migration file after the
+apply, and corrected before anything referenced it. Do that diff every time —
+a wrong digit in a description is cosmetic, a wrong digit in a `lat` puts a
+family's clothing closet in the wrong neighbourhood.
+
+## How to apply
+
+1. Open the Supabase dashboard → project `mldatfcwnmvrmxumzxyb` → **SQL Editor**.
+2. Paste the whole of `supabase/migrations/036_seed_student_clothing_resources.sql`.
+3. Run it once.
+
+Re-running is safe. The two bulk `INSERT`s end in `ON CONFLICT (id) DO NOTHING`
+over stable `uuid5` ids; section 1b guards with `WHERE NOT EXISTS` on both its
+id and its `external_id`, since that provider's id is not reproducible. A second
+run is a no-op either way.
+
+---
+
+## Verify after applying
+
+Run these in the SQL editor. The same queries are in the migration's footer.
+
+```sql
+-- 1. Providers landed: expect 15
+SELECT count(*) FROM providers WHERE external_id IN (
+  'CTK-001','OASISOPP-001','HATB-001','MERCYK-001','ECHOBR-001','FBCPV-001',
+  'OCPS-001','BOLF-001','CORNSTN-001','ONEHEART-001','SAMARES-001','LRCORL-001',
+  'OYCMIA-001','MDCPSF-001','CFMIA-001');
+
+-- 2. Resources landed: expect 20
+SELECT count(*) FROM resources WHERE import_batch_id = 'student_clothing_batch_1';
+
+-- 3. All 20 are publicly visible. If this is < 20 the Students chip
+--    and /students will under-report.
+SELECT count(*) FROM resources
+ WHERE import_batch_id = 'student_clothing_batch_1'
+   AND is_active AND verification_status IN ('verified','pending')
+   AND is_map_ready AND lat IS NOT NULL AND lng IS NOT NULL;
+
+-- 4. The tag the whole feature hangs on: expect 20
+SELECT count(*) FROM resources WHERE population_focus @> ARRAY['students'];
+
+-- 5. Category split: expect clothing 19, outreach 1
+SELECT category, count(*) FROM resources
+ WHERE import_batch_id = 'student_clothing_batch_1' GROUP BY 1;
+
+-- 6. Referral-only rows: expect exactly 4
+--    (OASIS Opportunities, OCPS Kids' Closet, M-DCPS "The Shop", Project UP-START)
+SELECT name FROM resources
+ WHERE import_batch_id = 'student_clothing_batch_1' AND requires_referral
+ ORDER BY name;
+
+-- 7. Rows that publish per-day hours: expect exactly 1 (ECHO of Brandon).
+--    It is the only listing in this batch that can ever satisfy
+--    "Open right now" — see the note below.
+SELECT name FROM resources
+ WHERE import_batch_id = 'student_clothing_batch_1'
+   AND hours_of_operation ? 'monday';
+
+-- 8. Rows claiming walk-in access: expect 11, and none of them may be
+--    appointment-based. A row whose description says "book an appointment"
+--    must not also advertise "Walk-ins OK".
+SELECT name FROM resources
+ WHERE import_batch_id = 'student_clothing_batch_1'
+   AND walk_ins_accepted
+   AND (description ILIKE '%appointment%'
+        OR hours_of_operation::text ILIKE '%appointment%');
+--    ^ expect ZERO rows.
+
+-- 9. No referral-only row may still offer Directions to a district office.
+SELECT name FROM resources
+ WHERE import_batch_id = 'student_clothing_batch_1'
+   AND requires_referral AND access_type = 'onsite';
+--    ^ expect ZERO rows.
+
+-- 10. Rows that withhold Directions: expect 5 — the four referral-only
+--     offices plus Caring for Miami's travelling Mobile Closet.
+SELECT name FROM resources
+ WHERE import_batch_id = 'student_clothing_batch_1'
+   AND access_type = 'phone_intake' ORDER BY name;
+```
+
+Then check the app:
+
+- `/map` → the **🎒 Students** chip appears with a count of 20.
+- `/students` → 20 cards, each with a Community Listed badge; four also show
+  "Referral needed".
+- `/map?populationFocus=students` → opens with the Students chip active.
+- `/map` → the **👕 Clothing** chip appears for the first time (19).
+
+---
+
+## Judgement calls worth knowing about
+
+**Only 1 of 20 rows publishes per-day hours.** That is deliberate, not missing
+data. "Open right now" is the one filter that fails *closed* because it makes a
+positive claim, and for these listings we genuinely do not know: the source says
+"verify hours", or the published hours are the org's *office* rather than its
+clothing room (Mattie Williams, Mercy Keepers, Overtown Youth Center), or access
+is by referral so "open" is meaningless to a family who has not been referred
+yet. Adding hours you have not confirmed sends a parent on a wasted trip. If you
+phone an org and confirm real distribution hours, add them in
+`/admin/resources` — the row starts appearing under "Open right now" immediately.
+
+ECHO of Brandon is the exception because its posted Mon–Fri 9–1 **are** its
+client-service hours. It also opens Tue 5–7 PM; the Tuesday window stores only
+`09:00–13:00`, under-claiming per the house rule, with the evening session in
+`summary` and `notes`.
+
+Mattie Williams originally stored its *office* hours as day windows plus a note
+saying clothing might not be available during them — the rule stated and broken
+in the same row. Windows removed; the schedule now lives in `summary` only.
+
+**Appointment-based means `walk_ins_accepted = FALSE`.** The column is
+`NOT NULL DEFAULT TRUE` and `ResourceCard` renders it as a public "Walk-ins OK"
+line, so leaving the default is an affirmative claim, not a silence. The three
+Clothes To Kids rows shipped `TRUE` while their own descriptions said to book an
+appointment — the card contradicted the listing it sat on. Verification query 8
+above exists to stop that recurring.
+
+**Five rows are `phone_intake`, not `onsite`** — the four referral-only rows
+(OASIS, OCPS Kids' Closet, The Shop, Project UP-START) plus Caring for Miami.
+`phone_intake` makes `ResourceSheet` withhold the Directions action and
+`ResourceCard` show "Call for location", while the address still renders for
+context. Do not "fix" any of them to `onsite`: the first four are district or
+program offices where the clothing is not handed out, and the fifth is a
+ministry base for a program that travels.
+
+The test is **not** "does it take walk-ins". Clothes To Kids and Cornerstone
+Connections are also `walk_ins_accepted = FALSE`, but a family genuinely does
+go there once an appointment is booked — so they stay `onsite` and keep their
+Directions link. The question is whether the stored address is where the
+service reaches the public at all.
+
+**Four rows are referral-only** (`requires_referral = TRUE`,
+`walk_ins_accepted = FALSE`). Their addresses are district or program offices,
+not walk-in stores, and each description says so in its first two sentences.
+Do not "clean this up" by flipping them to walk-in — a parent who drives to
+445 W Amelia St expecting a clothing store will be turned away.
+
+---
+
+## Related
+
+- `docs/student-resources-outreach.md` — the four organisations from the source
+  directory that were deliberately **not** seeded as public resources, and the
+  ask for each.
+- `supabase/migrations/036_seed_student_clothing_resources.sql` — the migration,
+  whose header carries the full reasoning.

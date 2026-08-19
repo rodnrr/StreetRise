@@ -166,3 +166,95 @@ This is a product decision, not a bug fix. Two ways to close it:
 They compose — (2) is the honest stopgap while (1) fills in. Neither is
 started. Note that any freshness badge must not read as a guarantee: per
 `CLAUDE.md`, avoid "certified", "guaranteed", or "always up-to-date".
+
+---
+
+## `requires_id` / `requires_referral` cannot express "unknown" (opened 2026-08-18)
+
+Surfaced while seeding migration 036. Both columns are `BOOLEAN NOT NULL
+DEFAULT FALSE`, so "we don't know whether ID is required" and "no ID is
+required" are the same stored value — and `ResourceSheet` turns that value into
+a positive public claim:
+
+```tsx
+{!r.requires_id && <span className="badge …">No ID needed</span>}
+```
+
+Every listing that has never been asked the question therefore advertises
+"No ID needed". Today that is 164 of 197 rows for `requires_id`. It is the
+inverse of the house rule elsewhere: unknown fields fail *open* so a real bed is
+never hidden, but here an unknown field makes an assertion instead of
+withholding one.
+
+Migration 036 works around it row by row — `requires_id = TRUE` where
+documentation is genuinely required (Clothes To Kids needs proof of enrolment;
+the school-referral programs verify enrolment), `FALSE` on ordinary community
+clothing closets where no-ID is the norm. That is a judgement call per row, not
+a fix.
+
+The real fix is to make the tri-state representable, then only claim what is
+known:
+
+1. Add nullable `requires_id_known` / `requires_referral_known` booleans, **or**
+   make the columns themselves nullable (`overnight_allowed` is already
+   `BOOLEAN NULL` and the map handles it correctly — that is the precedent).
+2. Render the badge only on an explicit `false`, exactly as
+   `TOGGLE_DEFS.noCallRequired` already tests `=== false` rather than falsiness.
+3. Backfill: rows from a seed migration that never asked should become NULL,
+   not FALSE. This needs care — it cannot be inferred after the fact for the
+   older batches, so it may have to be scoped to batches whose provenance is
+   known.
+
+Not urgent, but it is a correctness bug in public-facing copy, and it gets
+slightly worse with every seed batch.
+
+## Category pages now match the map's public set (closed 2026-08-18)
+
+`fetchCategoryResources()` filtered `verification_status = 'verified'` while the
+map filtered `IN ('verified','pending')`, so a category page showed a strictly
+smaller world than the map it links into — `/shelters` listed 23 where the map
+had 34 of the same rows, and migration 036's entire (pending) batch would have
+been invisible on `/students` while live on the map. `CLAUDE.md` describes these
+pages as presentation-only aliases over the map's filters, so the divergence was
+a bug. The predicate now matches, and `CategoryPage` cards render the
+Staff Verified / Community Listed badge plus a "Referral needed" chip so the
+distinction stays visible instead of vanishing.
+
+Watch for: the six previously-live category pages now show more listings than
+before (shelters 23→34, food 26→32; medical and employment are unchanged
+because they have no pending rows).
+
+## Two confidence triggers, the second discarding the first (opened 2026-08-18)
+
+`resources.confidence_score` is written by **two** BEFORE INSERT OR UPDATE
+triggers, fired in alphabetical order by trigger name:
+
+1. `resources_confidence_score` → `compute_confidence_score()` (migration 010),
+   an additive formula over is_active, description length, phone, website,
+   hours, verification_status, freshness and map-readiness, capped at 100.
+2. `trg_resource_confidence` → `fn_update_resource_confidence()`, which runs
+   second (`'t' > 'r'`) and **assigns** rather than accumulating, so it
+   overwrites everything step 1 computed.
+
+Step 1 is therefore dead weight on every insert and update of the table, and
+the real scoring rule is step 2's five-branch ladder (0 rejected/suspended,
+35 pending, then 20/50/70/90 by staleness). Nothing is wrong with the stored
+values — but two functions where one is silently discarded is a trap for the
+next person who tunes the additive formula and sees no effect.
+
+Migration 037 captured trigger 2 into the repo (it previously existed only on
+live — see `docs/apply-migration-037.md`), so the repo now at least describes
+what happens. Consolidating the two is the remaining cleanup, and it is a
+product decision rather than a parity fix: dropping trigger 1 changes nothing,
+but folding its signal into trigger 2 would move scores for `verified` and
+stale rows across the whole table, which changes what the map's
+`MIN_CONFIDENCE_SCORE` filter and the trust badges say about existing
+listings.
+
+Also worth noting the deeper lesson, which cost two review findings on PR #79:
+**live carries state that no migration reproduces**, and verifying a change
+against live cannot detect that by construction. Both the missing trigger here
+and the imported Christian Service Center provider row (migration 036 section
+1b) were invisible to post-apply verification for exactly that reason. A
+periodic diff of live's schema objects — triggers, functions, policies,
+constraints — against what the migrations create would surface the rest.
