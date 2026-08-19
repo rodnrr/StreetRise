@@ -133,8 +133,10 @@ appears at `/blog` and `/blog/<slug>`.
 - **Do not regenerate `database.types.ts` until 029 is live.** The `blog_posts`
   block was hand-written to match 029; regenerating against a DB without the
   table would delete it and break `npm run typecheck`.
-- **030 is still unapplied.** The unread indicators shipped in PR #50 read
-  `conversations.admin_last_read_at` / `provider_last_read_at`, which do not
-  exist on live. Needs its own pass.
+- ~~**030 is still unapplied.**~~ **030 was applied out-of-band and verified on
+  live 2026-08-18** — see `docs/apply-migration-030.md`, and do not re-run it.
+  `conversations.admin_last_read_at` / `provider_last_read_at` both exist.
+  (The pre-flight table above is a dated 2026-07-29 snapshot and is left as the
+  historical record.)
 - `body_markdown` is rendered as plain text by `BlogPostPage` — no markdown
   renderer yet.

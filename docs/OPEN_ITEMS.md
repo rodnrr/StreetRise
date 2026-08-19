@@ -33,15 +33,22 @@ exactly one error — `supabase.from('bookings') as any` at `supabase.ts:29` —
 
 ## Must do
 
-1. **Apply 030** — see `docs/apply-migration-030.md`. Until then the unread
-   indicator in admin/provider chat can never clear.
+1. ~~**Apply 030**~~ — **done.** Applied out-of-band; confirmed against live on
+   2026-08-18 that both columns exist with the intended shape, and that
+   `admin_last_read_at` holds values on all five conversations. Nothing
+   recorded identifies what wrote them, so the app path is **not** verified —
+   the authenticated smoke test (Step 4 of `docs/apply-migration-030.md`) is
+   still outstanding. See that runbook for the full post-apply table.
 2. **Commit + push** everything above, including the one-line 029 edit so the
    repo matches what was actually run against live.
 3. **Record applied dates** for 029 and 030 in the runbook tables. Do not edit
-   the migrations' "NOT YET APPLIED" headers.
-4. **Do not regenerate `database.types.ts`** from the CLI until 030 is applied —
-   the `blog_posts` block and the two conversation columns are hand-written to
-   match live. A regen against a lagging DB would delete them.
+   the migrations' "NOT YET APPLIED" headers. (030 recorded 2026-08-18; 029
+   still needs its date.)
+4. **Do not regenerate `database.types.ts`** from the CLI without first
+   confirming live has every migration the code depends on. 030 is now applied,
+   but the `blog_posts` block and the two conversation columns are still
+   hand-written, and live lags the repo elsewhere — a regen against it can
+   still delete things.
 5. **Smoke-test blog end-to-end** (needs an authenticated browser session, which
    could not be tested from here): admin → `/admin/blog` → create draft →
    confirm `/blog` still shows "No posts yet" → publish → confirm it appears at
@@ -51,8 +58,8 @@ exactly one error — `supabase.from('bookings') as any` at `supabase.ts:29` —
 
 - **Messages badge semantics.** It currently counts `status = 'open'`, so it does
   **not** drop when you merely read a thread — only when the thread is closed.
-  Once 030 is applied, `admin_last_read_at` makes a true unread count possible.
-  Pick one: "unresolved threads" (today) or "unread threads" (post-030).
+  Now that 030 is applied, `admin_last_read_at` makes a true unread count
+  possible. Pick one: "unresolved threads" (today) or "unread threads".
   Note the two differ: 5 open conversations, but only 4 have any message.
 
 ## Known gaps, not bugs
@@ -62,6 +69,14 @@ exactly one error — `supabase.from('bookings') as any` at `supabase.ts:29` —
   admin editor labels this honestly. Needs a renderer to be real.
 - **`CLAUDE.md` is stale on `booking_status`.** Live enum also includes
   `needs_info, contacted, no_response, closed` beyond the documented set.
+- **Sending a message marks the thread unread for the sender.** Now that 030 is
+  applied this is visible: `bump_conversation_on_message()` advances
+  `last_message_at`, but neither `AdminChat` nor `ProviderChat` calls
+  `markConversationRead()` on send success, and the mark-read effect is keyed on
+  `selectedConversationId` so it does not re-run while the thread stays open.
+  `isConversationUnread()` therefore flags the sender's own thread. Live example:
+  conversation "Rod af" had `admin_last_read_at` 22:37:30 and the admin's own
+  message at 22:37:41. Fix is to mark read after a successful send on both sides.
 - **`conversations_update` RLS is column-agnostic.** A provider can update any
   column on their own conversation, including `status` and `admin_id`, not just
   their read timestamp. Pre-existing; low severity; worth tightening eventually.
