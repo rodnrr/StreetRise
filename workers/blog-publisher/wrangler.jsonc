@@ -1,0 +1,23 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "streetrise-blog-publisher",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-19",
+
+  "ai": {
+    "binding": "AI"
+  },
+
+  "r2_buckets": [
+    {
+      "binding": "BLOG_ASSETS",
+      "bucket_name": "streetrise-assets"
+    }
+  ],
+
+  "vars": {
+    "ASSET_BASE_URL": "https://assets.streetrise.org",
+    "DEFAULT_AUTHOR_NAME": "StreetRise Team",
+    "ALLOWED_ORIGIN": "https://app.streetrise.org"
+  }
+}
