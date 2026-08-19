@@ -141,7 +141,7 @@ Shipped and live:
 
 Tracked in detail in `docs/OPEN_ITEMS.md`; the short list:
 
-- [ ] **Apply migration 030 to live** (conversation read tracking) — until then chat unread indicators can never clear. Runbook: `docs/apply-migration-030.md`.
+- [ ] **Finish chat unread tracking** — migration 030 is applied to live (verified 2026-08-18, `docs/apply-migration-030.md`; do **not** re-run it). Opening a thread marks it read, but sending into the open thread re-marks it unread for the sender — neither chat page marks read on send success.
 - [ ] **Render blog markdown** — `BlogPostPage` currently shows raw `body_markdown`.
 - [ ] **Filter internal tags from public pages** — `subcategory:`/`service_area:`/`import:`/`access_src:` tags render as public badges on `ResourceDetailPage`.
 - [ ] **Fix the one known lint error** — `supabase.from('bookings') as any` at `src/lib/supabase.ts:29`.

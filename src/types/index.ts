@@ -327,9 +327,9 @@ export interface Conversation {
   created_at: string
   updated_at: string
   last_message_at: string | null
-  // Added in migration 030 (not yet applied to production — see file
-  // header). Optional so code compiles and degrades gracefully against
-  // the pre-migration schema.
+  // Added in migration 030, applied to live and verified 2026-08-18.
+  // Still optional: the columns are nullable, and PostgREST omits them
+  // from rows where they were never written.
   provider_last_read_at?: string | null
   admin_last_read_at?: string | null
 }
