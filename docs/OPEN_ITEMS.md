@@ -33,10 +33,12 @@ exactly one error — `supabase.from('bookings') as any` at `supabase.ts:29` —
 
 ## Must do
 
-1. ~~**Apply 030**~~ — **done.** Applied out-of-band and verified against live
-   on 2026-08-18; both columns exist and `admin_last_read_at` is being written
-   from `/admin/messages`. See `docs/apply-migration-030.md` for the
-   post-apply verification table.
+1. ~~**Apply 030**~~ — **done.** Applied out-of-band; confirmed against live on
+   2026-08-18 that both columns exist with the intended shape, and that
+   `admin_last_read_at` holds values on all five conversations. Nothing
+   recorded identifies what wrote them, so the app path is **not** verified —
+   the authenticated smoke test (Step 4 of `docs/apply-migration-030.md`) is
+   still outstanding. See that runbook for the full post-apply table.
 2. **Commit + push** everything above, including the one-line 029 edit so the
    repo matches what was actually run against live.
 3. **Record applied dates** for 029 and 030 in the runbook tables. Do not edit
