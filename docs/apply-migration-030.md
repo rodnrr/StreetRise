@@ -106,11 +106,23 @@ unread indicator should now stay cleared. Before 030 it always came back.
 | Shape matches the migration | **yes** — nothing else on `conversations` changed |
 | `conversations` RLS UPDATE policy | unchanged: `provider_id = my_provider_id() OR is_admin()` |
 | `admin_last_read_at` populated | **yes**, on all 5 conversations — most recent write 2026-08-18 15:22 UTC |
-| `provider_last_read_at` populated | no — still null everywhere; expected, no provider has opened `/portal/messages` since |
+| `provider_last_read_at` populated | no — still null everywhere |
 
-The live `admin_last_read_at` writes are the proof the path works end to end:
-those rows can only have been set by `markConversationRead(id, 'admin')`
-succeeding through RLS from `/admin/messages`.
+**What those timestamps do and do not prove.** They establish that the columns
+exist and accept writes, and their spread over several days is consistent with
+someone working through `/admin/messages`. They are **not** proof that the app
+path works: `conversations_update` (015) is column-agnostic, so the owning
+provider can write `admin_last_read_at` too, and the SQL editor or a
+service-role key can write it without any app involvement. Nothing recorded
+here identifies the writer.
+
+So **Step 4 below is still outstanding** — the authenticated smoke test is the
+only thing that actually confirms `markConversationRead()` works from the UI.
+Do not skip it on the strength of the timestamps.
+
+The null `provider_last_read_at` is likewise only consistent with "no provider
+has opened `/portal/messages` since the columns landed"; that side is untested
+either way.
 
 ## Notes
 
