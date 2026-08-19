@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "deploy": "./scripts/deploy-pages.sh dist",
     "import:seed": "npx tsx scripts/import-seed-candidates.ts",
-    "agent:work": "npx tsx scripts/work-exchange-agent.ts"
+    "agent:work": "npx tsx scripts/work-exchange-agent.ts",
+    "worker:blog:dev": "wrangler dev --config workers/blog-publisher/wrangler.jsonc",
+    "worker:blog:deploy": "wrangler deploy --config workers/blog-publisher/wrangler.jsonc"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
@@ -42,7 +44,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.0",
-    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.6",
     "postcss": "^8.5.26",
     "rollup-plugin-visualizer": "^7.0.1",
