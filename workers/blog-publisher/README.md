@@ -1,66 +1,72 @@
 # StreetRise Blog Publisher Worker
 
-Generates a **draft** StreetRise blog post and, by default, a matching hero image. The Worker then stores the image in the existing `streetrise-assets` R2 bucket and inserts the post into `blog_posts` with `is_published = false`.
+Generates a **draft** StreetRise blog post and, by default, a matching cover
+image. The draft lands in `blog_posts` with `is_published = false`.
 
-It never publishes automatically. An admin still reviews and publishes the post from `/admin/blog`.
+It never publishes. An admin reviews and publishes it from `/admin/blog`, the
+same as a hand-written post.
 
 ## What it uses
 
-- Cloudflare Workers AI text model: `@cf/meta/llama-3.3-70b-instruct-fp8-fast`
-- Cloudflare Workers AI image model: `@cf/black-forest-labs/flux-2-klein-4b`
-- R2 bucket binding: `streetrise-assets`
-- Public asset base: `https://assets.streetrise.org`
-- Existing Supabase `blog_posts` table and `is_admin()` RLS helper
+- Workers AI text model: `@cf/meta/llama-3.3-70b-instruct-fp8-fast`
+- Workers AI image model: `@cf/black-forest-labs/flux-2-klein-4b`
+- Supabase Storage bucket `blog-images` for the cover (migration 031)
+- Supabase `blog_posts` table and the `is_admin()` RLS helper
 
-The hero image is generated at 1536×1024 (3:2) to match the blog's current cover ratio. The prompt deliberately asks for **no text or logos inside the generated image** so article titles are rendered by the site rather than relying on image-model typography.
+Covers are generated at 1536×1024 (3:2) to match the ratio both blog pages
+render. The prompt asks for **no text or logos inside the image** — titles are
+drawn by the site, not by the image model.
+
+Cover storage is Supabase, not R2, because that bucket is already public-read
+with an admin-only write policy and R2 has no public base URL connected. See
+`docs/r2-blog-images.md`.
 
 ## Security model
 
-The `/draft` route requires the caller's **Supabase access token** in the `Authorization` header.
+`/draft` requires the caller's **Supabase access token** in the `Authorization`
+header. The Worker calls `is_admin()` with that token, and then does the image
+upload and the `blog_posts` insert with the same token — so RLS is the real
+gate, and a leaked Worker URL grants nothing to a non-admin.
 
-The Worker calls the existing `is_admin()` RPC with that token. Only a verified StreetRise admin/super-admin can continue. The same user token is then used for the `blog_posts` insert, so the existing RLS policy remains the final authorization gate.
+The Worker holds **no service-role key**.
 
-This Worker does **not** contain a Supabase service-role key.
+## Setup
 
-## One-time setup
+Two values must be set on the Worker: `SUPABASE_URL` and `SUPABASE_ANON_KEY`
+(the same pair the app uses — both are public values, but they are set as
+Worker secrets rather than committed).
 
-From the repository root:
+**From the Cloudflare dashboard (no terminal needed):**
 
-```bash
-npm ci
+1. **Workers & Pages → streetrise-blog-publisher → Settings → Variables and
+   Secrets**
+2. Add `SUPABASE_URL`, then `SUPABASE_ANON_KEY`, and deploy.
 
-npx wrangler secret put SUPABASE_URL \
-  --config workers/blog-publisher/wrangler.jsonc
-
-npx wrangler secret put SUPABASE_ANON_KEY \
-  --config workers/blog-publisher/wrangler.jsonc
-```
-
-Use the same Supabase URL and anon key already configured for the StreetRise app.
-
-The R2 binding is declared in `workers/blog-publisher/wrangler.jsonc` and points to `streetrise-assets`.
-
-## Run locally
+**From a terminal:**
 
 ```bash
-npx wrangler dev --config workers/blog-publisher/wrangler.jsonc
+npx wrangler secret put SUPABASE_URL   --config workers/blog-publisher/wrangler.jsonc
+npx wrangler secret put SUPABASE_ANON_KEY --config workers/blog-publisher/wrangler.jsonc
+npm run worker:blog:deploy
 ```
 
-Cloudflare normally uses local simulations for bindings during `wrangler dev`. For a production-style test, deploy the Worker and call its deployed URL instead of writing test images into a local R2 simulation.
+The first deploy has to come from a terminal, or from **Workers Builds**
+(Workers & Pages → Create → connect this repo, root directory
+`workers/blog-publisher`), which then redeploys on every push to `main` and can
+be set up entirely from a phone.
 
-## Deploy
+`ALLOWED_ORIGIN` in `wrangler.jsonc` is a comma-separated allowlist for CORS.
+Add a Pages preview host or `http://localhost:5173` there when testing the
+admin panel outside production.
 
-```bash
-npx wrangler deploy --config workers/blog-publisher/wrangler.jsonc
-```
+## Connecting the admin panel
 
-After deployment, Cloudflare will return a `workers.dev` URL. You can optionally attach a custom domain such as:
+Set `VITE_BLOG_WORKER_URL` to the deployed Worker's origin (no trailing slash)
+in **Cloudflare Pages → streetrise → Settings → Environment variables**, then
+redeploy the app. An **AI Draft** button appears on `/admin/blog`.
 
-```text
-blog-agent.streetrise.org
-```
-
-Do not point `assets.streetrise.org` at the Worker; that domain is already the public R2 asset host.
+With the variable unset the panel stays hidden, so an app deployed without the
+Worker shows no button that cannot work.
 
 ## Health check
 
@@ -68,15 +74,10 @@ Do not point `assets.streetrise.org` at the Worker; that domain is already the p
 curl https://<worker-host>/health
 ```
 
-Expected:
+`{"ok":true,...}` means both config values are set. If one is missing the
+response says which, with status 500.
 
-```json
-{"ok":true,"service":"streetrise-blog-publisher"}
-```
-
-## Create a draft
-
-Obtain the current admin user's Supabase access token from the authenticated StreetRise session, then call:
+## Create a draft directly
 
 ```bash
 curl -X POST https://<worker-host>/draft \
@@ -84,16 +85,13 @@ curl -X POST https://<worker-host>/draft \
   -H "Content-Type: application/json" \
   -d '{
     "topic": "StreetRise is now live in Miami",
-    "angle": "Expansion announcement and invitation for local providers to participate",
+    "angle": "Expansion announcement and invitation for local providers",
     "location": "Miami, Florida",
-    "audience": "People seeking resources, outreach teams, providers, and supporters",
     "facts": [
       "StreetRise is now live in Miami, Florida.",
-      "StreetRise helps people discover community resources.",
       "The public app is available at https://app.streetrise.org."
     ],
-    "keywords": ["Miami community resources", "StreetRise Miami"],
-    "author_name": "StreetRise Team",
+    "keywords": ["Miami community resources"],
     "generate_hero": true
   }'
 ```
@@ -106,47 +104,37 @@ curl -X POST https://<worker-host>/draft \
 | `angle` | no | Editorial framing |
 | `audience` | no | Who the post is for |
 | `location` | no | City/region when relevant |
-| `facts` | no | Facts the model is allowed to assert; strongly recommended for launches, partnerships, counts, dates, and current-status posts |
+| `facts` | no | The only claims the model may assert; supply these for anything involving launches, partnerships, counts, dates, or current status |
 | `keywords` | no | SEO terms to weave in naturally |
 | `author_name` | no | Defaults to `StreetRise Team` |
 | `generate_hero` | no | Defaults to `true` |
 
 ## Response
 
-On success the Worker returns the new draft metadata, including the R2 cover URL:
-
 ```json
 {
   "ok": true,
-  "post": {
-    "id": "...",
-    "slug": "streetrise-is-now-live-in-miami",
-    "title": "StreetRise Is Now Live in Miami",
-    "cover_image_url": "https://assets.streetrise.org/blog/streetrise-is-now-live-in-miami-cover-....jpg",
-    "is_published": false
-  },
-  "hero": {
-    "generated": true,
-    "key": "blog/...jpg",
-    "error": null
-  },
+  "post": { "id": "…", "slug": "…", "title": "…", "is_published": false },
+  "hero": { "generated": true, "key": "covers/ai-…jpg", "error": null },
   "note": "Draft created. Review it in /admin/blog before publishing."
 }
 ```
 
-If hero generation fails, the Worker still creates the text draft and returns the hero error. An admin can upload or paste a cover image later in `/admin/blog`.
+If the cover fails, the text draft is still created and `hero.error` says why —
+losing a draft over a missing image would be the worse trade. The admin panel
+surfaces that message and the cover can be uploaded by hand.
 
 ## Editorial safeguards
 
-The writing prompt instructs the model to:
+The writing prompt tells the model to:
 
-- use supplied facts as the only basis for concrete launch, partner, date, count, availability, or service claims;
-- avoid inventing statistics, quotes, provider names, or impact numbers;
-- avoid implying a booking request guarantees a bed, admission, or placement;
+- treat the supplied `facts` as the only basis for concrete claims;
+- invent no statistics, quotes, provider names, or impact numbers;
+- never imply a booking request guarantees a bed, admission, or placement;
 - use respectful, non-sensational language;
-- create plain-text body content that renders cleanly in the current `BlogPostPage` implementation;
-- create a human-centered 3:2 hero prompt with no embedded text or logos.
+- produce plain text, which is what `BlogPostPage` currently renders
+  (`body_markdown` is shown as-is, not parsed as markdown);
+- describe a human-centered 3:2 cover with no embedded text or logos.
 
-## Recommended next step
-
-Once the Worker is deployed and tested, wire a small **Generate with AI** panel into `/admin/blog`. The browser can pass the logged-in admin's Supabase access token directly to this Worker; no new shared secret needs to be exposed to the frontend.
+These constrain the model; they do not verify it. Every generated draft still
+needs a human to check its claims before publishing.

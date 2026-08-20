@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
-import { Plus, Pencil, Trash2, ChevronDown, Eye, EyeOff, ExternalLink, Wand2, Upload } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronDown, Eye, EyeOff, ExternalLink, Wand2, Upload, Sparkles } from 'lucide-react'
 import { db, supabase } from '@/lib/supabase'
 import { useToast } from '@/lib/store'
 import type { Database } from '@/lib/database.types'
@@ -18,6 +18,16 @@ type PostForm = {
   cover_image_url: string
 }
 
+type GenerateForm = {
+  topic: string
+  angle: string
+  location: string
+  facts: string
+  keywords: string
+  author_name: string
+  generate_hero: boolean
+}
+
 const EMPTY_FORM: PostForm = {
   title: '',
   slug: '',
@@ -25,6 +35,39 @@ const EMPTY_FORM: PostForm = {
   body_markdown: '',
   author_name: 'StreetRise Team',
   cover_image_url: '',
+}
+
+const EMPTY_GENERATE_FORM: GenerateForm = {
+  topic: '',
+  angle: '',
+  location: '',
+  facts: '',
+  keywords: '',
+  author_name: 'StreetRise Team',
+  generate_hero: true,
+}
+
+/**
+ * The blog publisher Worker (workers/blog-publisher). Unset in most
+ * environments — the AI panel below stays hidden rather than offering a
+ * button that cannot work.
+ */
+const BLOG_WORKER_URL = (import.meta.env.VITE_BLOG_WORKER_URL ?? '').replace(/\/+$/, '')
+
+/** Text generation plus a hero image runs well past a default fetch wait. */
+const GENERATE_TIMEOUT_MS = 180_000
+
+type GenerateResponse = {
+  post: { id: string; title: string }
+  hero: { generated: boolean; error: string | null }
+}
+
+function splitLines(value: string): string[] {
+  return value.split('\n').map(line => line.trim()).filter(Boolean)
+}
+
+function splitCommas(value: string): string[] {
+  return value.split(',').map(item => item.trim()).filter(Boolean)
 }
 
 const MAX_COVER_WIDTH = 1600
@@ -78,6 +121,7 @@ export default function AdminBlog() {
   const [editing, setEditing]   = useState<BlogPostRow | null | 'new'>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [generatorOpen, setGeneratorOpen] = useState(false)
   const coverFileRef = useRef<HTMLInputElement>(null)
   const toast = useToast()
   const qc    = useQueryClient()
@@ -96,8 +140,11 @@ export default function AdminBlog() {
   const { register, handleSubmit, reset, setValue, getValues, formState: { isSubmitting } } =
     useForm<PostForm>({ defaultValues: EMPTY_FORM })
 
+  const generateForm = useForm<GenerateForm>({ defaultValues: EMPTY_GENERATE_FORM })
+
   function openEdit(post: BlogPostRow | 'new') {
     setEditing(post)
+    setGeneratorOpen(false)
     if (post === 'new') {
       reset(EMPTY_FORM)
     } else {
@@ -165,6 +212,78 @@ export default function AdminBlog() {
     onError: (e: Error) => toast.error('Save failed', e.message),
   })
 
+  /**
+   * Hands the admin's own Supabase access token to the Worker, which re-checks
+   * is_admin() and writes the row under that same token — the Worker holds no
+   * service-role key, so RLS stays the authorization gate.
+   */
+  const generate = useMutation({
+    mutationFn: async (form: GenerateForm): Promise<GenerateResponse> => {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Your session has expired — sign in again.')
+
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS)
+      let response: Response
+      try {
+        response = await fetch(`${BLOG_WORKER_URL}/draft`, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            authorization: `Bearer ${token}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            topic:        form.topic.trim(),
+            angle:        form.angle.trim() || undefined,
+            location:     form.location.trim() || undefined,
+            facts:        splitLines(form.facts),
+            keywords:     splitCommas(form.keywords),
+            author_name:  form.author_name.trim() || undefined,
+            generate_hero: form.generate_hero,
+          }),
+        })
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          // The Worker may still finish and insert the draft after we stop
+          // waiting, so don't claim nothing was written.
+          throw new Error('The generator did not answer in time. Check the list below before retrying — a draft may still have been created.')
+        }
+        throw new Error('Could not reach the blog generator. Check that the Worker is deployed.')
+      } finally {
+        clearTimeout(timer)
+      }
+
+      const payload = await response.json().catch(() => null) as
+        (GenerateResponse & { error?: string }) | null
+      if (!response.ok || !payload?.post) {
+        throw new Error(payload?.error ?? `The blog generator returned ${response.status}.`)
+      }
+      return payload
+    },
+    onSuccess: async (result) => {
+      await qc.invalidateQueries({ queryKey: ['admin-blog-posts'] })
+      toast.success(
+        'Draft created',
+        result.hero.generated
+          ? 'Review every claim in it before publishing.'
+          : `No cover image was generated${result.hero.error ? ` (${result.hero.error})` : ''} — add one below.`,
+      )
+      generateForm.reset(EMPTY_GENERATE_FORM)
+      setGeneratorOpen(false)
+
+      // Open it straight away: an unreviewed machine draft should not sit in
+      // the list looking like finished copy.
+      const { data } = await db.blog_posts().select('*').eq('id', result.post.id).single()
+      if (data) openEdit(data as BlogPostRow)
+    },
+    onError: (e: Error) => {
+      qc.invalidateQueries({ queryKey: ['admin-blog-posts'] })
+      toast.error('Generation failed', e.message)
+    },
+  })
+
   const togglePublish = useMutation({
     mutationFn: async (post: BlogPostRow) => {
       const next = !post.is_published
@@ -212,10 +331,127 @@ export default function AdminBlog() {
             {posts.length} {posts.length === 1 ? 'post' : 'posts'} · {publishedCount} published
           </p>
         </div>
-        <button onClick={() => openEdit('new')} className="btn-primary btn-sm gap-1.5">
-          <Plus size={16} /> New Post
-        </button>
+        <div className="flex flex-wrap items-center gap-2 justify-end">
+          {BLOG_WORKER_URL && (
+            <button
+              onClick={() => { setGeneratorOpen(o => !o); setEditing(null) }}
+              className="btn-secondary btn-sm gap-1.5"
+            >
+              <Sparkles size={16} /> AI Draft
+            </button>
+          )}
+          <button onClick={() => openEdit('new')} className="btn-primary btn-sm gap-1.5">
+            <Plus size={16} /> New Post
+          </button>
+        </div>
       </div>
+
+      {/* AI draft generator — creates an unpublished post for review */}
+      {generatorOpen && (
+        <div className="bg-gray-800 rounded-2xl p-5 border border-gray-600">
+          <h2 className="font-semibold text-white mb-1 flex items-center gap-2">
+            <Sparkles size={16} className="text-primary-400" /> Generate a draft
+          </h2>
+          <p className="text-xs text-gray-400 mb-4">
+            Writes an unpublished draft you can edit below. Nothing goes live until you publish it.
+          </p>
+
+          <form
+            onSubmit={generateForm.handleSubmit(d => generate.mutate(d))}
+            className="space-y-3"
+          >
+            <div>
+              <label className="label text-gray-300">Topic *</label>
+              <input
+                {...generateForm.register('topic', { required: true, minLength: 3 })}
+                className="input bg-gray-700 border-gray-600 text-white placeholder:text-gray-500"
+                placeholder="e.g. How to find a food pantry near you"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="label text-gray-300">Angle</label>
+                <input
+                  {...generateForm.register('angle')}
+                  className="input bg-gray-700 border-gray-600 text-white placeholder:text-gray-500"
+                  placeholder="Practical walkthrough for first-time users"
+                />
+              </div>
+              <div>
+                <label className="label text-gray-300">Location</label>
+                <input
+                  {...generateForm.register('location')}
+                  className="input bg-gray-700 border-gray-600 text-white placeholder:text-gray-500"
+                  placeholder="Tampa Bay, Florida"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="label text-gray-300">Facts it may state — one per line</label>
+              <textarea
+                {...generateForm.register('facts')}
+                className="input bg-gray-700 border-gray-600 text-white min-h-[90px] text-sm"
+                placeholder={'StreetRise covers Tampa Bay, Orlando, and Miami.\nThe map is free and needs no sign-up.'}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Counts, dates, partner names, and coverage claims must come from here — the
+                model is told not to invent them. Check them anyway before publishing.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="label text-gray-300">Keywords</label>
+                <input
+                  {...generateForm.register('keywords')}
+                  className="input bg-gray-700 border-gray-600 text-white placeholder:text-gray-500 text-sm"
+                  placeholder="food pantry Tampa, free groceries"
+                />
+              </div>
+              <div>
+                <label className="label text-gray-300">Author</label>
+                <input
+                  {...generateForm.register('author_name')}
+                  className="input bg-gray-700 border-gray-600 text-white"
+                  placeholder="StreetRise Team"
+                />
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm text-gray-300">
+              <input
+                type="checkbox"
+                {...generateForm.register('generate_hero')}
+                className="rounded border-gray-600 bg-gray-700"
+              />
+              Also generate a cover image
+            </label>
+
+            <div className="flex flex-wrap gap-3 pt-1">
+              <button type="submit" disabled={generate.isPending} className="btn-primary gap-1.5">
+                <Sparkles size={16} />
+                {generate.isPending ? 'Writing…' : 'Generate draft'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setGeneratorOpen(false)}
+                disabled={generate.isPending}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+
+            {generate.isPending && (
+              <p className="text-xs text-gray-400">
+                This usually takes 30–60 seconds. Keep this tab open.
+              </p>
+            )}
+          </form>
+        </div>
+      )}
 
       {/* Edit form */}
       {editing !== null && (

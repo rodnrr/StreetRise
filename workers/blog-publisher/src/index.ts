@@ -3,30 +3,23 @@ const IMAGE_MODEL = '@cf/black-forest-labs/flux-2-klein-4b'
 const MAX_TOPIC_LENGTH = 240
 const MAX_CONTEXT_LENGTH = 8_000
 
+/**
+ * Covers go to the same Supabase Storage bucket the Upload button on
+ * /admin/blog writes to (migration 031), so every blog cover lives in one
+ * place and a generated post needs no extra hosting setup. The bucket is
+ * public-read; writes are gated by is_admin(), which is the same check the
+ * caller already passed.
+ */
+const COVER_BUCKET = 'blog-images'
+
 interface AiBinding {
   run(model: string, input: Record<string, unknown>): Promise<unknown>
 }
 
-interface R2Binding {
-  put(
-    key: string,
-    value: ArrayBuffer | ArrayBufferView | Blob | string,
-    options?: {
-      httpMetadata?: {
-        contentType?: string
-        cacheControl?: string
-      }
-      customMetadata?: Record<string, string>
-    },
-  ): Promise<unknown>
-}
-
 interface Env {
   AI: AiBinding
-  BLOG_ASSETS: R2Binding
   SUPABASE_URL: string
   SUPABASE_ANON_KEY: string
-  ASSET_BASE_URL: string
   DEFAULT_AUTHOR_NAME: string
   ALLOWED_ORIGIN?: string
 }
@@ -87,6 +80,17 @@ function cleanBaseUrl(value: string): string {
   return value.replace(/\/+$/, '')
 }
 
+/**
+ * Every deployment needs these two set. Without the check a missing value
+ * surfaces as an opaque fetch failure against `undefined/rest/v1/...` — name
+ * the binding instead, the way scripts/work-exchange-agent.ts does.
+ */
+function missingConfig(env: Env): string | null {
+  if (!env.SUPABASE_URL) return 'SUPABASE_URL'
+  if (!env.SUPABASE_ANON_KEY) return 'SUPABASE_ANON_KEY'
+  return null
+}
+
 function bearerToken(request: Request): string | null {
   const auth = request.headers.get('authorization')
   if (!auth) return null
@@ -142,7 +146,13 @@ function validateInput(raw: unknown): GenerateRequest {
   }
 }
 
-async function verifyAdmin(token: string, env: Env): Promise<boolean> {
+/**
+ * `expired` is kept separate from `denied` so a stale session says "sign in
+ * again" instead of accusing a real admin of not being one.
+ */
+type AdminCheck = 'ok' | 'denied' | 'expired'
+
+async function verifyAdmin(token: string, env: Env): Promise<AdminCheck> {
   const response = await fetch(`${cleanBaseUrl(env.SUPABASE_URL)}/rest/v1/rpc/is_admin`, {
     method: 'POST',
     headers: {
@@ -153,11 +163,12 @@ async function verifyAdmin(token: string, env: Env): Promise<boolean> {
     body: '{}',
   })
 
-  if (!response.ok) return false
+  if (response.status === 401) return 'expired'
+  if (!response.ok) return 'denied'
   try {
-    return (await response.json()) === true
+    return (await response.json()) === true ? 'ok' : 'denied'
   } catch {
-    return false
+    return 'denied'
   }
 }
 
@@ -220,7 +231,11 @@ function parseGeneratedDraft(result: unknown): GeneratedDraft {
   let parsed: unknown = response
 
   if (typeof response === 'string') {
-    parsed = JSON.parse(response)
+    try {
+      parsed = JSON.parse(response)
+    } catch {
+      throw new Error('The writing model did not return valid JSON. Try again.')
+    }
   }
 
   if (!parsed || typeof parsed !== 'object') {
@@ -260,16 +275,18 @@ async function generateDraft(input: GenerateRequest, env: Env): Promise<Generate
   return parseGeneratedDraft(result)
 }
 
-function base64ToBytes(base64: string): Uint8Array {
+/** Returns the raw buffer — a Uint8Array view is not a valid fetch body type. */
+function base64ToBytes(base64: string): ArrayBuffer {
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
-  return bytes
+  return bytes.buffer
 }
 
 async function generateHeroImage(
   draft: GeneratedDraft,
   slug: string,
+  token: string,
   env: Env,
 ): Promise<{ url: string; key: string }> {
   const form = new FormData()
@@ -279,9 +296,10 @@ async function generateHeroImage(
   )
   form.append('width', '1536')
   form.append('height', '1024')
-  form.append('guidance', '4.5')
-  form.append('seed', String(Math.floor(Math.random() * 2_000_000_000)))
 
+  // FormData does not expose its serialized body or boundary; passing it to a
+  // Response constructor produces both, which is what the multipart binding
+  // needs. `steps` is fixed at 4 on this distilled model and is not sent.
   const serialized = new Response(form)
   const contentType = serialized.headers.get('content-type')
   if (!serialized.body || !contentType) throw new Error('Could not prepare the image request.')
@@ -296,32 +314,40 @@ async function generateHeroImage(
   const image = (result as { image?: unknown } | null)?.image
   if (typeof image !== 'string' || !image) throw new Error('The image model returned no image.')
 
-  const key = `blog/${slug}-cover-${Date.now()}.jpg`
-  await env.BLOG_ASSETS.put(key, base64ToBytes(image), {
-    httpMetadata: {
-      contentType: 'image/jpeg',
-      cacheControl: 'public, max-age=31536000, immutable',
+  const key = `covers/ai-${Date.now()}-${slug}.jpg`
+  const upload = await fetch(
+    `${cleanBaseUrl(env.SUPABASE_URL)}/storage/v1/object/${COVER_BUCKET}/${key}`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: env.SUPABASE_ANON_KEY,
+        authorization: `Bearer ${token}`,
+        'content-type': 'image/jpeg',
+        'cache-control': 'max-age=31536000',
+      },
+      body: base64ToBytes(image),
     },
-    customMetadata: {
-      generatedBy: 'streetrise-blog-publisher',
-      model: IMAGE_MODEL,
-    },
-  })
+  )
+
+  if (!upload.ok) {
+    const detail = (await upload.text()).slice(0, 300)
+    throw new Error(`Storing the hero image failed (${upload.status}): ${detail}`)
+  }
 
   return {
     key,
-    url: `${cleanBaseUrl(env.ASSET_BASE_URL)}/${key}`,
+    url: `${cleanBaseUrl(env.SUPABASE_URL)}/storage/v1/object/public/${COVER_BUCKET}/${key}`,
   }
 }
 
 async function insertDraft(
   draft: GeneratedDraft,
   input: GenerateRequest,
+  baseSlug: string,
   coverImageUrl: string | null,
   token: string,
   env: Env,
 ): Promise<BlogPostRow> {
-  const baseSlug = slugify(draft.title) || `streetrise-update-${randomSuffix()}`
   const authorName = input.author_name?.trim() || env.DEFAULT_AUTHOR_NAME || 'StreetRise Team'
 
   const makePayload = (slug: string) => ({
@@ -365,7 +391,10 @@ async function handleGenerate(request: Request, env: Env, origin?: string): Prom
   if (!token) return json({ error: 'Missing Supabase access token.' }, 401, origin)
 
   const admin = await verifyAdmin(token, env)
-  if (!admin) return json({ error: 'Admin access required.' }, 403, origin)
+  if (admin === 'expired') {
+    return json({ error: 'Your session has expired — sign in again.' }, 401, origin)
+  }
+  if (admin === 'denied') return json({ error: 'Admin access required.' }, 403, origin)
 
   let input: GenerateRequest
   try {
@@ -384,15 +413,16 @@ async function handleGenerate(request: Request, env: Env, origin?: string): Prom
 
     if (input.generate_hero !== false) {
       try {
-        const hero = await generateHeroImage(draft, slug, env)
+        const hero = await generateHeroImage(draft, slug, token, env)
         coverImageUrl = hero.url
         heroKey = hero.key
       } catch (error) {
+        // A missing cover is recoverable in /admin/blog; a lost draft is not.
         heroError = error instanceof Error ? error.message : 'Hero image generation failed.'
       }
     }
 
-    const post = await insertDraft(draft, input, coverImageUrl, token, env)
+    const post = await insertDraft(draft, input, slug, coverImageUrl, token, env)
 
     return json(
       {
@@ -431,19 +461,35 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     const requestOrigin = request.headers.get('origin') ?? ''
-    const allowedOrigin = env.ALLOWED_ORIGIN || 'https://app.streetrise.org'
-    const origin = requestOrigin === allowedOrigin ? requestOrigin : undefined
+    // Comma-separated so a Pages preview or a local dev server can be added
+    // without a code change.
+    const allowed = (env.ALLOWED_ORIGIN || 'https://app.streetrise.org')
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean)
+    const origin = allowed.includes(requestOrigin) ? requestOrigin : undefined
 
     if (request.method === 'OPTIONS') {
       if (!origin) return new Response(null, { status: 403 })
       return new Response(null, { status: 204, headers: corsHeaders(origin) })
     }
 
+    const missing = missingConfig(env)
+
     if (request.method === 'GET' && url.pathname === '/health') {
-      return json({ ok: true, service: 'streetrise-blog-publisher' }, 200, origin)
+      return json(
+        missing
+          ? { ok: false, service: 'streetrise-blog-publisher', error: `${missing} is not set.` }
+          : { ok: true, service: 'streetrise-blog-publisher' },
+        missing ? 500 : 200,
+        origin,
+      )
     }
 
     if (request.method === 'POST' && url.pathname === '/draft') {
+      if (missing) {
+        return json({ error: `${missing} is not set on this Worker.` }, 500, origin)
+      }
       return handleGenerate(request, env, origin)
     }
 

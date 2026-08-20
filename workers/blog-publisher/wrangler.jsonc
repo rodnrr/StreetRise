@@ -8,16 +8,14 @@
     "binding": "AI"
   },
 
-  "r2_buckets": [
-    {
-      "binding": "BLOG_ASSETS",
-      "bucket_name": "streetrise-assets"
-    }
-  ],
+  // Hero images are written to the Supabase Storage `blog-images` bucket
+  // (migration 031) with the calling admin's own token, so no R2 binding and
+  // no separate asset domain are involved. See README.md.
 
   "vars": {
-    "ASSET_BASE_URL": "https://assets.streetrise.org",
     "DEFAULT_AUTHOR_NAME": "StreetRise Team",
+    // Comma-separated. Add a Pages preview host or http://localhost:5173 here
+    // when testing the /admin/blog panel outside production.
     "ALLOWED_ORIGIN": "https://app.streetrise.org"
   }
 }

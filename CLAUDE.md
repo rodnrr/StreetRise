@@ -16,6 +16,8 @@ The pre-debut launch review described in earlier versions of this file is **done
 
 Known open items (verified 2026-07-31; migration 036 added 2026-08-18):
 
+- **The blog publisher Worker is written but NOT deployed** (`workers/blog-publisher/`). Until it is deployed and `VITE_BLOG_WORKER_URL` is set in Cloudflare Pages, the AI Draft panel on `/admin/blog` stays hidden and the feature is inert — merging it changes nothing about the live app. Setup steps: `workers/blog-publisher/README.md`. Nothing about it has been exercised against the real Workers AI models yet, so treat the first run as the real test.
+
 - **Migration 036 (student clothing seed) APPLIED to live 2026-08-18.** Runbook + verification: `docs/apply-migration-036.md`. Added the platform's first `clothing` listings (20 resources, 15 providers) and the `students` population-focus tag; public map total 146 → 166. Partnership leads deliberately kept off the public map are in `docs/student-resources-outreach.md`.
 - **Migration 037 (confidence trigger parity) is NOT applied, and needs a decision.** Its DDL is a no-op on live — live already has both triggers; the repo did not, so a rebuilt database scored `pending` rows ~80 instead of 35. But its **backfill is a real production data change**: it re-scores 66 stale `verified` rows to 20 (measured 2026-08-18). Nothing leaves the map (`MIN_CONFIDENCE_SCORE` is 20, tested `>=`) and `updated_at` is untouched, so no listing gains false freshness. Unhurried — the parity gap only bites a rebuilt database. Read `docs/apply-migration-037.md` before running it.
 - ~~Migration 030 was not yet applied to live~~ — **applied and verified 2026-08-18** (`docs/apply-migration-030.md`). Both `provider_last_read_at` and `admin_last_read_at` exist on live with the intended shape, and `admin_last_read_at` carries real values, so writes to it are landing rather than no-opping as they did before the columns existed. (Those values do not by themselves prove the app path: `conversations_update` is column-agnostic and the SQL editor can write the column too, so the authenticated smoke test in the runbook is still outstanding.) **Unread does not fully clear yet**: opening a thread marks it read, but *sending* into the open thread re-marks it unread for the sender — `bump_conversation_on_message` advances `last_message_at` and neither send handler re-marks read (see `docs/OPEN_ITEMS.md`). Note the apply is **not** recorded in `supabase_migrations.schema_migrations` — that table is drifted and also missing 032–035; verify live columns, not that table.
@@ -49,6 +51,9 @@ npm run preview      # Preview production build locally
 npm run deploy       # scripts/deploy-pages.sh → wrangler pages deploy dist
 npm run import:seed  # Run scripts/import-seed-candidates.ts via tsx
 npm run agent:work   # Work exchange agent (scripts/work-exchange-agent.ts) — dry run unless --apply
+npm run worker:blog:typecheck  # Type-check the blog publisher Worker (also runs in CI)
+npm run worker:blog:dev        # wrangler dev for the Worker
+npm run worker:blog:deploy     # wrangler deploy for the Worker
 ```
 
 **Setup:**
@@ -58,7 +63,7 @@ cp .env.example .env.local
 ```
 
 Required env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-Optional: `VITE_STRIPE_PUBLISHABLE_KEY`, `VITE_GOOGLE_MAPS_API_KEY` (falls back to Nominatim), `VITE_APP_URL`, `VITE_APP_ENV`
+Optional: `VITE_STRIPE_PUBLISHABLE_KEY`, `VITE_GOOGLE_MAPS_API_KEY` (falls back to Nominatim), `VITE_APP_URL`, `VITE_APP_ENV`, `VITE_BLOG_WORKER_URL` (blog publisher Worker origin — unset hides the AI Draft panel on `/admin/blog`)
 Admin scripts only: `SUPABASE_SERVICE_ROLE_KEY` (never `VITE_`-prefixed)
 Deploy only: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (32-char hex; validated by `scripts/deploy-pages.sh`)
 
@@ -177,6 +182,13 @@ scripts/
   import-seed-candidates.ts # Seed import (needs SUPABASE_SERVICE_ROLE_KEY)
   work-exchange-agent.ts    # Re-verifies /work listings + drafts new ones into a review queue.
                             # Needs SUPABASE_SERVICE_ROLE_KEY + ANTHROPIC_API_KEY. Never publishes.
+
+workers/
+  blog-publisher/           # Cloudflare Worker: generates an UNPUBLISHED blog draft +
+                            # cover image with Workers AI. Deployed separately from the
+                            # app; runs on the caller's admin token, holds no service-role
+                            # key. Covers go to the Supabase `blog-images` bucket, not R2.
+                            # Reached from the AI Draft panel on /admin/blog.
 
 supabase/migrations/        # 001–037 with gaps: NO 012, 013, or 021 exist.
                             # See Migrations section — applied to live BY HAND.
@@ -433,6 +445,7 @@ Later migrations (past the 001–011 core): 014/015/018/030 conversations system
 - **Build output**: `dist/`; SPA fallback via `public/_redirects`
 - **CI**: `.github/workflows/deploy.yml` (named "CI") runs typecheck + build on push/PR to `main`. The workflow itself contains no deploy step; pushes to `main` reach production via the Pages integration — treat **merging to `main` as a production deploy** and never merge with red CI.
 - **Manual deploy**: `npm run deploy` (needs `CLOUDFLARE_API_TOKEN` + 32-char `CLOUDFLARE_ACCOUNT_ID`)
+- **The blog publisher Worker deploys separately** — merging to `main` does not ship it. `npm run worker:blog:deploy`, or connect it as a Workers Build. CI only type-checks it.
 - **Env vars**: `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` set in Cloudflare Pages settings and GitHub secrets. Never commit secrets.
 - **PWA**: Service worker auto-registers. Supabase API responses cached 5 min (NetworkFirst). OSM tiles cached 7 days (CacheFirst).
 
