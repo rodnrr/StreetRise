@@ -109,6 +109,12 @@ curl -X POST https://<worker-host>/draft \
 | `author_name` | no | Defaults to `StreetRise Team` |
 | `generate_hero` | no | Defaults to `true` |
 
+The fields above add up to a budget of **6,000 characters**. A brief over that
+is rejected with a 400 naming its size, rather than trimmed — trimming would
+drop facts off the end of the list, and the draft may only assert facts that
+were supplied, so a silent trim would narrow the post while looking like a
+success.
+
 ## Response
 
 ```json

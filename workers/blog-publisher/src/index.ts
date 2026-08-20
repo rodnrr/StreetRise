@@ -1,7 +1,19 @@
 const TEXT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 const IMAGE_MODEL = '@cf/black-forest-labs/flux-2-klein-4b'
 const MAX_TOPIC_LENGTH = 240
-const MAX_CONTEXT_LENGTH = 8_000
+
+/**
+ * Ceiling on the caller-supplied part of the brief. The per-field caps above
+ * it allow far more than this in aggregate (25 facts x 600 chars on their
+ * own), so the total is checked before anything is sent to the model.
+ *
+ * An oversized brief is rejected rather than trimmed: trimming drops facts off
+ * the end of the list, and the draft is only allowed to assert facts that were
+ * supplied — so a silent trim would quietly narrow the post while looking like
+ * a success. The prompt scaffold is ~2,000 characters, leaving the assembled
+ * prompt well inside the model's 24,000-token window.
+ */
+const MAX_BRIEF_LENGTH = 6_000
 
 /**
  * Covers go to the same Supabase Storage bucket the Upload button on
@@ -115,35 +127,81 @@ function randomSuffix(): string {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 7)
 }
 
-function stringArray(value: unknown, maxItems = 20): string[] {
-  if (!Array.isArray(value)) return []
-  return value
-    .filter((item): item is string => typeof item === 'string')
-    .map(item => item.trim())
-    .filter(Boolean)
-    .slice(0, maxItems)
-}
-
 function safeText(value: unknown, maxLength: number): string {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
+}
+
+/**
+ * Caller input is never silently shortened — every cap below rejects instead.
+ * `safeText` still truncates, but only where it is applied to *model* output,
+ * which has no author to tell.
+ */
+function checkedText(value: unknown, field: string, maxLength: number): string {
+  if (value === undefined || value === null) return ''
+  if (typeof value !== 'string') throw new Error(`${field} must be a string.`)
+  const trimmed = value.trim()
+  if (trimmed.length > maxLength) {
+    throw new Error(`${field} is ${trimmed.length} characters and the limit is ${maxLength}.`)
+  }
+  return trimmed
+}
+
+function checkedArray(
+  value: unknown,
+  field: string,
+  maxItems: number,
+  maxItemLength: number,
+): string[] {
+  if (value === undefined || value === null) return []
+  if (!Array.isArray(value)) throw new Error(`${field} must be an array of strings.`)
+  if (value.length > maxItems) {
+    throw new Error(`${field} has ${value.length} entries and the limit is ${maxItems}.`)
+  }
+  return value
+    .map((item, index) => checkedText(item, `${field}[${index}]`, maxItemLength))
+    .filter(Boolean)
 }
 
 function validateInput(raw: unknown): GenerateRequest {
   if (!raw || typeof raw !== 'object') throw new Error('Request body must be a JSON object.')
   const input = raw as Record<string, unknown>
-  const topic = safeText(input.topic, MAX_TOPIC_LENGTH)
+  const topic = checkedText(input.topic, 'topic', MAX_TOPIC_LENGTH)
   if (topic.length < 3) throw new Error('topic is required and must be at least 3 characters.')
 
-  return {
+  const request: GenerateRequest = {
     topic,
-    angle: safeText(input.angle, 500) || undefined,
-    audience: safeText(input.audience, 500) || undefined,
-    location: safeText(input.location, 200) || undefined,
-    facts: stringArray(input.facts, 25).map(item => item.slice(0, 600)),
-    keywords: stringArray(input.keywords, 15).map(item => item.slice(0, 80)),
-    author_name: safeText(input.author_name, 120) || undefined,
+    angle: checkedText(input.angle, 'angle', 500) || undefined,
+    audience: checkedText(input.audience, 'audience', 500) || undefined,
+    location: checkedText(input.location, 'location', 200) || undefined,
+    facts: checkedArray(input.facts, 'facts', 25, 600),
+    keywords: checkedArray(input.keywords, 'keywords', 15, 80),
+    author_name: checkedText(input.author_name, 'author_name', 120) || undefined,
     generate_hero: typeof input.generate_hero === 'boolean' ? input.generate_hero : true,
   }
+
+  const size = briefLength(request)
+  if (size > MAX_BRIEF_LENGTH) {
+    throw new Error(
+      `The brief is ${size} characters and the limit is ${MAX_BRIEF_LENGTH}. ` +
+        'Shorten the facts, or split the post in two — trimming it here would drop ' +
+        'supplied facts, and the draft may only assert facts you supplied.',
+    )
+  }
+
+  return request
+}
+
+/** Total caller-supplied text, measured the way buildWriterPrompt spends it. */
+function briefLength(input: GenerateRequest): number {
+  return (
+    input.topic.length +
+    (input.angle?.length ?? 0) +
+    (input.audience?.length ?? 0) +
+    (input.location?.length ?? 0) +
+    (input.author_name?.length ?? 0) +
+    (input.facts ?? []).reduce((total, fact) => total + fact.length + 4, 0) +
+    (input.keywords ?? []).reduce((total, word) => total + word.length + 2, 0)
+  )
 }
 
 /**
@@ -211,7 +269,7 @@ Author: ${input.author_name ?? 'StreetRise Team'}
 SUPPLIED FACTS
 ${facts}
 
-Return only the structured fields requested by the response schema.`.slice(0, MAX_CONTEXT_LENGTH)
+Return only the structured fields requested by the response schema.`
 }
 
 const BLOG_SCHEMA = {
