@@ -16,7 +16,7 @@ The pre-debut launch review described in earlier versions of this file is **done
 
 Known open items (verified 2026-07-31; migration 036 added 2026-08-18):
 
-- **The blog publisher Worker is written but NOT deployed** (`workers/blog-publisher/`). Until it is deployed and `VITE_BLOG_WORKER_URL` is set in Cloudflare Pages, the AI Draft panel on `/admin/blog` stays hidden and the feature is inert — merging it changes nothing about the live app. Setup steps: `workers/blog-publisher/README.md`. Nothing about it has been exercised against the real Workers AI models yet, so treat the first run as the real test.
+- **The blog publisher Worker is written but NOT deployed** (`workers/blog-publisher/`). Until it is deployed and `VITE_BLOG_WORKER_URL` is set in Cloudflare Pages, the AI Draft panel on `/admin/blog` stays hidden and the feature is inert — merging it changes nothing about the live app. Setup steps: `docs/deploy-blog-worker.md` for the dashboard-only path (no terminal), `workers/blog-publisher/README.md` for the CLI path and the request/response contract. Nothing about it has been exercised against the real Workers AI models yet, so treat the first run as the real test.
 
 - **Migration 036 (student clothing seed) APPLIED to live 2026-08-18.** Runbook + verification: `docs/apply-migration-036.md`. Added the platform's first `clothing` listings (20 resources, 15 providers) and the `students` population-focus tag; public map total 146 → 166. Partnership leads deliberately kept off the public map are in `docs/student-resources-outreach.md`.
 - **Migration 037 (confidence trigger parity) is NOT applied, and needs a decision.** Its DDL is a no-op on live — live already has both triggers; the repo did not, so a rebuilt database scored `pending` rows ~80 instead of 35. But its **backfill is a real production data change**: it re-scores 66 stale `verified` rows to 20 (measured 2026-08-18). Nothing leaves the map (`MIN_CONFIDENCE_SCORE` is 20, tested `>=`) and `updated_at` is untouched, so no listing gains false freshness. Unhurried — the parity gap only bites a rebuilt database. Read `docs/apply-migration-037.md` before running it.
@@ -172,6 +172,8 @@ docs/
   apply-migration-036.md    # Hand-apply runbook (036 = student clothing seed)
   apply-migration-037.md    # Hand-apply runbook (037 = confidence trigger parity; DDL is a
                             # no-op on live, but its backfill re-scores 66 rows — read first)
+  deploy-blog-worker.md     # Dashboard-only runbook for shipping the blog publisher Worker
+                            # (merging the PR does not deploy it)
   student-resources-outreach.md  # Partnership leads deliberately NOT on the public map
   work-exchange-agent.md    # What the agent does, how to run it, review workflow
   data-dictionary.md
