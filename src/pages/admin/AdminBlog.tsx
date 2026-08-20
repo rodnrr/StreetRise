@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
@@ -123,6 +123,14 @@ export default function AdminBlog() {
   const [uploading, setUploading] = useState(false)
   const [generatorOpen, setGeneratorOpen] = useState(false)
   const coverFileRef = useRef<HTMLInputElement>(null)
+
+  /**
+   * Generation runs for up to three minutes, and the edit form below is shared.
+   * This tracks whether an editor is open so a draft landing mid-edit does not
+   * reset the form out from under whatever the admin is typing.
+   */
+  const editingRef = useRef<BlogPostRow | null | 'new'>(null)
+  useEffect(() => { editingRef.current = editing }, [editing])
   const toast = useToast()
   const qc    = useQueryClient()
 
@@ -264,18 +272,26 @@ export default function AdminBlog() {
     },
     onSuccess: async (result) => {
       await qc.invalidateQueries({ queryKey: ['admin-blog-posts'] })
-      toast.success(
-        'Draft created',
-        result.hero.generated
-          ? 'Review every claim in it before publishing.'
-          : `No cover image was generated${result.hero.error ? ` (${result.hero.error})` : ''} — add one below.`,
-      )
       generateForm.reset(EMPTY_GENERATE_FORM)
       setGeneratorOpen(false)
 
       // Open it straight away: an unreviewed machine draft should not sit in
-      // the list looking like finished copy.
-      const { data } = await db.blog_posts().select('*').eq('id', result.post.id).single()
+      // the list looking like finished copy. But not over an editor the admin
+      // opened while this was generating — that would discard their typing.
+      const busy = editingRef.current !== null
+      const { data } = busy
+        ? { data: null }
+        : await db.blog_posts().select('*').eq('id', result.post.id).single()
+
+      toast.success(
+        'Draft created',
+        busy
+          ? `“${result.post.title}” is in the list below — review every claim in it before publishing.`
+          : result.hero.generated
+            ? 'Review every claim in it before publishing.'
+            : `No cover image was generated${result.hero.error ? ` (${result.hero.error})` : ''} — add one below.`,
+      )
+
       if (data) openEdit(data as BlogPostRow)
     },
     onError: (e: Error) => {
@@ -335,7 +351,9 @@ export default function AdminBlog() {
           {BLOG_WORKER_URL && (
             <button
               onClick={() => { setGeneratorOpen(o => !o); setEditing(null) }}
-              className="btn-secondary btn-sm gap-1.5"
+              // Hiding the panel mid-run would take the progress note with it.
+              disabled={generate.isPending}
+              className="btn-secondary btn-sm gap-1.5 disabled:opacity-50"
             >
               <Sparkles size={16} /> AI Draft
             </button>

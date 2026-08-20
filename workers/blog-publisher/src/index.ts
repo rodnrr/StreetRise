@@ -398,6 +398,25 @@ async function generateHeroImage(
   }
 }
 
+/**
+ * Best-effort cleanup for a cover whose draft never landed. A failure here is
+ * swallowed on purpose: the caller is already handling a more important error,
+ * and a leftover object is a smaller problem than masking it.
+ */
+async function deleteCover(key: string, token: string, env: Env): Promise<void> {
+  try {
+    await fetch(`${cleanBaseUrl(env.SUPABASE_URL)}/storage/v1/object/${COVER_BUCKET}/${key}`, {
+      method: 'DELETE',
+      headers: {
+        apikey: env.SUPABASE_ANON_KEY,
+        authorization: `Bearer ${token}`,
+      },
+    })
+  } catch {
+    /* nothing useful to do — the draft error is what the admin needs to see */
+  }
+}
+
 async function insertDraft(
   draft: GeneratedDraft,
   input: GenerateRequest,
@@ -480,7 +499,15 @@ async function handleGenerate(request: Request, env: Env, origin?: string): Prom
       }
     }
 
-    const post = await insertDraft(draft, input, slug, coverImageUrl, token, env)
+    let post: BlogPostRow
+    try {
+      post = await insertDraft(draft, input, slug, coverImageUrl, token, env)
+    } catch (error) {
+      // The cover is already in the bucket at this point and nothing will ever
+      // reference it, so each retry would leave another public orphan behind.
+      if (heroKey) await deleteCover(heroKey, token, env)
+      throw error
+    }
 
     return json(
       {
