@@ -215,18 +215,27 @@ type AdminCheck =
   | { status: 'ok' }
   | { status: 'denied' }
   | { status: 'expired' }
-  | { status: 'unavailable'; upstream: number; unreadable?: true }
+  | { status: 'unavailable'; upstream: number; unreadable?: true; unreachable?: true }
 
 async function verifyAdmin(token: string, env: Env): Promise<AdminCheck> {
-  const response = await fetch(`${cleanBaseUrl(env.SUPABASE_URL)}/rest/v1/rpc/is_admin`, {
-    method: 'POST',
-    headers: {
-      apikey: env.SUPABASE_ANON_KEY,
-      authorization: `Bearer ${token}`,
-      'content-type': 'application/json',
-    },
-    body: '{}',
-  })
+  let response: Response
+  try {
+    response = await fetch(`${cleanBaseUrl(env.SUPABASE_URL)}/rest/v1/rpc/is_admin`, {
+      method: 'POST',
+      headers: {
+        apikey: env.SUPABASE_ANON_KEY,
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+      body: '{}',
+    })
+  } catch {
+    // DNS, TLS or connection failure — no HTTP response at all. Left to throw
+    // it would escape handleGenerate's try block entirely and surface as an
+    // opaque 500 with no CORS headers, which the panel reads as "the Worker is
+    // unreachable" when the Worker is fine and Supabase is not.
+    return { status: 'unavailable', upstream: 0, unreachable: true }
+  }
 
   if (response.status === 401) return { status: 'expired' }
   // 403 is PostgREST refusing the token itself; anything else that is not ok
@@ -487,11 +496,14 @@ async function handleGenerate(request: Request, env: Env, origin?: string): Prom
   if (admin.status === 'unavailable') {
     return json(
       {
-        error: admin.unreadable
-          ? 'Could not check your account — Supabase returned an unreadable response. ' +
-            'This is not a permissions problem — try again in a moment.'
-          : `Could not check your account with Supabase (it returned ${admin.upstream}). ` +
-            'This is not a permissions problem — try again in a moment.',
+        error: admin.unreachable
+          ? 'Could not reach Supabase to check your account. The Worker is running; ' +
+            'Supabase is not answering it. This is not a permissions problem — try again in a moment.'
+          : admin.unreadable
+            ? 'Could not check your account — Supabase returned an unreadable response. ' +
+              'This is not a permissions problem — try again in a moment.'
+            : `Could not check your account with Supabase (it returned ${admin.upstream}). ` +
+              'This is not a permissions problem — try again in a moment.',
       },
       503,
       origin,

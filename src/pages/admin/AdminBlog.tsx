@@ -57,6 +57,27 @@ const BLOG_WORKER_URL = (import.meta.env.VITE_BLOG_WORKER_URL ?? '').replace(/\/
 /** Text generation plus a hero image runs well past a default fetch wait. */
 const GENERATE_TIMEOUT_MS = 180_000
 
+/**
+ * How long to keep re-checking the list after a timeout. The Worker is not
+ * cancelled when the browser stops waiting, so a draft can land minutes later.
+ * A single refetch at the moment of the abort would almost always run while
+ * the Worker was still writing, show nothing, and invite a retry that costs a
+ * second generation and leaves a duplicate.
+ */
+const TIMEOUT_RECHECK_MS = [15_000, 45_000, 90_000, 150_000]
+
+/** Distinguishes the timeout path, which is not a failed generation. */
+class TimedOutError extends Error {
+  constructor() {
+    super(
+      'The generator is taking longer than expected. It is probably still ' +
+        'working — this list will keep checking for the draft over the next few ' +
+        'minutes. Do not retry yet, or you may get two.',
+    )
+    this.name = 'TimedOutError'
+  }
+}
+
 type GenerateResponse = {
   post: { id: string; title: string }
   hero: { generated: boolean; error: string | null }
@@ -131,6 +152,9 @@ export default function AdminBlog() {
    */
   const editingRef = useRef<BlogPostRow | null | 'new'>(null)
   useEffect(() => { editingRef.current = editing }, [editing])
+
+  const recheckTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+  useEffect(() => () => recheckTimers.current.forEach(clearTimeout), [])
   const toast = useToast()
   const qc    = useQueryClient()
 
@@ -268,7 +292,7 @@ export default function AdminBlog() {
         if (err instanceof DOMException && err.name === 'AbortError') {
           // The Worker may still finish and insert the draft after we stop
           // waiting, so don't claim nothing was written.
-          throw new Error('The generator did not answer in time. Check the list below before retrying — a draft may still have been created.')
+          throw new TimedOutError()
         }
         throw new Error('Could not reach the blog generator. Check that the Worker is deployed.')
       } finally {
@@ -308,6 +332,18 @@ export default function AdminBlog() {
     },
     onError: (e: Error) => {
       qc.invalidateQueries({ queryKey: ['admin-blog-posts'] })
+      if (e instanceof TimedOutError) {
+        // Keep looking: the Worker runs on regardless of the browser giving up.
+        for (const delay of TIMEOUT_RECHECK_MS) {
+          const timer = setTimeout(
+            () => qc.invalidateQueries({ queryKey: ['admin-blog-posts'] }),
+            delay,
+          )
+          recheckTimers.current.push(timer)
+        }
+        toast.error('Still generating', e.message)
+        return
+      }
       toast.error('Generation failed', e.message)
     },
   })
