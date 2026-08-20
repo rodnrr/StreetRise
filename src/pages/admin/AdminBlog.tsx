@@ -145,12 +145,24 @@ export default function AdminBlog() {
     },
   })
 
-  const { register, handleSubmit, reset, setValue, getValues, formState: { isSubmitting } } =
+  const { register, handleSubmit, reset, setValue, getValues, formState: { isSubmitting, isDirty } } =
     useForm<PostForm>({ defaultValues: EMPTY_FORM })
 
   const generateForm = useForm<GenerateForm>({ defaultValues: EMPTY_GENERATE_FORM })
 
+  /**
+   * One form is shared by New Post, Edit and the generated draft, so every
+   * entry point that loads something else into it throws away what is already
+   * there. Ask first, but only when there is real typing to lose — `confirm`
+   * is what the delete button below uses too.
+   */
+  function confirmDiscard(): boolean {
+    if (editing === null || !isDirty) return true
+    return confirm('You have unsaved changes in the editor. Discard them?')
+  }
+
   function openEdit(post: BlogPostRow | 'new') {
+    if (!confirmDiscard()) return
     setEditing(post)
     setGeneratorOpen(false)
     if (post === 'new') {
@@ -350,7 +362,11 @@ export default function AdminBlog() {
         <div className="flex flex-wrap items-center gap-2 justify-end">
           {BLOG_WORKER_URL && (
             <button
-              onClick={() => { setGeneratorOpen(o => !o); setEditing(null) }}
+              onClick={() => {
+                if (!confirmDiscard()) return
+                setGeneratorOpen(o => !o)
+                setEditing(null)
+              }}
               // Hiding the panel mid-run would take the progress note with it.
               disabled={generate.isPending}
               className="btn-secondary btn-sm gap-1.5 disabled:opacity-50"
