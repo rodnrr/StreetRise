@@ -205,10 +205,17 @@ function briefLength(input: GenerateRequest): number {
 }
 
 /**
- * `expired` is kept separate from `denied` so a stale session says "sign in
- * again" instead of accusing a real admin of not being one.
+ * Only a clean `false` from is_admin() means denied. A stale session and an
+ * unreachable Supabase are told apart from it and from each other, because all
+ * three need different things from the admin: sign in again, try again later,
+ * or stop trying. Answering "Admin access required" to any of them accuses a
+ * real admin of not being one and sends them looking in the wrong place.
  */
-type AdminCheck = 'ok' | 'denied' | 'expired'
+type AdminCheck =
+  | { status: 'ok' }
+  | { status: 'denied' }
+  | { status: 'expired' }
+  | { status: 'unavailable'; upstream: number; unreadable?: true }
 
 async function verifyAdmin(token: string, env: Env): Promise<AdminCheck> {
   const response = await fetch(`${cleanBaseUrl(env.SUPABASE_URL)}/rest/v1/rpc/is_admin`, {
@@ -221,12 +228,18 @@ async function verifyAdmin(token: string, env: Env): Promise<AdminCheck> {
     body: '{}',
   })
 
-  if (response.status === 401) return 'expired'
-  if (!response.ok) return 'denied'
+  if (response.status === 401) return { status: 'expired' }
+  // 403 is PostgREST refusing the token itself; anything else that is not ok
+  // (429, 5xx, a gateway error) says nothing about who the caller is.
+  if (response.status === 403) return { status: 'denied' }
+  if (!response.ok) return { status: 'unavailable', upstream: response.status }
   try {
-    return (await response.json()) === true ? 'ok' : 'denied'
+    return (await response.json()) === true ? { status: 'ok' } : { status: 'denied' }
   } catch {
-    return 'denied'
+    // A 2xx carrying something that is not JSON — a proxy or error page in
+    // front of Supabase. Reporting the status alone would read as "returned
+    // 200", which sends the reader looking in the wrong place.
+    return { status: 'unavailable', upstream: response.status, unreadable: true }
   }
 }
 
@@ -468,10 +481,23 @@ async function handleGenerate(request: Request, env: Env, origin?: string): Prom
   if (!token) return json({ error: 'Missing Supabase access token.' }, 401, origin)
 
   const admin = await verifyAdmin(token, env)
-  if (admin === 'expired') {
+  if (admin.status === 'expired') {
     return json({ error: 'Your session has expired — sign in again.' }, 401, origin)
   }
-  if (admin === 'denied') return json({ error: 'Admin access required.' }, 403, origin)
+  if (admin.status === 'unavailable') {
+    return json(
+      {
+        error: admin.unreadable
+          ? 'Could not check your account — Supabase returned an unreadable response. ' +
+            'This is not a permissions problem — try again in a moment.'
+          : `Could not check your account with Supabase (it returned ${admin.upstream}). ` +
+            'This is not a permissions problem — try again in a moment.',
+      },
+      503,
+      origin,
+    )
+  }
+  if (admin.status === 'denied') return json({ error: 'Admin access required.' }, 403, origin)
 
   let input: GenerateRequest
   try {
