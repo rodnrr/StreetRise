@@ -1,0 +1,21 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "streetrise-blog-publisher",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-19",
+
+  "ai": {
+    "binding": "AI"
+  },
+
+  // Hero images are written to the Supabase Storage `blog-images` bucket
+  // (migration 031) with the calling admin's own token, so no R2 binding and
+  // no separate asset domain are involved. See README.md.
+
+  "vars": {
+    "DEFAULT_AUTHOR_NAME": "StreetRise Team",
+    // Comma-separated. Add a Pages preview host or http://localhost:5173 here
+    // when testing the /admin/blog panel outside production.
+    "ALLOWED_ORIGIN": "https://app.streetrise.org"
+  }
+}

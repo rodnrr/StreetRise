@@ -90,3 +90,19 @@ set its `cover_image_url` the same way.
 3. Upload to the bucket under the `blog/` prefix (step 2 above).
 4. Set the post's `cover_image_url` (step 3 above) — also editable per-post in
    `/admin/blog`.
+
+## AI-generated covers
+
+The Worker in `workers/blog-publisher/` generates a 3:2 cover alongside the
+draft it writes and stores it in the **Supabase Storage `blog-images` bucket**
+(migration 031) — the same place the Upload button on `/admin/blog` writes to,
+not the R2 bucket above.
+
+It uses Supabase Storage rather than R2 for two reasons: the bucket is already
+public-read with an `is_admin()` write policy, so the Worker needs no extra
+binding and no credentials of its own; and R2 still has no public base URL
+connected (step 1 above), so an object written there would not resolve.
+
+If a public R2 domain is connected later, moving generated covers back is a
+one-function change in `workers/blog-publisher/src/index.ts` — the bucket to
+bind is `assets-streetrise`.

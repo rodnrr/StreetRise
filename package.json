@@ -12,7 +12,10 @@
     "typecheck": "tsc --noEmit",
     "deploy": "./scripts/deploy-pages.sh dist",
     "import:seed": "npx tsx scripts/import-seed-candidates.ts",
-    "agent:work": "npx tsx scripts/work-exchange-agent.ts"
+    "agent:work": "npx tsx scripts/work-exchange-agent.ts",
+    "worker:blog:typecheck": "tsc -p workers/blog-publisher/tsconfig.json",
+    "worker:blog:dev": "wrangler dev --config workers/blog-publisher/wrangler.jsonc",
+    "worker:blog:deploy": "wrangler deploy --config workers/blog-publisher/wrangler.jsonc"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
