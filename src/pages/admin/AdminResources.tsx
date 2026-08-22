@@ -49,7 +49,7 @@ export default function AdminResources() {
 
   const filtered = resources.filter(r =>
     !search || r.name.toLowerCase().includes(search.toLowerCase()) ||
-    r.address.city.toLowerCase().includes(search.toLowerCase())
+    (r.address?.city?.toLowerCase().includes(search.toLowerCase()) ?? false)
   )
 
   const AVAIL_STYLE: Record<string, string> = {
@@ -108,7 +108,7 @@ export default function AdminResources() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-400">
-                  {r.providers?.organization_name ?? 'Unknown provider'} · {r.address.city}, {r.address.state}
+                  {r.providers?.organization_name ?? 'Unknown provider'} · {r.address?.city ?? 'No city'}, {r.address?.state ?? '—'}
                 </p>
                 {r.beds_total != null && (
                   <p className="text-xs text-gray-500 mt-0.5">{r.beds_available ?? '?'} / {r.beds_total} beds</p>
