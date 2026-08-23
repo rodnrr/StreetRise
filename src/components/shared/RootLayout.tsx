@@ -4,17 +4,20 @@ import { useState, useEffect } from 'react'
 import clsx from 'clsx'
 import ToastContainer from './ToastContainer'
 import Footer from './Footer'
+import LangToggle from './LangToggle'
+import { useI18n } from '@/lib/i18n'
 
 const NAV_LINKS = [
-  { to: '/map',    label: 'Find Resources', icon: MapPin },
-  { to: '/work',   label: 'Work Exchange',  icon: Briefcase },
-  { to: '/donate', label: 'Donate',         icon: Heart },
-  { to: '/faq',    label: 'FAQ',            icon: HelpCircle },
+  { to: '/map',    key: 'nav.findResources', icon: MapPin },
+  { to: '/work',   key: 'nav.workExchange',  icon: Briefcase },
+  { to: '/donate', key: 'nav.donate',        icon: Heart },
+  { to: '/faq',    key: 'nav.faq',           icon: HelpCircle },
 ]
 
 export default function RootLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
+  const { t } = useI18n()
   const isMapPage = location.pathname === '/map'
   const isHomePage = location.pathname === '/'
 
@@ -33,16 +36,19 @@ export default function RootLayout() {
               StreetRise
             </NavLink>
 
-            {/* Hamburger trigger (all screen sizes) */}
-            <button
-              type="button"
-              className="btn-icon"
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label="Toggle menu"
-              aria-expanded={menuOpen}
-            >
-              {menuOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
+            {/* Language switch + hamburger trigger (all screen sizes) */}
+            <div className="flex items-center gap-2">
+              <LangToggle />
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={() => setMenuOpen(!menuOpen)}
+                aria-label={t('nav.toggleMenu')}
+                aria-expanded={menuOpen}
+              >
+                {menuOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+            </div>
 
             {/* Dropdown menu */}
             {menuOpen && (
@@ -50,12 +56,12 @@ export default function RootLayout() {
                 {/* Click-away backdrop */}
                 <button
                   type="button"
-                  aria-label="Close menu"
+                  aria-label={t('nav.closeMenu')}
                   className="fixed inset-0 z-30 cursor-default"
                   onClick={() => setMenuOpen(false)}
                 />
                 <div className="absolute right-4 top-full z-40 mt-2 w-64 rounded-2xl border border-gray-100 bg-white p-2 shadow-lg animate-fade-in">
-                  {NAV_LINKS.map(({ to, label, icon: Icon }) => (
+                  {NAV_LINKS.map(({ to, key, icon: Icon }) => (
                     <NavLink
                       key={to}
                       to={to}
@@ -67,7 +73,7 @@ export default function RootLayout() {
                       }
                     >
                       <Icon size={18} />
-                      {label}
+                      {t(key)}
                     </NavLink>
                   ))}
                   <NavLink
@@ -80,11 +86,11 @@ export default function RootLayout() {
                     }
                   >
                     <UserPlus size={18} />
-                    Become a Provider
+                    {t('nav.becomeProvider')}
                   </NavLink>
                   <div className="my-1 border-t border-gray-100" />
                   <NavLink to="/portal" className="btn-primary w-full">
-                    Provider Login
+                    {t('nav.providerLogin')}
                   </NavLink>
                 </div>
               </>
@@ -107,7 +113,7 @@ export default function RootLayout() {
       {!isMapPage && !isHomePage && (
         <Link
           to="/map"
-          aria-label="Get Help Now — find resources near you"
+          aria-label={t('cta.getHelpAria')}
           className={clsx(
             'fixed right-4 z-50 rounded-full px-5 py-3 text-sm font-bold uppercase tracking-wide shadow-lg',
             'focus:outline-none focus:ring-4 focus:ring-offset-2',
@@ -116,14 +122,14 @@ export default function RootLayout() {
             'bottom-20 md:bottom-4',
           )}
         >
-          Get Help Now
+          {t('cta.getHelpNow')}
         </Link>
       )}
 
       {/* ── Bottom tab bar (mobile) ── */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200
                        flex items-center justify-around pb-[env(safe-area-inset-bottom)]">
-        {NAV_LINKS.map(({ to, label, icon: Icon }) => (
+        {NAV_LINKS.map(({ to, key, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -135,7 +141,7 @@ export default function RootLayout() {
             }
           >
             <Icon size={22} strokeWidth={isMapPage ? 1.5 : 2} />
-            {label.split(' ')[0]}
+            {t(key).split(' ')[0]}
           </NavLink>
         ))}
       </nav>
