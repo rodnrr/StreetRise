@@ -17,12 +17,16 @@ const NAV_LINKS = [
 export default function RootLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const isMapPage = location.pathname === '/map'
   const isHomePage = location.pathname === '/'
 
   // Collapse the menu whenever the route changes.
   useEffect(() => { setMenuOpen(false) }, [location.pathname])
+
+  // Keep the document language in sync so screen readers and language-aware
+  // tools interpret the translated UI correctly.
+  useEffect(() => { document.documentElement.lang = lang }, [lang])
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -43,7 +47,7 @@ export default function RootLayout() {
                 type="button"
                 className="btn-icon"
                 onClick={() => setMenuOpen(!menuOpen)}
-                aria-label={t('nav.toggleMenu')}
+                aria-label={menuOpen ? t('nav.closeMenu') : t('nav.toggleMenu')}
                 aria-expanded={menuOpen}
               >
                 {menuOpen ? <X size={20} /> : <Menu size={20} />}

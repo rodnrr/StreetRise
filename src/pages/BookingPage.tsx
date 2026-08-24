@@ -11,19 +11,25 @@ import { useToast } from '@/lib/store'
 import { useI18n } from '@/lib/i18n'
 import type { Resource } from '@/types'
 
-const baseSchema = z.object({
-  requester_name:  z.string().trim().min(2, 'Name required'),
-  requester_phone: z.string().trim().optional(),
-  requester_email: z.string().trim().email('Enter a valid email').optional().or(z.literal('')),
-  contact_preference: z.enum(['phone', 'email', 'either']),
-  best_contact_time: z.string().trim().max(120).optional(),
-  contact_consent: z.boolean().refine(Boolean, 'Contact consent is required'),
-  adults:          z.coerce.number().int().min(1, 'At least 1 adult'),
-  children:        z.coerce.number().int().min(0).default(0),
-  check_in_date:   z.string().optional(),
-  check_out_date:  z.string().optional(),
-  notes:           z.string().max(500).optional(),
-})
+// Validation messages are built from the active locale so error text matches
+// the translated labels/placeholders (see @/lib/i18n).
+type TFn = (key: string) => string
+
+function makeBaseSchema(t: TFn) {
+  return z.object({
+    requester_name:  z.string().trim().min(2, t('booking.err.name')),
+    requester_phone: z.string().trim().optional(),
+    requester_email: z.string().trim().email(t('booking.err.email')).optional().or(z.literal('')),
+    contact_preference: z.enum(['phone', 'email', 'either']),
+    best_contact_time: z.string().trim().max(120).optional(),
+    contact_consent: z.boolean().refine(Boolean, t('booking.err.consent')),
+    adults:          z.coerce.number().int().min(1, t('booking.err.adult')),
+    children:        z.coerce.number().int().min(0).default(0),
+    check_in_date:   z.string().optional(),
+    check_out_date:  z.string().optional(),
+    notes:           z.string().max(500).optional(),
+  })
+}
 
 /**
  * `?intent=question` reaches this form from the map's "Ask a Question" action.
@@ -31,19 +37,19 @@ const baseSchema = z.object({
  * queue — but party size and dates are meaningless for a question, and the
  * question itself becomes the required field.
  */
-function makeSchema(isQuestion: boolean) {
-  return baseSchema.superRefine((data, ctx) => {
+function makeSchema(isQuestion: boolean, t: TFn) {
+  return makeBaseSchema(t).superRefine((data, ctx) => {
     if (!data.requester_phone && !data.requester_email) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['requester_phone'], message: 'Phone or email required' })
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['requester_email'], message: 'Phone or email required' })
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['requester_phone'], message: t('booking.err.contactRequired') })
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['requester_email'], message: t('booking.err.contactRequired') })
     }
     if (isQuestion && !data.notes?.trim()) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['notes'], message: 'Type your question so the provider can answer it' })
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['notes'], message: t('booking.err.questionRequired') })
     }
   })
 }
 
-type FormData = z.infer<typeof baseSchema>
+type FormData = z.infer<ReturnType<typeof makeBaseSchema>>
 
 const STATUS_STYLE: Record<string, string> = {
   available: 'text-success-600 bg-success-50',
@@ -72,10 +78,11 @@ export default function BookingPage() {
   const [searchParams]  = useSearchParams()
   const [done, setDone] = useState(false)
   const toast           = useToast()
-  const { t }           = useI18n()
+  const { t, lang }     = useI18n()
 
   const isQuestion = searchParams.get('intent') === 'question'
-  const schema = useMemo(() => makeSchema(isQuestion), [isQuestion])
+  // Rebuild the schema when the language changes so validation messages match.
+  const schema = useMemo(() => makeSchema(isQuestion, t), [isQuestion, lang]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: resource } = useQuery<Resource | null>({
     queryKey: ['resource', resourceId],

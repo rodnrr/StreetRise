@@ -110,6 +110,13 @@ const en: Dict = {
   'booking.replyNotInstant': 'A staff member will reply using the contact details you gave. Replies are not instant.',
   'booking.findMore': 'Find More Resources',
   'booking.returnHome': 'Return Home',
+  // Booking validation messages
+  'booking.err.name': 'Name required',
+  'booking.err.email': 'Enter a valid email',
+  'booking.err.consent': 'Contact consent is required',
+  'booking.err.adult': 'At least 1 adult',
+  'booking.err.contactRequired': 'Phone or email required',
+  'booking.err.questionRequired': 'Type your question so the provider can answer it',
 }
 
 const es: Dict = {
@@ -198,6 +205,13 @@ const es: Dict = {
   'booking.replyNotInstant': 'Un miembro del personal responderá usando los datos de contacto que diste. Las respuestas no son inmediatas.',
   'booking.findMore': 'Buscar Más Recursos',
   'booking.returnHome': 'Volver al Inicio',
+  // Booking validation messages
+  'booking.err.name': 'Se requiere el nombre',
+  'booking.err.email': 'Introduce un correo válido',
+  'booking.err.consent': 'Se requiere el consentimiento de contacto',
+  'booking.err.adult': 'Al menos 1 adulto',
+  'booking.err.contactRequired': 'Se requiere teléfono o correo',
+  'booking.err.questionRequired': 'Escribe tu pregunta para que el proveedor pueda responderla',
 }
 
 export const translations: Record<Lang, Dict> = { en, es }
