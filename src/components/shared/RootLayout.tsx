@@ -25,8 +25,13 @@ export default function RootLayout() {
   useEffect(() => { setMenuOpen(false) }, [location.pathname])
 
   // Keep the document language in sync so screen readers and language-aware
-  // tools interpret the translated UI correctly.
-  useEffect(() => { document.documentElement.lang = lang }, [lang])
+  // tools interpret the translated UI correctly. The cleanup restores 'en'
+  // when this public layout unmounts (e.g. navigating into the English-only
+  // /portal or /admin), so those pages aren't left marked as Spanish.
+  useEffect(() => {
+    document.documentElement.lang = lang
+    return () => { document.documentElement.lang = 'en' }
+  }, [lang])
 
   return (
     <div className="flex flex-col min-h-screen">

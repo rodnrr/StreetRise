@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -93,11 +93,18 @@ export default function BookingPage() {
     enabled: !!resourceId,
   })
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } =
+  const { register, handleSubmit, trigger, formState: { errors, isSubmitting, submitCount } } =
     useForm<FormData>({
       resolver: zodResolver(schema),
       defaultValues: { adults: 1, children: 0, contact_preference: 'either', contact_consent: false },
     })
+
+  // Once the form has been submitted, switching language should re-run
+  // validation so any visible error messages are shown in the new locale
+  // rather than lingering in the previous one.
+  useEffect(() => {
+    if (submitCount > 0) trigger()
+  }, [lang, submitCount, trigger])
 
   const submit = useMutation({
     mutationFn: async (data: FormData) => {
