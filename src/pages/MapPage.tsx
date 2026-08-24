@@ -26,6 +26,8 @@ import {
   NEED_ORDER,
   CATEGORY_SLUG_MAP,
 } from '@/lib/mapFilters'
+import { useI18n } from '@/lib/i18n'
+import LangToggle from '@/components/shared/LangToggle'
 import type { LatLng } from '@/lib/geo'
 import type { NeedKey, QuickFilterKey } from '@/types'
 
@@ -121,6 +123,7 @@ export default function MapPage() {
     setFilters, clearFilters, clearRefinements,
   } = useMapStore()
   const toast = useToast()
+  const { t } = useI18n()
   const [searchParams] = useSearchParams()
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -325,7 +328,7 @@ export default function MapPage() {
               to="/"
               className="hidden sm:flex w-8 h-8 rounded-lg bg-primary-600 items-center justify-center
                          text-white text-[11px] font-black shrink-0"
-              aria-label="StreetRise home"
+              aria-label={t('map.homeAria')}
             >
               SR
             </Link>
@@ -335,14 +338,14 @@ export default function MapPage() {
               <input
                 type="search"
                 inputMode="search"
-                placeholder="Search by name, city, or ZIP"
+                placeholder={t('map.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400 min-w-0"
-                aria-label="Search resources"
+                aria-label={t('map.searchAria')}
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600" aria-label="Clear search">
+                <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600" aria-label={t('map.clearSearch')}>
                   <X size={15} />
                 </button>
               )}
@@ -354,7 +357,7 @@ export default function MapPage() {
                 'btn-icon relative shrink-0 bg-gray-100 hover:bg-gray-200',
                 activeRefinements > 0 && 'ring-2 ring-primary-600',
               )}
-              aria-label="Open filters"
+              aria-label={t('map.openFilters')}
             >
               <SlidersHorizontal size={18} className={activeRefinements > 0 ? 'text-primary-600' : 'text-gray-600'} />
               {activeRefinements > 0 && (
@@ -369,10 +372,12 @@ export default function MapPage() {
               onClick={locateUser}
               disabled={locating}
               className={clsx('btn-icon shrink-0 bg-gray-100 hover:bg-gray-200', locating && 'opacity-60')}
-              aria-label="Find my location"
+              aria-label={t('map.findLocation')}
             >
               <LocateFixed size={18} className={clsx(locating ? 'text-primary-600 animate-pulse' : 'text-gray-600')} />
             </button>
+
+            <LangToggle className="shrink-0" />
           </div>
 
           {/* Need chips — one flat list, one active at a time, each with a count.
@@ -478,7 +483,7 @@ export default function MapPage() {
               onClick={() => setMapExpanded((v) => !v)}
               className="w-8 h-8 rounded-lg bg-white shadow-md flex items-center justify-center
                          text-gray-600 hover:text-gray-900"
-              aria-label={mapExpanded ? 'Shrink map' : 'Expand map'}
+              aria-label={mapExpanded ? t('map.shrinkMap') : t('map.expandMap')}
             >
               <Maximize2 size={15} />
             </button>
@@ -487,7 +492,7 @@ export default function MapPage() {
                 onClick={() => { fitToken.current += 1; setFit({ token: fitToken.current, points }) }}
                 className="w-8 h-8 rounded-lg bg-white shadow-md flex items-center justify-center
                            text-gray-600 hover:text-gray-900"
-                aria-label="Fit map to results"
+                aria-label={t('map.fitResults')}
               >
                 <RotateCcw size={15} />
               </button>
@@ -496,7 +501,7 @@ export default function MapPage() {
 
           {ranked.length === 0 && !isLoading && (
             <div className="absolute inset-0 z-[20] bg-white/70 backdrop-blur-[1px] flex items-center justify-center">
-              <p className="text-sm text-gray-500">No places match yet</p>
+              <p className="text-sm text-gray-500">{t('map.noMatch')}</p>
             </div>
           )}
         </div>
@@ -533,9 +538,9 @@ export default function MapPage() {
             {isError && (
               <div className="text-center py-10 px-4">
                 <AlertCircle size={28} className="text-danger-500 mx-auto mb-3" />
-                <p className="text-sm text-gray-700 mb-1">Couldn't load resources.</p>
-                <p className="text-xs text-gray-400 mb-4">Check your connection and try again.</p>
-                <button onClick={() => refetch()} className="btn-secondary btn-sm">Retry</button>
+                <p className="text-sm text-gray-700 mb-1">{t('map.loadError')}</p>
+                <p className="text-xs text-gray-400 mb-4">{t('map.loadErrorHint')}</p>
+                <button onClick={() => refetch()} className="btn-secondary btn-sm">{t('map.retry')}</button>
               </div>
             )}
 

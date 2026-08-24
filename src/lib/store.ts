@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { MapFilters, ToastMessage } from '@/types'
+import type { Lang } from '@/lib/i18n'
 
 // ── Map / Search State ──
 interface MapState {
@@ -96,6 +97,22 @@ export const useAuthStore = create<AuthState>()(
         providerId: s.providerId, verificationStatus: s.verificationStatus,
       }),
     }
+  )
+)
+
+// ── Language / i18n State ──
+interface LangState {
+  lang: Lang
+  setLang: (lang: Lang) => void
+}
+
+export const useLangStore = create<LangState>()(
+  persist(
+    (set) => ({
+      lang: 'en',
+      setLang: (lang) => set({ lang }),
+    }),
+    { name: 'streetrise-lang' }
   )
 )
 

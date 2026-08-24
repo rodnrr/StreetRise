@@ -13,6 +13,7 @@ import EmptyState from '@/components/ui/EmptyState'
 import SeoHead from '@/lib/seo/SeoHead'
 import { organizationSchema } from '@/lib/seo/structuredData'
 import { fetchPublishedPosts } from '@/lib/blog'
+import { useI18n } from '@/lib/i18n'
 import type { Resource } from '@/types'
 
 // "Browse by need" — categories with a dedicated marketing page link into it
@@ -124,6 +125,7 @@ function useLatestPosts() {
 }
 
 export default function HomePage() {
+  const { t } = useI18n()
   const { data: count } = useResourceCount()
   const { data: featured } = useFeaturedResources()
   const { data: posts } = useLatestPosts()
@@ -145,14 +147,13 @@ export default function HomePage() {
           <div className="grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
             <div className="text-center lg:text-left">
               <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-primary-600 dark:text-primary-400">
-                Real-time local resources
+                {t('home.eyebrow')}
               </p>
               <h1 className="mb-4 text-3xl font-bold leading-tight text-slate-900 dark:text-white md:text-5xl lg:text-6xl">
-                Find Real Shelter, Food &amp; Support in Tampa Bay, Orlando &amp; Miami
+                {t('home.h1')}
               </h1>
               <p className="mb-7 max-w-xl leading-relaxed text-slate-500 dark:text-slate-400 md:text-lg lg:mx-0 mx-auto">
-                A free app that connects you to verified local resources — updated
-                by the organizations that provide them.
+                {t('home.subhead')}
               </p>
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
                 <Button
@@ -162,7 +163,7 @@ export default function HomePage() {
                   onMouseEnter={() => import('@/pages/MapPage')}
                   onTouchStart={() => import('@/pages/MapPage')}
                 >
-                  Find Help
+                  {t('home.findHelp')}
                   <ArrowRight size={20} />
                 </Button>
                 <Button
@@ -174,10 +175,10 @@ export default function HomePage() {
                   onTouchStart={() => import('@/pages/DonatePage')}
                 >
                   <Heart size={18} />
-                  Give Hope (Donate)
+                  {t('home.donate')}
                 </Button>
               </div>
-              <p className="mt-3 text-xs text-slate-400">Free. No sign-up required.</p>
+              <p className="mt-3 text-xs text-slate-400">{t('home.freeNoSignup')}</p>
             </div>
 
             {/* Live stats panel — real data, no stock photography needed */}
