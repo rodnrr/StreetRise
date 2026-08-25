@@ -41,6 +41,10 @@ jobs:
       - name: Deploy Worker with secrets
         run: |
           set -euo pipefail
+          if [ -z "${VITE_SUPABASE_URL}" ] || [ -z "${VITE_SUPABASE_ANON_KEY}" ]; then
+            echo "::error::VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY repo secrets are unset. Refusing to deploy with an empty Supabase secret." >&2
+            exit 1
+          fi
           SECRETS_FILE="${RUNNER_TEMP}/worker-secrets.env"
           umask 077
           cat > "$SECRETS_FILE" <<EOF
