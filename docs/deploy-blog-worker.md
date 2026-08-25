@@ -1,12 +1,24 @@
 # Deploying the blog publisher Worker (no terminal required)
 
-Everything here is done from the Cloudflare and Supabase dashboards in a phone
-browser. The Worker source is `workers/blog-publisher/`.
+**As of 2026-08-25, deploys normally happen automatically** via
+`.github/workflows/deploy-blog-worker.yml` — a push to `main` that touches
+`workers/blog-publisher/**` (or the workflow file itself) runs
+`npm run worker:blog:deploy` and sets the two Supabase secrets on GitHub's
+runners, which aren't behind Cloudflare's flaky native "Workers Builds" Git
+integration. It needs two repo secrets set once in GitHub (Settings → Secrets
+and variables → Actions): `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) and
+`CLOUDFLARE_ACCOUNT_ID`. It can also be run on demand via that workflow's
+"Run workflow" button (`workflow_dispatch`) without waiting for a push.
 
-**Merging the PR does not deploy this Worker.** The app and the Worker deploy
-separately: `main` reaches production through the Pages integration, while the
-Worker is its own deployment. Until every step below is done, the AI Draft
-panel on `/admin/blog` stays hidden and nothing about the live app changes.
+Everything below is the **dashboard-only fallback path** — useful if the
+GitHub Actions workflow itself needs debugging, or you want to do this from a
+phone without touching GitHub at all. It predates the workflow above and is
+what originally kept failing: Cloudflare's "Import a repository" Root
+Directory setting repeatedly reverted to the repo root instead of
+`workers/blog-publisher`, so every build ran the main SPA's `npm run build`
+instead of the Worker's. The app and the Worker are still two separate
+deployments either way — `main` reaching production through the Pages
+integration does not by itself ship the Worker.
 
 The terminal equivalent of steps 3–4 is `npm run worker:blog:deploy` plus two
 `wrangler secret put` calls — see `workers/blog-publisher/README.md`.
