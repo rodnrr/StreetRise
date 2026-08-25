@@ -47,27 +47,40 @@ In the Supabase dashboard, open the StreetRise project (`mldatfcwnmvrmxumzxyb`)
 The Worker deliberately holds no service-role key. It runs every call on the
 admin's own token, so Supabase's existing RLS stays the real gate.
 
-## 3. Create the Worker from the repository
+## 3. Fix the existing Worker's build settings
 
-In the Cloudflare dashboard → **Workers & Pages** → **Create application** →
-**Import a repository** → pick `rodnrr/StreetRise`, then set:
+**The Worker already exists — do not use Create application.** A Worker named
+`streetrise-blog-publisher`, connected to this repo via Workers Builds, was
+created on 2026-08-21. Creating a second one from **Create application** →
+**Import a repository** either fails on the duplicate name or creates a
+differently-named Worker whose `*.workers.dev` URL the app doesn't reference
+— either way it does not fix anything. Instead:
+
+Cloudflare dashboard → **Workers & Pages** → **streetrise-blog-publisher** →
+**Settings** → **Build**, and check/set:
 
 | Setting | Value |
 |---|---|
-| Worker name | `streetrise-blog-publisher` |
 | Root directory | `workers/blog-publisher` |
 | Build command | *(leave empty)* |
 | Deploy command | `npx wrangler deploy` |
-| Production branch | `main` |
+| Build watch paths → Include paths | `workers/blog-publisher/**` (not the default `*`, which fires on every push to the repo, including ones that don't touch the Worker) |
 
-**The Worker name must match exactly.** Workers Builds compares it against the
-`name` field in the `wrangler.jsonc` found in the root directory, and fails the
-build on a mismatch.
+**This setting has proven unreliable** — in practice it repeatedly reverted to
+Root directory `/` even after saving, which sent every build against the main
+app's `npm run build` instead of the Worker's. If you save this and a fresh
+build still installs ~600 packages and runs `tsc && vite build` rather than
+deploying `workers/blog-publisher/src/index.ts`, that reversion is happening
+again — re-check the field rather than assuming it's some other bug. This is
+exactly why the GitHub Actions workflow at the top of this doc is the
+preferred path now.
 
-Save and deploy. The first build will succeed but the Worker cannot serve
-requests yet — the secrets from step 2 are not on it.
+Trigger a fresh build after saving (Deployments tab → push a commit, or
+retry). The first successful build cannot serve requests yet — the secrets
+from step 2 are not on it.
 
-Note the `*.workers.dev` URL Cloudflare assigns; step 6 needs it.
+The Worker's `*.workers.dev` URL is unchanged by any of this — step 6 needs
+it; find it on the Worker's Overview tab if you don't already have it.
 
 ## 4. Add the two secrets
 
