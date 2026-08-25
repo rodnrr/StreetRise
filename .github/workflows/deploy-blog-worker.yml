@@ -1,0 +1,47 @@
+name: Deploy Blog Publisher Worker
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/blog-publisher/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-blog-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy Worker
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy Worker
+        run: npm run worker:blog:deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Set Worker secrets
+        run: |
+          echo "https://mldatfcwnmvrmxumzxyb.supabase.co" | npx wrangler secret put SUPABASE_URL --config workers/blog-publisher/wrangler.jsonc
+          echo "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1sZGF0ZmN3bm12cm14dW16eHliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMjQ5NTEsImV4cCI6MjA5MDkwMDk1MX0.UsceZ1w2uPiKrea4Yt6zgtztdg0iLV6tycLBlgNcInM" | npx wrangler secret put SUPABASE_ANON_KEY --config workers/blog-publisher/wrangler.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
