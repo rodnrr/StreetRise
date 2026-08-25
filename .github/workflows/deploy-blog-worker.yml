@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'workers/blog-publisher/**'
+      - '.github/workflows/deploy-blog-worker.yml'
 
 permissions:
   contents: read
