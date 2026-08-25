@@ -2,7 +2,9 @@
 
 **As of 2026-08-25, deploys normally happen automatically** via
 `.github/workflows/deploy-blog-worker.yml` — a push to `main` that touches
-`workers/blog-publisher/**` (or the workflow file itself) runs
+`workers/blog-publisher/**`, the workflow file itself, or the root
+`package.json`/`package-lock.json` (a dependency or `wrangler` version bump
+also redeploys the Worker with the new tooling) — runs
 `npm run worker:blog:deploy` and sets the two Supabase secrets on GitHub's
 runners, which aren't behind Cloudflare's flaky native "Workers Builds" Git
 integration. It needs two repo secrets set once in GitHub (Settings → Secrets
