@@ -7,6 +7,8 @@ on:
     paths:
       - 'workers/blog-publisher/**'
       - '.github/workflows/deploy-blog-worker.yml'
+      - 'package.json'
+      - 'package-lock.json'
 
 permissions:
   contents: read
