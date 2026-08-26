@@ -1,0 +1,63 @@
+name: Deploy Blog Publisher Worker
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/blog-publisher/**'
+      - '.github/workflows/deploy-blog-worker.yml'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-blog-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy Worker
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check Worker
+        run: npm run worker:blog:typecheck
+
+      - name: Deploy Worker with secrets
+        run: |
+          set -euo pipefail
+          if [ -z "${VITE_SUPABASE_URL}" ] || [ -z "${VITE_SUPABASE_ANON_KEY}" ]; then
+            echo "::error::VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY repo secrets are unset. Refusing to deploy with an empty Supabase secret." >&2
+            exit 1
+          fi
+          SECRETS_FILE="${RUNNER_TEMP}/worker-secrets.env"
+          umask 077
+          cat > "$SECRETS_FILE" <<EOF
+          SUPABASE_URL=${VITE_SUPABASE_URL}
+          SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+          EOF
+          npm run worker:blog:deploy -- --secrets-file "$SECRETS_FILE"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Clean up secrets file
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/worker-secrets.env"

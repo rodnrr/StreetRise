@@ -1,12 +1,26 @@
 # Deploying the blog publisher Worker (no terminal required)
 
-Everything here is done from the Cloudflare and Supabase dashboards in a phone
-browser. The Worker source is `workers/blog-publisher/`.
+**As of 2026-08-25, deploys normally happen automatically** via
+`.github/workflows/deploy-blog-worker.yml` — a push to `main` that touches
+`workers/blog-publisher/**`, the workflow file itself, or the root
+`package.json`/`package-lock.json` (a dependency or `wrangler` version bump
+also redeploys the Worker with the new tooling) — runs
+`npm run worker:blog:deploy` and sets the two Supabase secrets on GitHub's
+runners, which aren't behind Cloudflare's flaky native "Workers Builds" Git
+integration. It needs two repo secrets set once in GitHub (Settings → Secrets
+and variables → Actions): `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) and
+`CLOUDFLARE_ACCOUNT_ID`. It can also be run on demand via that workflow's
+"Run workflow" button (`workflow_dispatch`) without waiting for a push.
 
-**Merging the PR does not deploy this Worker.** The app and the Worker deploy
-separately: `main` reaches production through the Pages integration, while the
-Worker is its own deployment. Until every step below is done, the AI Draft
-panel on `/admin/blog` stays hidden and nothing about the live app changes.
+Everything below is the **dashboard-only fallback path** — useful if the
+GitHub Actions workflow itself needs debugging, or you want to do this from a
+phone without touching GitHub at all. It predates the workflow above and is
+what originally kept failing: Cloudflare's "Import a repository" Root
+Directory setting repeatedly reverted to the repo root instead of
+`workers/blog-publisher`, so every build ran the main SPA's `npm run build`
+instead of the Worker's. The app and the Worker are still two separate
+deployments either way — `main` reaching production through the Pages
+integration does not by itself ship the Worker.
 
 The terminal equivalent of steps 3–4 is `npm run worker:blog:deploy` plus two
 `wrangler secret put` calls — see `workers/blog-publisher/README.md`.
@@ -35,27 +49,40 @@ In the Supabase dashboard, open the StreetRise project (`mldatfcwnmvrmxumzxyb`)
 The Worker deliberately holds no service-role key. It runs every call on the
 admin's own token, so Supabase's existing RLS stays the real gate.
 
-## 3. Create the Worker from the repository
+## 3. Fix the existing Worker's build settings
 
-In the Cloudflare dashboard → **Workers & Pages** → **Create application** →
-**Import a repository** → pick `rodnrr/StreetRise`, then set:
+**The Worker already exists — do not use Create application.** A Worker named
+`streetrise-blog-publisher`, connected to this repo via Workers Builds, was
+created on 2026-08-21. Creating a second one from **Create application** →
+**Import a repository** either fails on the duplicate name or creates a
+differently-named Worker whose `*.workers.dev` URL the app doesn't reference
+— either way it does not fix anything. Instead:
+
+Cloudflare dashboard → **Workers & Pages** → **streetrise-blog-publisher** →
+**Settings** → **Build**, and check/set:
 
 | Setting | Value |
 |---|---|
-| Worker name | `streetrise-blog-publisher` |
 | Root directory | `workers/blog-publisher` |
 | Build command | *(leave empty)* |
 | Deploy command | `npx wrangler deploy` |
-| Production branch | `main` |
+| Build watch paths → Include paths | `workers/blog-publisher/**` (not the default `*`, which fires on every push to the repo, including ones that don't touch the Worker) |
 
-**The Worker name must match exactly.** Workers Builds compares it against the
-`name` field in the `wrangler.jsonc` found in the root directory, and fails the
-build on a mismatch.
+**This setting has proven unreliable** — in practice it repeatedly reverted to
+Root directory `/` even after saving, which sent every build against the main
+app's `npm run build` instead of the Worker's. If you save this and a fresh
+build still installs ~600 packages and runs `tsc && vite build` rather than
+deploying `workers/blog-publisher/src/index.ts`, that reversion is happening
+again — re-check the field rather than assuming it's some other bug. This is
+exactly why the GitHub Actions workflow at the top of this doc is the
+preferred path now.
 
-Save and deploy. The first build will succeed but the Worker cannot serve
-requests yet — the secrets from step 2 are not on it.
+Trigger a fresh build after saving (Deployments tab → push a commit, or
+retry). The first successful build cannot serve requests yet — the secrets
+from step 2 are not on it.
 
-Note the `*.workers.dev` URL Cloudflare assigns; step 6 needs it.
+The Worker's `*.workers.dev` URL is unchanged by any of this — step 6 needs
+it; find it on the Worker's Overview tab if you don't already have it.
 
 ## 4. Add the two secrets
 
