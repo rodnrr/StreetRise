@@ -6,14 +6,6 @@
   "pages_build_output_dir": "dist",
   "compatibility_date": "2024-04-04",
 
-  // This public URL must be available while Vite builds the production bundle.
-  // Because this file is enabled for Pages, Cloudflare treats it as the
-  // configuration source of truth; a dashboard Text variable alone was listed
-  // on the deployment but was not injected into npm run build.
-  "vars": {
-    "VITE_BLOG_WORKER_URL": "https://streetrise-blog-publisher.wmsqfykktn.workers.dev"
-  },
-
   // Environment variables — set secrets via: wrangler pages secret put <KEY>
   // VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in Cloudflare Pages dashboard
   // under Settings → Environment Variables for both Preview and Production
