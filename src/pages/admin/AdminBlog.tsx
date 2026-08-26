@@ -48,11 +48,21 @@ const EMPTY_GENERATE_FORM: GenerateForm = {
 }
 
 /**
- * The blog publisher Worker (workers/blog-publisher). Unset in most
- * environments — the AI panel below stays hidden rather than offering a
- * button that cannot work.
+ * The dashboard variable is the preferred override. Production also has a
+ * checked-in fallback because Cloudflare Pages has repeatedly listed the Text
+ * variable on a deployment without injecting it into Vite's build process.
+ * Keep previews hidden: the Worker deliberately allows app.streetrise.org
+ * only, so showing the button on a pages.dev preview would offer a control
+ * that CORS must reject.
  */
-const BLOG_WORKER_URL = (import.meta.env.VITE_BLOG_WORKER_URL ?? '').replace(/\/+$/, '')
+const PRODUCTION_BLOG_WORKER_URL =
+  typeof window !== 'undefined' && window.location.origin === 'https://app.streetrise.org'
+    ? 'https://streetrise-blog-publisher.wmsqfykktn.workers.dev'
+    : ''
+
+const BLOG_WORKER_URL = (
+  import.meta.env.VITE_BLOG_WORKER_URL ?? PRODUCTION_BLOG_WORKER_URL
+).replace(/\/+$/, '')
 
 /** Text generation plus a hero image runs well past a default fetch wait. */
 const GENERATE_TIMEOUT_MS = 180_000
