@@ -230,28 +230,32 @@ export default function BookingPage() {
             placeholder={t('booking.faq.placeholder')}
             aria-labelledby="faq-panel-heading"
           />
-          {faqQuery.trim().length > 1 && (
-            faqAnswers.length > 0 ? (
-              <div className="mt-3 space-y-2">
-                {faqAnswers.map((a) => (
-                  <div key={a.key} className="rounded-xl bg-primary-50 p-3">
-                    <p className="text-xs font-semibold text-primary-700 mb-0.5">{a.label}</p>
-                    <p className="text-sm text-gray-700">{a.answer}</p>
-                  </div>
-                ))}
-                <button type="button" onClick={fillFaqQueryIntoNotes} className="text-sm font-medium text-primary-600 hover:underline">
-                  {t('booking.faq.stillAsk')}
-                </button>
-              </div>
-            ) : (
-              <div className="mt-3 space-y-2">
-                <p className="text-sm text-gray-500">{t('booking.faq.noMatch')}</p>
-                <button type="button" onClick={fillFaqQueryIntoNotes} className="text-sm font-medium text-primary-600 hover:underline">
-                  {t('booking.faq.fillIn')}
-                </button>
-              </div>
-            )
-          )}
+          {/* aria-live announces the instant answer (or no-match message) as it
+              appears, since focus stays in the input while this updates. */}
+          <div role="status" aria-live="polite">
+            {faqQuery.trim().length > 1 && (
+              faqAnswers.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {faqAnswers.map((a) => (
+                    <div key={a.key} className="rounded-xl bg-primary-50 p-3">
+                      <p className="text-xs font-semibold text-primary-700 mb-0.5">{a.label}</p>
+                      <p className="text-sm text-gray-700">{a.answer}</p>
+                    </div>
+                  ))}
+                  <button type="button" onClick={fillFaqQueryIntoNotes} className="text-sm font-medium text-primary-600 hover:underline">
+                    {t('booking.faq.stillAsk')}
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm text-gray-500">{t('booking.faq.noMatch')}</p>
+                  <button type="button" onClick={fillFaqQueryIntoNotes} className="text-sm font-medium text-primary-600 hover:underline">
+                    {t('booking.faq.fillIn')}
+                  </button>
+                </div>
+              )
+            )}
+          </div>
         </div>
       )}
       <div className="card">

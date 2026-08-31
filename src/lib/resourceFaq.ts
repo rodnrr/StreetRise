@@ -338,7 +338,10 @@ const RULES: FaqRule[] = [
     // as abr\w* — that also matched unrelated "abr"-prefixed words like
     // "abrigo(s)" (coat/coats), and even a narrower abr[i]\w* would still
     // collide with "abrigo" since "abri" is a shared prefix.
-    keywords: /\b(hours?|open(s|ing)?|close[sd]?|closing|late|schedule|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*|tarde)\b/i,
+    // open(?!\s+to\b) excludes "open to volunteers"/"open to referrals" etc.
+    // — that sense of "open" (receptive/accepting) has nothing to do with
+    // hours, but "Are you open?" (no "to" following) still matches.
+    keywords: /\b(hours?|open(?!\s+to\b)(s|ing)?|close[sd]?|closing|late|schedule|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*|tarde)\b/i,
     answer: hoursAnswer,
   },
   {
@@ -354,7 +357,11 @@ const RULES: FaqRule[] = [
   {
     key: 'distance',
     label: 'Distance',
-    keywords: /\b(how far|distance|miles?|near(by|\s?me)?|qué tan lejos|que tan lejos|distancia|millas?|cerca)\b/i,
+    // Bare "near"/"nearby"/"cerca" fired on questions about some other
+    // nearby amenity ("Is there a pharmacy nearby?"), answering with this
+    // listing's own distance instead. Restricted to phrasing that compares
+    // the listing to the visitor ("near me", "cerca de mí").
+    keywords: /\b(how far|distance|miles?|near me|qué tan lejos|que tan lejos|distancia|millas?|cerca de m[ií])\b/i,
     answer: distanceAnswer,
   },
   {
