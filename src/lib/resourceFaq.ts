@@ -284,12 +284,14 @@ function availabilityAnswer(r: Resource): string | null {
     limited: 'Availability is currently marked as limited.',
     full: "They're currently marked full.",
     closed: "They're currently marked closed.",
+    unknown: "Availability isn't currently confirmed for this listing.",
   }
-  // A `closed` or `full` operational status can outlive a shelter's
-  // last-known bed count (the two are saved independently), so both must be
-  // checked before falling back to that count — a shelter marked closed or
-  // full shouldn't still be told "beds available".
-  if (r.availability_status === 'closed' || r.availability_status === 'full') {
+  // A `closed`/`full`/`unknown` operational status can outlive a shelter's
+  // last-known bed count (status and counts are saved independently in
+  // ProviderListingEdit), so all three must be checked before falling back
+  // to that count — a shelter marked unknown shouldn't still be told a
+  // specific bed count as though it were confirmed current.
+  if (r.availability_status === 'closed' || r.availability_status === 'full' || r.availability_status === 'unknown') {
     return labels[r.availability_status]!
   }
   if (r.category === 'shelter' && r.beds_total != null) {
