@@ -368,8 +368,28 @@ interface FaqRule {
   key: string
   labelKey: string
   keywords: RegExp
+  /**
+   * When it returns true, the rule is skipped even though `keywords` also
+   * matched — carves out a false-positive sense of an otherwise-legitimate
+   * keyword (e.g. "parking spots available" vs. shelter/room availability)
+   * without having to enumerate every way the true sense can appear.
+   */
+  exclude?: (question: string) => boolean
   /** `question` is the raw (trimmed) query — only `hoursAnswer` uses it, to spot a named weekday. */
   answer: (r: Resource, ctx: FaqContext, question: string) => string | null
+}
+
+// "Are there parking spots available?" / "¿Hay estacionamiento disponible?"
+// reuse the exact words (spot(s), available, disponible) this rule looks for
+// on shelter/room availability, just applied to parking instead — excluded
+// whenever "parking"/"estacionamiento" sits near one of those words (either
+// order, same clause), unless the question ALSO names a real availability
+// noun (bed/room/cama/vacancy) this rule can actually answer, so a compound
+// question ("beds available, and is there parking?") still gets answered.
+const PARKING_NEAR_AVAILABILITY_RE = /\bparking\b[^.?!]{0,30}\b(spots?|spaces?|availab\w*|disponib\w*)\b|\b(spots?|spaces?|availab\w*|disponib\w*)\b[^.?!]{0,30}\bparking\b|\bestacionamiento\w*\b/i
+const REAL_AVAILABILITY_RE = /\b(bed|beds|room|vacan\w*|cama\w*|cupo\w*|hay lugar|lugar disponible|queda\w* lugar)\b/i
+function isParkingAvailabilityQuestion(q: string): boolean {
+  return PARKING_NEAR_AVAILABILITY_RE.test(q) && !REAL_AVAILABILITY_RE.test(q)
 }
 
 // Keyword patterns match English and Spanish: the app's own UI (including this
@@ -399,7 +419,10 @@ const RULES: FaqRule[] = [
     // Bare "late"/"tarde" fired on non-schedule uses ("Do you accept late
     // arrivals?", "¿Aceptan llegadas tarde?") — "tarde" is doubly ambiguous
     // since it also means "afternoon". Restricted to "how late"/"open late".
-    keywords: /\b(hours?|open(?!\s+to\b)(s|ing)?|(?<!how )close[sd]?|closing|how late|open late|(your|their|the) schedule\b|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*)\b/i,
+    // open(?!\s+(bed|room|spot)s?\b) excludes "an open bed/room/spot" — that
+    // "open" describes availability, not the hours this rule answers, and
+    // the availability rule already covers "bed"/"room"/"spot" on its own.
+    keywords: /\b(hours?|open(?!\s+to\b)(?!\s+(bed|room|spot)s?\b)(s|ing)?|(?<!how )close[sd]?|closing|how late|open late|(your|their|the) schedule\b|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*)\b/i,
     answer: hoursAnswer,
   },
   {
@@ -409,9 +432,8 @@ const RULES: FaqRule[] = [
     // the place at all, not just availability ("¿Qué tipo de lugar es
     // este?"). Restricted to the actual availability phrasing ("hay lugar",
     // "lugar disponible", "queda lugar" — "is there room/space?").
-    // (?<!parking )spots? excludes "parking spot(s)" — a question about
-    // parking, not this shelter's own space availability.
-    keywords: /\b(bed|beds|(?<!parking )spots?|room|vacan\w*|availab\w*|cama\w*|hay lugar|lugar disponible|queda\w* lugar|cupo\w*|disponib\w*)\b/i,
+    keywords: /\b(bed|beds|spots?|room|vacan\w*|availab\w*|cama\w*|hay lugar|lugar disponible|queda\w* lugar|cupo\w*|disponib\w*)\b/i,
+    exclude: isParkingAvailabilityQuestion,
     answer: availabilityAnswer,
   },
   {
@@ -463,7 +485,11 @@ const RULES: FaqRule[] = [
     // with something, not a family), so family forms are listed explicitly.
     // Bare "who can" fired on unrelated questions with their own next verb
     // ("Who can I call about intake?") — restricted to service-access verbs.
-    keywords: /\b(who can (stay|use|access|come|apply|get)|eligib\w*|qualify|men\b|women\b|famil(y|ies)|familias?|veteran\w*|lgbtq\w*|youth|senior\w*|age\b|ages\b|calificar|hombres|mujeres|j[oó]ven(es)?|edad\w*)\b/i,
+    // "Who is this for?" / "¿Para quién es esto?" is asking who the service
+    // serves — eligibility, not a description — so it's matched here (and
+    // excluded from the About rule below) rather than left to the generic
+    // "who is this" phrasing that would otherwise route it to About.
+    keywords: /\b(who can (stay|use|access|come|apply|get)|who(?:'s|\s+is|\s+are)\s+(?:this|it|they)\s+for|eligib\w*|qualify|men\b|women\b|famil(y|ies)|familias?|veteran\w*|lgbtq\w*|youth|senior\w*|age\b|ages\b|calificar|hombres|mujeres|j[oó]ven(es)?|edad\w*|para qui[eé]n)\b/i,
     answer: eligibilityAnswer,
   },
   {
@@ -538,7 +564,9 @@ const RULES: FaqRule[] = [
     // matched as a prefix of unrelated questions ("What is their phone
     // number?", "What are your Friday hours?"), firing this rule alongside
     // whichever one the visitor actually meant.
-    keywords: /\b(tell me about|what (is|are) (this|it|they)\b|what do(es)? (they|this|it) do|who (are|is) (they|this)|about (this|them)\b|acerca de|qu[eé] hacen|cu[eé]ntame)\b/i,
+    // who (are|is) (they|this)(?!\s+for\b) excludes "Who is this for?" —
+    // that's asking who the service serves (eligibility), not what it is.
+    keywords: /\b(tell me about|what (is|are) (this|it|they)\b|what do(es)? (they|this|it) do|who (are|is) (they|this)(?!\s+for\b)|about (this|them)\b|acerca de|qu[eé] hacen|cu[eé]ntame)\b/i,
     answer: aboutAnswer,
   },
 ]
@@ -556,6 +584,7 @@ export function findFaqAnswers(resource: Resource, question: string, ctx: FaqCon
   const out: FaqAnswer[] = []
   for (const rule of RULES) {
     if (!rule.keywords.test(q)) continue
+    if (rule.exclude?.(q)) continue
     const answer = rule.answer(resource, ctx, q)
     if (answer) out.push({ key: rule.key, label: translate(ctx.lang, rule.labelKey), answer })
   }
