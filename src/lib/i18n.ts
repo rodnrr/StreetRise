@@ -125,6 +125,18 @@ const en: Dict = {
   'booking.faq.noMatch': "We don't have an instant answer for that — send it to them below and they'll reply directly.",
   'booking.faq.stillAsk': 'Still want to ask them directly?',
   'booking.faq.fillIn': 'Fill this into my question below',
+  'booking.faq.suggest.hours': 'Hours',
+  'booking.faq.suggest.hoursQuery': 'What time do they open and close today?',
+  'booking.faq.suggest.distance': 'Distance',
+  'booking.faq.suggest.distanceQuery': 'How far is this from me?',
+  'booking.faq.suggest.address': 'Address',
+  'booking.faq.suggest.addressQuery': 'Where are they located?',
+  'booking.faq.suggest.contact': 'Contact',
+  'booking.faq.suggest.contactQuery': 'What is their phone number?',
+  'booking.faq.suggest.requirements': 'Requirements',
+  'booking.faq.suggest.requirementsQuery': 'Do I need an ID or referral, or can I just walk in?',
+  'booking.faq.suggest.availability': 'Availability',
+  'booking.faq.suggest.availabilityQuery': 'Do they have space available right now?',
 }
 
 const es: Dict = {
@@ -228,6 +240,18 @@ const es: Dict = {
   'booking.faq.noMatch': 'No tenemos una respuesta instantánea para eso — envíala abajo y te responderán directamente.',
   'booking.faq.stillAsk': '¿Aún quieres preguntarles directamente?',
   'booking.faq.fillIn': 'Usar esto como mi pregunta abajo',
+  'booking.faq.suggest.hours': 'Horario',
+  'booking.faq.suggest.hoursQuery': '¿A qué hora abren y cierran hoy?',
+  'booking.faq.suggest.distance': 'Distancia',
+  'booking.faq.suggest.distanceQuery': '¿Qué tan lejos está de mí?',
+  'booking.faq.suggest.address': 'Dirección',
+  'booking.faq.suggest.addressQuery': '¿Dónde están ubicados?',
+  'booking.faq.suggest.contact': 'Contacto',
+  'booking.faq.suggest.contactQuery': '¿Cuál es su número de teléfono?',
+  'booking.faq.suggest.requirements': 'Requisitos',
+  'booking.faq.suggest.requirementsQuery': '¿Necesito identificación o referencia, o puedo llegar sin cita?',
+  'booking.faq.suggest.availability': 'Disponibilidad',
+  'booking.faq.suggest.availabilityQuery': '¿Tienen espacio disponible ahora mismo?',
 }
 
 export const translations: Record<Lang, Dict> = { en, es }

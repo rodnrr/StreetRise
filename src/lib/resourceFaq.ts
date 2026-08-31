@@ -45,16 +45,17 @@ const DAY_LABEL: Record<DayKey, string> = {
 }
 
 // English and Spanish weekday names/abbreviations a visitor might name
-// explicitly ("Friday hours?", "¿el domingo?"). Matched with \w* so common
-// abbreviations and conjugated forms still hit ("tues", "miércoles").
+// explicitly ("Friday hours?", "¿el domingo?"). Deliberately an explicit
+// word list, not a prefix + \w* — "sun\w*" et al. also matched unrelated
+// words like "sunrise", "friendly", "wedding", "monthly".
 const DAY_ALIASES: [RegExp, DayKey][] = [
-  [/\bsun\w*\b|\bdomingo\b/i, 'sunday'],
-  [/\bmon\w*\b|\blunes\b/i, 'monday'],
-  [/\btue\w*\b|\bmartes\b/i, 'tuesday'],
-  [/\bwed\w*\b|\bmi[eé]rcoles\b/i, 'wednesday'],
-  [/\bthu\w*\b|\bjueves\b/i, 'thursday'],
-  [/\bfri\w*\b|\bviernes\b/i, 'friday'],
-  [/\bsat\w*\b|\bs[aá]bado\b/i, 'saturday'],
+  [/\b(sun|sundays?|domingos?)\b/i, 'sunday'],
+  [/\b(mon|mondays?|lunes)\b/i, 'monday'],
+  [/\b(tues?|tuesdays?|martes)\b/i, 'tuesday'],
+  [/\b(weds?|wednesdays?|mi[eé]rcoles)\b/i, 'wednesday'],
+  [/\b(thu|thur|thurs|thursdays?|jueves)\b/i, 'thursday'],
+  [/\b(fri|fridays?|viernes)\b/i, 'friday'],
+  [/\b(sat|saturdays?|s[aá]bados?)\b/i, 'saturday'],
 ]
 
 const TOMORROW_RE = /\btomorrow\b|\bma[ñn]ana\b/i
@@ -284,7 +285,10 @@ const RULES: FaqRule[] = [
   {
     key: 'hours',
     label: 'Hours',
-    keywords: /\b(hours?|open(s|ing)?|close[sd]?|closing|late|schedule|horarios?|abr[ei]\w*|cierr\w*|cerrad\w*|tarde)\b/i,
+    // hora\w* covers hora/horas/horario/horarios; abr\w*/abiert\w* cover both
+    // the verb ("abre/abren") and adjective ("abierto/abierta/abiertos")
+    // forms of "open" — the translated placeholder itself uses "abiertos".
+    keywords: /\b(hours?|open(s|ing)?|close[sd]?|closing|late|schedule|hora\w*|abr\w*|abiert\w*|cierr\w*|cerrad\w*|tarde)\b/i,
     answer: hoursAnswer,
   },
   {
@@ -398,12 +402,10 @@ export function findFaqAnswers(resource: Resource, question: string, ctx: FaqCon
   return out
 }
 
-/** Suggestion chips shown before the visitor types anything. */
-export const FAQ_SUGGESTIONS: { label: string; query: string }[] = [
-  { label: 'Hours', query: 'What time do they open and close today?' },
-  { label: 'Distance', query: 'How far is this from me?' },
-  { label: 'Address', query: 'Where are they located?' },
-  { label: 'Contact', query: 'What is their phone number?' },
-  { label: 'Requirements', query: 'Do I need an ID or referral, or can I just walk in?' },
-  { label: 'Availability', query: 'Do they have space available right now?' },
-]
+/**
+ * Keys for the suggestion chips shown before the visitor types anything.
+ * Labels and example queries are localized (see `booking.faq.suggest.*` in
+ * `@/lib/i18n`) rather than defined here, so a Spanish speaker's chip click
+ * doesn't switch the panel back to English mid-conversation.
+ */
+export const FAQ_SUGGESTION_KEYS = ['hours', 'distance', 'address', 'contact', 'requirements', 'availability'] as const

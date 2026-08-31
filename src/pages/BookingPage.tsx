@@ -9,7 +9,7 @@ import clsx from 'clsx'
 import { db } from '@/lib/supabase'
 import { useToast, useMapStore } from '@/lib/store'
 import { useI18n } from '@/lib/i18n'
-import { findFaqAnswers, FAQ_SUGGESTIONS } from '@/lib/resourceFaq'
+import { findFaqAnswers, FAQ_SUGGESTION_KEYS } from '@/lib/resourceFaq'
 import type { Resource } from '@/types'
 
 // Validation messages are built from the active locale so error text matches
@@ -121,6 +121,15 @@ export default function BookingPage() {
     () => (resource ? findFaqAnswers(resource, faqQuery, { origin: userLocation, now: faqNow }) : []),
     [resource, faqQuery, userLocation, faqNow],
   )
+  // Localized so a chip click doesn't switch the panel back to English.
+  const faqSuggestions = useMemo(
+    () => FAQ_SUGGESTION_KEYS.map((key) => ({
+      key,
+      label: t(`booking.faq.suggest.${key}`),
+      query: t(`booking.faq.suggest.${key}Query`),
+    })),
+    [lang], // eslint-disable-line react-hooks/exhaustive-deps
+  )
   const fillFaqQueryIntoNotes = () => {
     setValue('notes', faqQuery, { shouldValidate: true, shouldDirty: true })
     setFocus('notes')
@@ -203,9 +212,9 @@ export default function BookingPage() {
           </h2>
           <p className="text-sm text-gray-500 mb-3">{t('booking.faq.subtitle')}</p>
           <div className="flex flex-wrap gap-1.5 mb-3">
-            {FAQ_SUGGESTIONS.map((s) => (
+            {faqSuggestions.map((s) => (
               <button
-                key={s.label}
+                key={s.key}
                 type="button"
                 onClick={() => setFaqQuery(s.query)}
                 className="badge bg-gray-100 text-gray-700 hover:bg-gray-200"
