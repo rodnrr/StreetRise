@@ -396,7 +396,10 @@ const RULES: FaqRule[] = [
     // lookahead for just "a"/"an" still let "schedule my/the X" through.
     // Flipped to a positive match instead: only "your/their/the schedule"
     // (asking about it as a noun) fires this rule.
-    keywords: /\b(hours?|open(?!\s+to\b)(s|ing)?|(?<!how )close[sd]?|closing|late|(your|their|the) schedule\b|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*|tarde)\b/i,
+    // Bare "late"/"tarde" fired on non-schedule uses ("Do you accept late
+    // arrivals?", "¿Aceptan llegadas tarde?") — "tarde" is doubly ambiguous
+    // since it also means "afternoon". Restricted to "how late"/"open late".
+    keywords: /\b(hours?|open(?!\s+to\b)(s|ing)?|(?<!how )close[sd]?|closing|how late|open late|(your|their|the) schedule\b|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*)\b/i,
     answer: hoursAnswer,
   },
   {
@@ -427,7 +430,12 @@ const RULES: FaqRule[] = [
     // "located" had the same problem the other way ("Are the showers
     // located downstairs?") — restricted to phrasing whose subject is the
     // listing itself.
-    keywords: /\b(where (is|are|do) (it|this|they|you)|where('?s)? (it|this|they) located|(you|it|they|this)( is| are)? located|address|location|directions|dónde (est[aá]n|est[aá]|queda|se encuentra)|direcci[oó]n|ubicad\w*|ubicaci[oó]n)\b/i,
+    // ubicad\w* had the same problem as English "located" ("¿Las duchas
+    // están ubicadas abajo?") — Spanish's dropped-subject grammar makes a
+    // reliable positive restriction hard, so it's dropped in favor of
+    // keywords that already require the listing as subject ("dónde
+    // están...") or are unambiguous nouns ("ubicación").
+    keywords: /\b(where (is|are|do) (it|this|they|you)|where('?s)? (it|this|they) located|(you|it|they|this)( is| are)? located|address|location|directions|dónde (est[aá]n|est[aá]|queda|se encuentra)|direcci[oó]n|ubicaci[oó]n)\b/i,
     answer: locationAnswer,
   },
   {
@@ -436,7 +444,9 @@ const RULES: FaqRule[] = [
     // Bare "number"/"número" fired on any other numeric question ("What
     // number of beds are available?") whenever the resource had contact
     // data — "phone" alone already covers real phone-number questions.
-    keywords: /\b(phone|call|contact|reach|email|website|tel[eé]fono|llamar|contacto|correo|sitio\s?web)\b/i,
+    // Bare "reach" fired on physical-route questions ("Can I reach this
+    // shelter by bus?") — restricted to the contact sense ("reach them/you").
+    keywords: /\b(phone|call|contact|reach (them|you)|email|website|tel[eé]fono|llamar|contacto|correo|sitio\s?web)\b/i,
     answer: contactAnswer,
   },
   {
@@ -447,7 +457,9 @@ const RULES: FaqRule[] = [
     // population/gender/age terms already cover real eligibility questions.
     // famil\w* also matched "familiar"/"familiarized" (staff being familiar
     // with something, not a family), so family forms are listed explicitly.
-    keywords: /\b(who can|eligib\w*|qualify|men\b|women\b|famil(y|ies)|familias?|veteran\w*|lgbtq\w*|youth|senior\w*|age\b|ages\b|calificar|hombres|mujeres|j[oó]ven(es)?|edad\w*)\b/i,
+    // Bare "who can" fired on unrelated questions with their own next verb
+    // ("Who can I call about intake?") — restricted to service-access verbs.
+    keywords: /\b(who can (stay|use|access|come|apply|get)|eligib\w*|qualify|men\b|women\b|famil(y|ies)|familias?|veteran\w*|lgbtq\w*|youth|senior\w*|age\b|ages\b|calificar|hombres|mujeres|j[oó]ven(es)?|edad\w*)\b/i,
     answer: eligibilityAnswer,
   },
   {
