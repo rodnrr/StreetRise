@@ -409,7 +409,9 @@ const RULES: FaqRule[] = [
     // the place at all, not just availability ("¿Qué tipo de lugar es
     // este?"). Restricted to the actual availability phrasing ("hay lugar",
     // "lugar disponible", "queda lugar" — "is there room/space?").
-    keywords: /\b(bed|beds|spot|spots|room|vacan\w*|availab\w*|cama\w*|hay lugar|lugar disponible|queda\w* lugar|cupo\w*|disponib\w*)\b/i,
+    // (?<!parking )spots? excludes "parking spot(s)" — a question about
+    // parking, not this shelter's own space availability.
+    keywords: /\b(bed|beds|(?<!parking )spots?|room|vacan\w*|availab\w*|cama\w*|hay lugar|lugar disponible|queda\w* lugar|cupo\w*|disponib\w*)\b/i,
     answer: availabilityAnswer,
   },
   {
@@ -435,7 +437,9 @@ const RULES: FaqRule[] = [
     // reliable positive restriction hard, so it's dropped in favor of
     // keywords that already require the listing as subject ("dónde
     // están...") or are unambiguous nouns ("ubicación").
-    keywords: /\b(where (is|are|do) (it|this|they|you)|where('?s)? (it|this|they) located|(you|it|they|this)( is| are)? located|address|location|directions|dónde (est[aá]n|est[aá]|queda|se encuentra)|direcci[oó]n|ubicaci[oó]n)\b/i,
+    // Bare "address" fired on its verb sense ("Can you address dietary
+    // restrictions?") — restricted to noun-phrase usage.
+    keywords: /\b(where (is|are|do) (it|this|they|you)|where('?s)? (it|this|they) located|(you|it|they|this)( is| are)? located|(the|your|their|an?) address|location|directions|dónde (est[aá]n|est[aá]|queda|se encuentra)|direcci[oó]n|ubicaci[oó]n)\b/i,
     answer: locationAnswer,
   },
   {
@@ -513,13 +517,18 @@ const RULES: FaqRule[] = [
     key: 'transit',
     labelKey: 'faq.label.transit',
     // "bus" as a whole word, not a prefix — bus\w* also matched "business".
-    keywords: /\b(bus|buses|bus stop|bus route|transit|transportation|autob[uú]s\w*|transporte\w*)\b/i,
+    // Bare "transportation"/"transporte" fired on a service-offering
+    // question ("Do you provide transportation?") that this field (public
+    // transit *proximity*, not rides the org offers) can't actually answer.
+    keywords: /\b(bus|buses|bus stop|bus route|transit|public transportation|autob[uú]s\w*|transporte p[uú]blico)\b/i,
     answer: (r, ctx) => facilityAnswer(ctx.lang, r.public_transit_accessible, 'faq.facility.transitYes', 'faq.facility.transitNo'),
   },
   {
     key: 'languages',
     labelKey: 'faq.label.languages',
-    keywords: /\blanguages?\b|\bspeak\w*\b|\bidiomas?\b|\bhablan?\b/i,
+    // speak(?!\s+(to|with)\b) excludes "Can I speak to/with a counselor?"
+    // (wanting human contact) while "Do you speak Spanish?" still matches.
+    keywords: /\blanguages?\b|\bspeak(?!\s+(to|with)\b)\w*\b|\bidiomas?\b|\bhablan?\b/i,
     answer: languagesAnswer,
   },
   {
