@@ -12,8 +12,17 @@
 // This deliberately sits alongside the existing human-routed question form,
 // not in place of it — anything not covered here (cost, specific intake
 // steps, anything the data doesn't record) still goes to the provider.
+//
+// Rule *labels* and generated *answer sentences* are localized via i18n's
+// `faq.*` keys (matching the active locale) — only `aboutAnswer`, which is
+// literally the provider-authored `description` field, stays untranslated,
+// consistent with resource descriptions being English-only DB content
+// elsewhere in the app. gender_policy/population_focus labels also stay
+// English-only, matching how those badges render everywhere else (map
+// chips, ResourceSheet, category pages).
 
 import { distanceKm, formatDistance, type LatLng } from '@/lib/geo'
+import { translate, type Lang } from '@/lib/i18n'
 import {
   DAY_KEYS,
   GENDER_POLICY_LABEL,
@@ -37,12 +46,23 @@ export interface FaqContext {
   /** Visitor's location, when granted — powers the distance answer. */
   origin: LatLng | null
   now: Date
+  /** Active UI locale — drives both the rule label and the answer text. */
+  lang: Lang
 }
 
-const DAY_LABEL: Record<DayKey, string> = {
-  sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday',
-  thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday',
+/** `translate` plus `{placeholder}` substitution for the FAQ's templated strings. */
+function t(lang: Lang, key: string, vars: Record<string, string> = {}): string {
+  let s = translate(lang, key)
+  for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(v)
+  return s
 }
+
+const DAY_KEY_TO_I18N: Record<DayKey, string> = {
+  sunday: 'faq.day.sunday', monday: 'faq.day.monday', tuesday: 'faq.day.tuesday',
+  wednesday: 'faq.day.wednesday', thursday: 'faq.day.thursday', friday: 'faq.day.friday',
+  saturday: 'faq.day.saturday',
+}
+const dayLabel = (lang: Lang, day: DayKey) => translate(lang, DAY_KEY_TO_I18N[day])
 
 // English and Spanish weekday names/abbreviations a visitor might name
 // explicitly ("Friday hours?", "¿el domingo?"). Deliberately an explicit
@@ -108,9 +128,15 @@ function hidesAddress(r: Resource): boolean {
   return isConfidential(r) && (r.population_focus?.includes('domestic_violence') ?? false)
 }
 
+/** "call {phone}" or "contact them" — shared by distance/location answers. */
+function contactFragment(lang: Lang, phone: string | undefined): string {
+  return phone ? t(lang, 'faq.common.callPhone', { phone }) : t(lang, 'faq.common.contactThem')
+}
+
 // ── Individual answer builders ──────────────────────────────────────
 
 function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | null {
+  const { lang } = ctx
   const hours = r.hours_of_operation
   const notes = hours?.notes?.trim()
   // `summary` isn't in the HoursOfOperation type but is a real, commonly-seeded
@@ -124,9 +150,7 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
   // An operational `closed` status is independent of the weekly schedule (an
   // unplanned closure, say) and must be surfaced regardless of which day —
   // today or a named one — the schedule below describes.
-  const closedNotice = r.availability_status === 'closed'
-    ? "They're currently marked closed — check before planning around this schedule."
-    : null
+  const closedNotice = r.availability_status === 'closed' ? t(lang, 'faq.hours.closedNotice') : null
 
   // A specific day was named ("Friday hours?") — answer that day's own
   // published window, with no live "right now" framing (meaningless for a
@@ -134,14 +158,15 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
   const askedDay = requestedDay(question, dayIndex)
   if (askedDay && askedDay !== todayKey) {
     const win = windowFor(r, askedDay)
+    const day = dayLabel(lang, askedDay)
     const parts: string[] = []
     if (closedNotice) parts.push(closedNotice)
     if (win?.closed) {
-      parts.push(`They're closed on ${DAY_LABEL[askedDay]}.`)
+      parts.push(t(lang, 'faq.hours.closedOn', { day }))
     } else if (win?.open && win?.close) {
-      parts.push(`On ${DAY_LABEL[askedDay]} they're open ${formatClock(win.open)}–${formatClock(win.close)}.`)
+      parts.push(t(lang, 'faq.hours.openOn', { day, open: formatClock(win.open), close: formatClock(win.close) }))
     } else if (hasKnownHours(r)) {
-      parts.push(`No hours are published for ${DAY_LABEL[askedDay]}.`)
+      parts.push(t(lang, 'faq.hours.noHoursFor', { day }))
     } else if (summary) {
       parts.push(summary)
     }
@@ -152,6 +177,8 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
   const yesterdayKey = DAY_KEYS[(dayIndex + 6) % 7]
   const todayWin = windowFor(r, todayKey)
   const yesterdayWin = windowFor(r, yesterdayKey)
+  const todayName = dayLabel(lang, todayKey)
+  const yesterdayName = dayLabel(lang, yesterdayKey)
 
   // Mirrors mapFilters' isOpenNow: a window that opened yesterday and crosses
   // midnight can still be the one covering "now".
@@ -159,7 +186,8 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
   const openViaYesterday = !openViaToday && coversMinute(yesterdayWin, minutes, true)
   const openNow = (openViaToday || openViaYesterday) && r.availability_status !== 'closed'
   const spilloverLine = openViaYesterday && yesterdayWin?.open && yesterdayWin?.close
-    ? `They opened yesterday (${DAY_LABEL[yesterdayKey]}) at ${formatClock(yesterdayWin.open)} and are open until ${formatClock(yesterdayWin.close)}${openNow ? ' — open right now.' : ', but they are currently marked closed.'}`
+    ? t(lang, 'faq.hours.openedYesterday', { day: yesterdayName, open: formatClock(yesterdayWin.open), close: formatClock(yesterdayWin.close) })
+      + (openNow ? t(lang, 'faq.hours.rightNowOpen') : t(lang, 'faq.hours.yesterdayClosedSuffix'))
     : null
 
   // "today"/"hoy" or a weekday name that happens to equal today were both
@@ -171,33 +199,32 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
   // instead of folding it into today's window (which, at 2am, it isn't).
   const namedToday = askedDay === todayKey
 
-  const stillOpenFromLastNight = openViaYesterday && openNow
-    ? `They're currently open from last night's hours, until ${formatClock(yesterdayWin!.close!)}.`
+  const stillOpenFromLastNight = openViaYesterday && openNow && yesterdayWin?.close
+    ? t(lang, 'faq.hours.stillOpenLastNight', { close: formatClock(yesterdayWin.close) })
     : null
 
   const parts: string[] = []
   if (namedToday && todayWin?.closed) {
-    parts.push(`They're closed today (${DAY_LABEL[todayKey]}).`)
+    parts.push(t(lang, 'faq.hours.closedToday', { day: todayName }))
     if (stillOpenFromLastNight) parts.push(stillOpenFromLastNight)
   } else if (namedToday && todayWin?.open && todayWin?.close) {
-    const todayLine = `Today (${DAY_LABEL[todayKey]}) they're open ${formatClock(todayWin.open)}–${formatClock(todayWin.close)}`
+    const todayLine = t(lang, 'faq.hours.todayWindow', { day: todayName, open: formatClock(todayWin.open), close: formatClock(todayWin.close) })
     if (openViaToday && openNow) {
-      parts.push(`${todayLine} — open right now.`)
+      parts.push(`${todayLine}${t(lang, 'faq.hours.rightNowOpen')}`)
     } else if (stillOpenFromLastNight) {
       parts.push(`${todayLine}. ${stillOpenFromLastNight}`)
     } else {
-      parts.push(`${todayLine} — closed right now.`)
+      parts.push(`${todayLine}${t(lang, 'faq.hours.rightNowClosed')}`)
     }
   } else if (spilloverLine) {
     parts.push(spilloverLine)
   } else if (todayWin?.closed) {
-    parts.push(`They're closed today (${DAY_LABEL[todayKey]}).`)
+    parts.push(t(lang, 'faq.hours.closedToday', { day: todayName }))
   } else if (todayWin?.open && todayWin?.close) {
-    parts.push(
-      `Today (${DAY_LABEL[todayKey]}) they're open ${formatClock(todayWin.open)}–${formatClock(todayWin.close)} — ${openNow ? 'open right now.' : 'closed right now.'}`,
-    )
+    const todayLine = t(lang, 'faq.hours.todayWindow', { day: todayName, open: formatClock(todayWin.open), close: formatClock(todayWin.close) })
+    parts.push(`${todayLine}${openNow ? t(lang, 'faq.hours.rightNowOpen') : t(lang, 'faq.hours.rightNowClosed')}`)
   } else if (hasKnownHours(r)) {
-    parts.push(`No hours are published for ${DAY_LABEL[todayKey]}.`)
+    parts.push(t(lang, 'faq.hours.noHoursFor', { day: todayName }))
   } else if (summary) {
     if (closedNotice) parts.push(closedNotice)
     parts.push(summary)
@@ -208,83 +235,92 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
 }
 
 function distanceAnswer(r: Resource, ctx: FaqContext): string | null {
+  const { lang } = ctx
   // A phone-intake/confidential-address resource's coordinates are often an
   // administrative office or mobile-service base, not a walk-in destination —
   // ResourceSheet suppresses Directions for the same reason, so a distance
   // figure here would be equally misleading.
   if (isConfidential(r)) {
-    return `This isn't a walk-in location, so distance doesn't apply — ${r.phone ? `call ${r.phone}` : 'contact them'} to get connected.`
+    return t(lang, 'faq.distance.confidential', { contact: contactFragment(lang, r.phone) })
   }
   if (r.lat == null || r.lng == null) return null
-  if (!ctx.origin) {
-    return "We don't have your location yet — share it on the map (the locate button) to see the distance here, or use Directions on the listing."
-  }
+  if (!ctx.origin) return t(lang, 'faq.distance.noOrigin')
   const km = distanceKm(ctx.origin, { lat: r.lat, lng: r.lng })
-  return `${r.name} is about ${formatDistance(km)} from your current location.`
+  return t(lang, 'faq.distance.result', { name: r.name, distance: formatDistance(km) })
 }
 
-function locationAnswer(r: Resource): string | null {
+function locationAnswer(r: Resource, ctx: FaqContext): string | null {
+  const { lang } = ctx
   if (hidesAddress(r)) {
-    return `For safety, this address isn't published — ${r.phone ? `call ${r.phone}` : 'contact them'} for the location and intake details.`
+    return t(lang, 'faq.location.hidden', { contact: contactFragment(lang, r.phone) })
   }
   if (isConfidential(r)) {
-    return `They don't publish a walk-in address — ${r.phone ? `call ${r.phone}` : 'contact them'} to get started.`
+    return t(lang, 'faq.location.noWalkInAddress', { contact: contactFragment(lang, r.phone) })
   }
   const addr = [r.address?.street, r.address?.city, r.address?.state, r.address?.zip].filter(Boolean).join(', ')
-  return addr ? `They're located at ${addr}.` : null
+  return addr ? t(lang, 'faq.location.result', { address: addr }) : null
 }
 
-function contactAnswer(r: Resource): string | null {
+function contactAnswer(r: Resource, ctx: FaqContext): string | null {
+  const { lang } = ctx
   const bits: string[] = []
-  if (r.phone) bits.push(`call them at ${r.phone}`)
-  if (r.email) bits.push(`email them at ${r.email}`)
-  if (r.website) bits.push(`visit their website (${r.website.replace(/^https?:\/\//, '')})`)
-  return bits.length ? `You can ${bits.join(' or ')}.` : null
+  if (r.phone) bits.push(t(lang, 'faq.contact.callPhone', { phone: r.phone }))
+  if (r.email) bits.push(t(lang, 'faq.contact.emailThem', { email: r.email }))
+  if (r.website) bits.push(t(lang, 'faq.contact.visitWebsite', { website: r.website.replace(/^https?:\/\//, '') }))
+  if (!bits.length) return null
+  return t(lang, 'faq.contact.wrap', { bits: bits.join(` ${t(lang, 'faq.contact.or')} `) })
 }
 
 function aboutAnswer(r: Resource): string | null {
+  // Provider-authored DB content — stays English-only like resource
+  // descriptions elsewhere in the app (see i18n.ts's own scope comment).
   const d = r.description?.trim()
   return d ? d : null
 }
 
-function eligibilityAnswer(r: Resource): string | null {
+function eligibilityAnswer(r: Resource, ctx: FaqContext): string | null {
+  const { lang } = ctx
   const bits: string[] = []
   if (r.gender_policy && r.gender_policy !== 'unknown') {
     bits.push(GENDER_POLICY_LABEL[r.gender_policy] ?? r.gender_policy)
   }
   if (r.population_focus?.length) {
-    bits.push(`Serves: ${r.population_focus.map((t) => POPULATION_FOCUS_LABEL[t] ?? t).join(', ')}`)
+    const tags = r.population_focus.map((tag) => POPULATION_FOCUS_LABEL[tag] ?? tag).join(', ')
+    bits.push(t(lang, 'faq.eligibility.serves', { tags }))
   }
   if (r.age_min != null) {
-    bits.push(`Ages ${r.age_min}${r.age_max ? `–${r.age_max}` : '+'}`)
+    const range = `${r.age_min}${r.age_max ? `–${r.age_max}` : '+'}`
+    bits.push(t(lang, 'faq.eligibility.ages', { range }))
   }
   return bits.length ? bits.join('. ') + '.' : null
 }
 
-function intakeAnswer(r: Resource): string {
+function intakeAnswer(r: Resource, ctx: FaqContext): string {
+  const { lang } = ctx
   // "No walk-ins" shouldn't itself invent a phone call as the alternative —
   // some resources reject walk-ins but also don't require calling first
   // (access arranged through a website or another site instead), and saying
   // "call ahead" there would contradict the "no need to call first" bit below.
   const noWalkIns = r.phone_required_before_arrival
-    ? 'No walk-ins — call ahead'
-    : 'No walk-ins — contact them to arrange access'
+    ? t(lang, 'faq.intake.noWalkInsCallAhead')
+    : t(lang, 'faq.intake.noWalkInsContact')
   const bits = [
-    r.walk_ins_accepted ? 'Walk-ins are accepted' : noWalkIns,
-    r.requires_id ? 'ID is required' : 'No ID required',
-    r.requires_referral ? 'A referral is required' : 'No referral needed',
-    r.phone_required_before_arrival ? 'Call before visiting' : 'No need to call first',
+    r.walk_ins_accepted ? t(lang, 'faq.intake.walkInsAccepted') : noWalkIns,
+    r.requires_id ? t(lang, 'faq.intake.idRequired') : t(lang, 'faq.intake.noIdRequired'),
+    r.requires_referral ? t(lang, 'faq.intake.referralRequired') : t(lang, 'faq.intake.noReferralRequired'),
+    r.phone_required_before_arrival ? t(lang, 'faq.intake.callBeforeVisiting') : t(lang, 'faq.intake.noNeedToCallFirst'),
   ]
   return bits.join('; ') + '.'
 }
 
-function availabilityAnswer(r: Resource): string | null {
-  const labels: Partial<Record<Resource['availability_status'], string>> = {
-    available: "They're currently marked open / available.",
-    limited: 'Availability is currently marked as limited.',
-    full: "They're currently marked full.",
-    closed: "They're currently marked closed.",
-    unknown: "Availability isn't currently confirmed for this listing.",
+function availabilityAnswer(r: Resource, ctx: FaqContext): string | null {
+  const { lang } = ctx
+  const statusKeys: Partial<Record<Resource['availability_status'], string>> = {
+    available: 'faq.availability.available',
+    limited: 'faq.availability.limited',
+    full: 'faq.availability.full',
+    closed: 'faq.availability.closed',
+    unknown: 'faq.availability.unknown',
   }
   // A `closed`/`full`/`unknown` operational status can outlive a shelter's
   // last-known bed count (status and counts are saved independently in
@@ -292,23 +328,25 @@ function availabilityAnswer(r: Resource): string | null {
   // to that count — a shelter marked unknown shouldn't still be told a
   // specific bed count as though it were confirmed current.
   if (r.availability_status === 'closed' || r.availability_status === 'full' || r.availability_status === 'unknown') {
-    return labels[r.availability_status]!
+    return t(lang, statusKeys[r.availability_status]!)
   }
   if (r.category === 'shelter' && r.beds_total != null) {
     if (r.beds_available != null) {
-      return `${r.beds_available} of ${r.beds_total} beds are currently listed as available.`
+      return t(lang, 'faq.availability.bedsKnown', { available: String(r.beds_available), total: String(r.beds_total) })
     }
-    return `Bed availability isn't currently listed (${r.beds_total} beds total).`
+    return t(lang, 'faq.availability.bedsUnknown', { total: String(r.beds_total) })
   }
-  return labels[r.availability_status] ?? null
+  const key = statusKeys[r.availability_status]
+  return key ? t(lang, key) : null
 }
 
-function facilityAnswer(condition: boolean, yes: string, no: string): string {
-  return condition ? yes : no
+function facilityAnswer(lang: Lang, condition: boolean, yesKey: string, noKey: string): string {
+  return t(lang, condition ? yesKey : noKey)
 }
 
-function languagesAnswer(r: Resource): string | null {
-  return r.languages_spoken?.length ? `Languages spoken: ${r.languages_spoken.join(', ')}.` : null
+function languagesAnswer(r: Resource, ctx: FaqContext): string | null {
+  if (!r.languages_spoken?.length) return null
+  return t(ctx.lang, 'faq.languages.spoken', { list: r.languages_spoken.join(', ') })
 }
 
 // ── Rules ─────────────────────────────────────────────────────────
@@ -319,7 +357,7 @@ function languagesAnswer(r: Resource): string | null {
 
 interface FaqRule {
   key: string
-  label: string
+  labelKey: string
   keywords: RegExp
   /** `question` is the raw (trimmed) query — only `hoursAnswer` uses it, to spot a named weekday. */
   answer: (r: Resource, ctx: FaqContext, question: string) => string | null
@@ -332,7 +370,7 @@ interface FaqRule {
 const RULES: FaqRule[] = [
   {
     key: 'hours',
-    label: 'Hours',
+    labelKey: 'faq.label.hours',
     // hora\w* covers hora/horas/horario/horarios. The verb forms of "open"
     // (abre/abren/abrimos/abrir/abriendo) are listed explicitly rather than
     // as abr\w* — that also matched unrelated "abr"-prefixed words like
@@ -341,12 +379,14 @@ const RULES: FaqRule[] = [
     // open(?!\s+to\b) excludes "open to volunteers"/"open to referrals" etc.
     // — that sense of "open" (receptive/accepting) has nothing to do with
     // hours, but "Are you open?" (no "to" following) still matches.
-    keywords: /\b(hours?|open(?!\s+to\b)(s|ing)?|close[sd]?|closing|late|schedule|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*|tarde)\b/i,
+    // (?<!how )close[sd]? excludes "How close is this to me?" (proximity,
+    // not hours) — that phrasing belongs to the distance rule instead.
+    keywords: /\b(hours?|open(?!\s+to\b)(s|ing)?|(?<!how )close[sd]?|closing|late|schedule|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*|tarde)\b/i,
     answer: hoursAnswer,
   },
   {
     key: 'availability',
-    label: 'Availability',
+    labelKey: 'faq.label.availability',
     // Bare "lugar" ("place") is too generic — it matches any question about
     // the place at all, not just availability ("¿Qué tipo de lugar es
     // este?"). Restricted to the actual availability phrasing ("hay lugar",
@@ -356,17 +396,17 @@ const RULES: FaqRule[] = [
   },
   {
     key: 'distance',
-    label: 'Distance',
+    labelKey: 'faq.label.distance',
     // Bare "near"/"nearby"/"cerca" fired on questions about some other
     // nearby amenity ("Is there a pharmacy nearby?"), answering with this
     // listing's own distance instead. Restricted to phrasing that compares
     // the listing to the visitor ("near me", "cerca de mí").
-    keywords: /\b(how far|distance|miles?|near me|qué tan lejos|que tan lejos|distancia|millas?|cerca de m[ií])\b/i,
+    keywords: /\b(how far|how close|distance|miles?|near me|qué tan lejos|que tan lejos|distancia|millas?|cerca de m[ií])\b/i,
     answer: distanceAnswer,
   },
   {
     key: 'location',
-    label: 'Location',
+    labelKey: 'faq.label.location',
     // Bare "where"/"dónde" fired on any where-question ("Where can I
     // park?"), not just ones about the listing's own location.
     keywords: /\b(where (is|are|do) (it|this|they|you)|where('?s)? (it|this|they) located|address|located|location|directions|dónde (est[aá]n|est[aá]|queda|se encuentra)|direcci[oó]n|ubicad\w*|ubicaci[oó]n)\b/i,
@@ -374,7 +414,7 @@ const RULES: FaqRule[] = [
   },
   {
     key: 'contact',
-    label: 'Contact',
+    labelKey: 'faq.label.contact',
     // Bare "number"/"número" fired on any other numeric question ("What
     // number of beds are available?") whenever the resource had contact
     // data — "phone" alone already covers real phone-number questions.
@@ -383,7 +423,7 @@ const RULES: FaqRule[] = [
   },
   {
     key: 'eligibility',
-    label: 'Who it serves',
+    labelKey: 'faq.label.eligibility',
     // Bare "allowed"/"permitido" fired on any permission question ("Is
     // parking allowed?"), not just eligibility ones — the concrete
     // population/gender/age terms already cover real eligibility questions.
@@ -394,7 +434,7 @@ const RULES: FaqRule[] = [
   },
   {
     key: 'intake',
-    label: 'Getting in',
+    labelKey: 'faq.label.intake',
     // walk[\s-]?in\w* also matched "walking" ("walk" + "in" + "g" with the
     // separator matching zero-width) — restricted to the actual walk-in
     // forms, no trailing wildcard.
@@ -403,58 +443,58 @@ const RULES: FaqRule[] = [
   },
   {
     key: 'showers',
-    label: 'Showers',
+    labelKey: 'faq.label.showers',
     keywords: /\b(shower\w*|duchas?|regaderas?)\b/i,
-    answer: (r) => facilityAnswer(r.has_showers, 'Yes, showers are available.', "They don't list showers as available."),
+    answer: (r, ctx) => facilityAnswer(ctx.lang, r.has_showers, 'faq.facility.showersYes', 'faq.facility.showersNo'),
   },
   {
     key: 'restrooms',
-    label: 'Restrooms',
+    labelKey: 'faq.label.restrooms',
     keywords: /\b(restroom\w*|bathroom\w*|toilet\w*|ba[ñn]os?|sanitarios?)\b/i,
-    answer: (r) => facilityAnswer(r.has_restrooms, 'Yes, restrooms are available.', "They don't list restrooms as available."),
+    answer: (r, ctx) => facilityAnswer(ctx.lang, r.has_restrooms, 'faq.facility.restroomsYes', 'faq.facility.restroomsNo'),
   },
   {
     key: 'meals',
-    label: 'Meals',
+    labelKey: 'faq.label.meals',
     keywords: /\b(meal\w*|food|eat\w*|lunch|dinner|breakfast|comidas?|almuerzo|cena|desayuno|comer)\b/i,
-    answer: (r) => facilityAnswer(r.serves_meals, 'Yes, meals are served here.', "They don't list meals as served here."),
+    answer: (r, ctx) => facilityAnswer(ctx.lang, r.serves_meals, 'faq.facility.mealsYes', 'faq.facility.mealsNo'),
   },
   {
     key: 'laundry',
-    label: 'Laundry',
+    labelKey: 'faq.label.laundry',
     keywords: /\b(laundry|lavander[ií]a)\b/i,
-    answer: (r) => facilityAnswer(r.has_laundry, 'Yes, laundry is available.', "They don't list laundry as available."),
+    answer: (r, ctx) => facilityAnswer(ctx.lang, r.has_laundry, 'faq.facility.laundryYes', 'faq.facility.laundryNo'),
   },
   {
     key: 'pets',
-    label: 'Pets',
+    labelKey: 'faq.label.pets',
     // Whole words only — pet\w*/dog\w*/cat\w* also matched "petition",
     // "dogma", "catering", "category".
     keywords: /\b(pet|pets|dog|dogs|cat|cats|mascotas?|perros?|gatos?)\b/i,
-    answer: (r) => facilityAnswer(r.pet_friendly, 'Yes, pets are welcome.', "They don't list themselves as pet-friendly."),
+    answer: (r, ctx) => facilityAnswer(ctx.lang, r.pet_friendly, 'faq.facility.petsYes', 'faq.facility.petsNo'),
   },
   {
     key: 'accessibility',
-    label: 'Accessibility',
+    labelKey: 'faq.label.accessibility',
     keywords: /\b(wheelchair\w*|accessib\w*|silla de ruedas|accesib\w*)\b/i,
-    answer: (r) => facilityAnswer(r.wheelchair_accessible, 'Yes, this location is wheelchair accessible.', "They don't list wheelchair accessibility."),
+    answer: (r, ctx) => facilityAnswer(ctx.lang, r.wheelchair_accessible, 'faq.facility.accessibilityYes', 'faq.facility.accessibilityNo'),
   },
   {
     key: 'transit',
-    label: 'Transit',
+    labelKey: 'faq.label.transit',
     // "bus" as a whole word, not a prefix — bus\w* also matched "business".
     keywords: /\b(bus|buses|bus stop|bus route|transit|transportation|autob[uú]s\w*|transporte\w*)\b/i,
-    answer: (r) => facilityAnswer(r.public_transit_accessible, "Yes, it's near public transit.", "They don't list themselves as near public transit."),
+    answer: (r, ctx) => facilityAnswer(ctx.lang, r.public_transit_accessible, 'faq.facility.transitYes', 'faq.facility.transitNo'),
   },
   {
     key: 'languages',
-    label: 'Languages',
+    labelKey: 'faq.label.languages',
     keywords: /\blanguages?\b|\bspeak\w*\b|\bidiomas?\b|\bhablan?\b/i,
     answer: languagesAnswer,
   },
   {
     key: 'about',
-    label: 'About',
+    labelKey: 'faq.label.about',
     // Deliberately specific phrasing, not bare "what is"/"who is" — those
     // matched as a prefix of unrelated questions ("What is their phone
     // number?", "What are your Friday hours?"), firing this rule alongside
@@ -478,7 +518,7 @@ export function findFaqAnswers(resource: Resource, question: string, ctx: FaqCon
   for (const rule of RULES) {
     if (!rule.keywords.test(q)) continue
     const answer = rule.answer(resource, ctx, q)
-    if (answer) out.push({ key: rule.key, label: rule.label, answer })
+    if (answer) out.push({ key: rule.key, label: translate(ctx.lang, rule.labelKey), answer })
   }
   return out
 }

@@ -118,8 +118,8 @@ export default function BookingPage() {
     return () => clearInterval(tick)
   }, [])
   const faqAnswers = useMemo(
-    () => (resource ? findFaqAnswers(resource, faqQuery, { origin: userLocation, now: faqNow }) : []),
-    [resource, faqQuery, userLocation, faqNow],
+    () => (resource ? findFaqAnswers(resource, faqQuery, { origin: userLocation, now: faqNow, lang }) : []),
+    [resource, faqQuery, userLocation, faqNow, lang],
   )
   // Localized so a chip click doesn't switch the panel back to English.
   const faqSuggestions = useMemo(
