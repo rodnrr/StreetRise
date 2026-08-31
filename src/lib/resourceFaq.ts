@@ -379,17 +379,24 @@ interface FaqRule {
   answer: (r: Resource, ctx: FaqContext, question: string) => string | null
 }
 
-// "Are there parking spots available?" / "¿Hay estacionamiento disponible?"
-// reuse the exact words (spot(s), available, disponible) this rule looks for
-// on shelter/room availability, just applied to parking instead — excluded
-// whenever "parking"/"estacionamiento" sits near one of those words (either
-// order, same clause), unless the question ALSO names a real availability
-// noun (bed/room/cama/vacancy) this rule can actually answer, so a compound
+// "Are there parking spots available?" / "Are showers available?" reuse the
+// exact words (spot(s)/available/disponible) this rule looks for on
+// shelter/room availability, just describing a different amenity — one that
+// already has its own yes/no rule (parking, showers, restrooms, meals,
+// laundry, pets, wheelchair access, transit) — instead. Excluded whenever
+// one of those amenity words sits near an availability word (either order,
+// same clause), unless the question ALSO names a real availability noun
+// (bed/room/cama/vacancy) this rule can actually answer, so a compound
 // question ("beds available, and is there parking?") still gets answered.
-const PARKING_NEAR_AVAILABILITY_RE = /\bparking\b[^.?!]{0,30}\b(spots?|spaces?|availab\w*|disponib\w*)\b|\b(spots?|spaces?|availab\w*|disponib\w*)\b[^.?!]{0,30}\bparking\b|\bestacionamiento\w*\b/i
+const OTHER_AMENITY_RE_SRC = '(?:parking|estacionamiento\\w*|shower\\w*|duchas?|regaderas?|restroom\\w*|bathroom\\w*|toilet\\w*|ba[ñn]os?|sanitarios?|meal\\w*|food|comidas?|laundry|lavander[ií]a|pet|pets|dog|dogs|cat|cats|mascotas?|perros?|gatos?|wheelchair\\w*|accessib\\w*|accesib\\w*|silla de ruedas|bus|buses|transit|autob[uú]s\\w*|transporte)'
+const AVAILABILITY_ADJ_RE_SRC = '(?:spots?|spaces?|availab\\w*|disponib\\w*)'
+const OTHER_AMENITY_NEAR_AVAILABILITY_RE = new RegExp(
+  `\\b${OTHER_AMENITY_RE_SRC}\\b[^.?!]{0,30}\\b${AVAILABILITY_ADJ_RE_SRC}\\b|\\b${AVAILABILITY_ADJ_RE_SRC}\\b[^.?!]{0,30}\\b${OTHER_AMENITY_RE_SRC}\\b|\\bestacionamiento\\w*\\b`,
+  'i',
+)
 const REAL_AVAILABILITY_RE = /\b(bed|beds|room|vacan\w*|cama\w*|cupo\w*|hay lugar|lugar disponible|queda\w* lugar)\b/i
-function isParkingAvailabilityQuestion(q: string): boolean {
-  return PARKING_NEAR_AVAILABILITY_RE.test(q) && !REAL_AVAILABILITY_RE.test(q)
+function isOtherAmenityAvailabilityQuestion(q: string): boolean {
+  return OTHER_AMENITY_NEAR_AVAILABILITY_RE.test(q) && !REAL_AVAILABILITY_RE.test(q)
 }
 
 // Keyword patterns match English and Spanish: the app's own UI (including this
@@ -433,7 +440,7 @@ const RULES: FaqRule[] = [
     // este?"). Restricted to the actual availability phrasing ("hay lugar",
     // "lugar disponible", "queda lugar" — "is there room/space?").
     keywords: /\b(bed|beds|spots?|room|vacan\w*|availab\w*|cama\w*|hay lugar|lugar disponible|queda\w* lugar|cupo\w*|disponib\w*)\b/i,
-    exclude: isParkingAvailabilityQuestion,
+    exclude: isOtherAmenityAvailabilityQuestion,
     answer: availabilityAnswer,
   },
   {
@@ -516,7 +523,11 @@ const RULES: FaqRule[] = [
   {
     key: 'meals',
     labelKey: 'faq.label.meals',
-    keywords: /\b(meal\w*|food|eat\w*|lunch|dinner|breakfast|comidas?|almuerzo|cena|desayuno|comer)\b/i,
+    // eat\w*(?!\s+disorders?\b) excludes "eating disorder(s)" — a clinical
+    // term for a mental-health question, not a question about this rule's
+    // food service — while "Where can I eat?"/"Do you serve food?" etc.
+    // still match.
+    keywords: /\b(meal\w*|food|eat\w*(?!\s+disorders?\b)|lunch|dinner|breakfast|comidas?|almuerzo|cena|desayuno|comer)\b/i,
     answer: (r, ctx) => facilityAnswer(ctx.lang, r.serves_meals, 'faq.facility.mealsYes', 'faq.facility.mealsNo'),
   },
   {
@@ -536,7 +547,10 @@ const RULES: FaqRule[] = [
   {
     key: 'accessibility',
     labelKey: 'faq.label.accessibility',
-    keywords: /\b(wheelchair\w*|accessib\w*|silla de ruedas|accesib\w*)\b/i,
+    // accessib\w*(?!\s+by\s+...) excludes "accessible by bus/public transit"
+    // — that's asking about transit access (the Transit rule), not the
+    // wheelchair/disability sense this rule answers.
+    keywords: /\b(wheelchair\w*|accessib\w*(?!\s+by\s+(the\s+)?(bus|public\s+transit\w*|public\s+transportation))|silla de ruedas|accesib\w*(?!\s+(en|por)\s+(el\s+)?(autob[uú]s|transporte\s+p[uú]blico)))\b/i,
     answer: (r, ctx) => facilityAnswer(ctx.lang, r.wheelchair_accessible, 'faq.facility.accessibilityYes', 'faq.facility.accessibilityNo'),
   },
   {
