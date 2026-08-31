@@ -331,10 +331,12 @@ const RULES: FaqRule[] = [
   {
     key: 'hours',
     label: 'Hours',
-    // hora\w* covers hora/horas/horario/horarios; abr\w*/abiert\w* cover both
-    // the verb ("abre/abren") and adjective ("abierto/abierta/abiertos")
-    // forms of "open" — the translated placeholder itself uses "abiertos".
-    keywords: /\b(hours?|open(s|ing)?|close[sd]?|closing|late|schedule|hora\w*|abr\w*|abiert\w*|cierr\w*|cerrad\w*|tarde)\b/i,
+    // hora\w* covers hora/horas/horario/horarios. The verb forms of "open"
+    // (abre/abren/abrimos/abrir/abriendo) are listed explicitly rather than
+    // as abr\w* — that also matched unrelated "abr"-prefixed words like
+    // "abrigo(s)" (coat/coats), and even a narrower abr[i]\w* would still
+    // collide with "abrigo" since "abri" is a shared prefix.
+    keywords: /\b(hours?|open(s|ing)?|close[sd]?|closing|late|schedule|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*|tarde)\b/i,
     answer: hoursAnswer,
   },
   {
