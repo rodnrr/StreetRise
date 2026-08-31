@@ -360,7 +360,9 @@ const RULES: FaqRule[] = [
   {
     key: 'location',
     label: 'Location',
-    keywords: /\b(where|address|located|location|directions|dónde|donde|direcci[oó]n|ubicad\w*|ubicaci[oó]n)\b/i,
+    // Bare "where"/"dónde" fired on any where-question ("Where can I
+    // park?"), not just ones about the listing's own location.
+    keywords: /\b(where (is|are|do) (it|this|they|you)|where('?s)? (it|this|they) located|address|located|location|directions|dónde (est[aá]n|est[aá]|queda|se encuentra)|direcci[oó]n|ubicad\w*|ubicaci[oó]n)\b/i,
     answer: locationAnswer,
   },
   {
@@ -386,7 +388,10 @@ const RULES: FaqRule[] = [
   {
     key: 'intake',
     label: 'Getting in',
-    keywords: /\b(id\b|identification|referral|walk[\s-]?in\w*|appointment|call first|need to call|identificaci[oó]n|c[eé]dula|referencia|cita\w*|llamar antes)\b/i,
+    // walk[\s-]?in\w* also matched "walking" ("walk" + "in" + "g" with the
+    // separator matching zero-width) — restricted to the actual walk-in
+    // forms, no trailing wildcard.
+    keywords: /\b(id\b|identification|referral|walk[\s-]?ins?|appointment|call first|need to call|identificaci[oó]n|c[eé]dula|referencia|cita\w*|llamar antes)\b/i,
     answer: intakeAnswer,
   },
   {
