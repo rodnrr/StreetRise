@@ -58,27 +58,33 @@ const DAY_ALIASES: [RegExp, DayKey][] = [
   [/\b(sat|saturdays?|s[aá]bados?)\b/i, 'saturday'],
 ]
 
+const TODAY_RE = /\btoday\b|\bhoy\b/i
 const TOMORROW_RE = /\btomorrow\b|\bma[ñn]ana\b/i
 const YESTERDAY_RE = /\byesterday\b|\bayer\b/i
 // "mañana" is ambiguous in Spanish — bare it means "tomorrow", but "en/por/de
 // la mañana" and "esta mañana" mean "(this) morning" and must NOT be read as
-// a day shift ("¿A qué hora abren en la mañana?" is asking about today).
-const MORNING_PHRASE_RE = /\b(en|por|de) la ma[ñn]ana\b|\besta ma[ñn]ana\b/i
+// a day shift ("¿A qué hora abren en la mañana?" is asking about today). A
+// question can use both senses at once ("¿Abren mañana por la mañana?" —
+// "open tomorrow morning?"), so morning phrases are stripped out (not just
+// detected) before re-testing for a standalone "mañana" left over.
+const MORNING_PHRASE_RE_G = /\b(en|por|de) la ma[ñn]ana\b|\besta ma[ñn]ana\b/gi
 
 /**
  * The weekday a question is actually asking about, if it names one — either
- * explicitly ("Friday", "el domingo") or relatively ("tomorrow", "mañana").
- * `todayIndex` is `zonedNow`'s 0=Sunday..6=Saturday index, needed to resolve
- * the relative terms into an actual day.
+ * explicitly ("Friday", "el domingo", "today", "hoy") or relatively
+ * ("tomorrow", "mañana", "yesterday", "ayer"). `todayIndex` is `zonedNow`'s
+ * 0=Sunday..6=Saturday index, needed to resolve the relative terms and
+ * "today"/"hoy" into an actual day.
  */
 function requestedDay(question: string, todayIndex: number): DayKey | null {
   for (const [re, day] of DAY_ALIASES) {
     if (re.test(question)) return day
   }
-  if (TOMORROW_RE.test(question) && !MORNING_PHRASE_RE.test(question)) {
+  if (TOMORROW_RE.test(question.replace(MORNING_PHRASE_RE_G, ''))) {
     return DAY_KEYS[(todayIndex + 1) % 7]
   }
   if (YESTERDAY_RE.test(question)) return DAY_KEYS[(todayIndex + 6) % 7]
+  if (TODAY_RE.test(question)) return DAY_KEYS[todayIndex]
   return null
 }
 
@@ -122,14 +128,11 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
     ? "They're currently marked closed — check before planning around this schedule."
     : null
 
-  // A specific day was named ("Friday hours?", "Monday hours?") — answer
-  // that day's own published window, even when it happens to equal today:
-  // at 2am Monday with a Sunday-night spillover window still active, "What
-  // are your Monday hours?" means Monday's own 9-5 schedule, not "you're
-  // currently open because of last night". "Right now" framing only makes
-  // sense for the undirected/no-day-named case below.
+  // A specific day was named ("Friday hours?") — answer that day's own
+  // published window, with no live "right now" framing (meaningless for a
+  // day that isn't today).
   const askedDay = requestedDay(question, dayIndex)
-  if (askedDay) {
+  if (askedDay && askedDay !== todayKey) {
     const win = windowFor(r, askedDay)
     const parts: string[] = []
     if (closedNotice) parts.push(closedNotice)
@@ -151,17 +154,42 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
   const yesterdayWin = windowFor(r, yesterdayKey)
 
   // Mirrors mapFilters' isOpenNow: a window that opened yesterday and crosses
-  // midnight can still be the one covering "now", so describe *that* window
-  // rather than always narrating today's (possibly unrelated) hours.
+  // midnight can still be the one covering "now".
   const openViaToday = coversMinute(todayWin, minutes, false)
   const openViaYesterday = !openViaToday && coversMinute(yesterdayWin, minutes, true)
   const openNow = (openViaToday || openViaYesterday) && r.availability_status !== 'closed'
+  const spilloverLine = openViaYesterday && yesterdayWin?.open && yesterdayWin?.close
+    ? `They opened yesterday (${DAY_LABEL[yesterdayKey]}) at ${formatClock(yesterdayWin.open)} and are open until ${formatClock(yesterdayWin.close)}${openNow ? ' — open right now.' : ', but they are currently marked closed.'}`
+    : null
+
+  // "today"/"hoy" or a weekday name that happens to equal today were both
+  // explicitly asking about the calendar day, so — like a different named
+  // day — lead with today's OWN published window rather than a spillover
+  // window from yesterday. Unlike a different day, live status still
+  // applies, so it's appended rather than dropped: if last night's window is
+  // what's actually keeping them open right now, say so as its own clause
+  // instead of folding it into today's window (which, at 2am, it isn't).
+  const namedToday = askedDay === todayKey
+
+  const stillOpenFromLastNight = openViaYesterday && openNow
+    ? `They're currently open from last night's hours, until ${formatClock(yesterdayWin!.close!)}.`
+    : null
 
   const parts: string[] = []
-  if (openViaYesterday && yesterdayWin?.open && yesterdayWin?.close) {
-    parts.push(
-      `They opened yesterday (${DAY_LABEL[yesterdayKey]}) at ${formatClock(yesterdayWin.open)} and are open until ${formatClock(yesterdayWin.close)}${openNow ? ' — open right now.' : ', but they are currently marked closed.'}`,
-    )
+  if (namedToday && todayWin?.closed) {
+    parts.push(`They're closed today (${DAY_LABEL[todayKey]}).`)
+    if (stillOpenFromLastNight) parts.push(stillOpenFromLastNight)
+  } else if (namedToday && todayWin?.open && todayWin?.close) {
+    const todayLine = `Today (${DAY_LABEL[todayKey]}) they're open ${formatClock(todayWin.open)}–${formatClock(todayWin.close)}`
+    if (openViaToday && openNow) {
+      parts.push(`${todayLine} — open right now.`)
+    } else if (stillOpenFromLastNight) {
+      parts.push(`${todayLine}. ${stillOpenFromLastNight}`)
+    } else {
+      parts.push(`${todayLine} — closed right now.`)
+    }
+  } else if (spilloverLine) {
+    parts.push(spilloverLine)
   } else if (todayWin?.closed) {
     parts.push(`They're closed today (${DAY_LABEL[todayKey]}).`)
   } else if (todayWin?.open && todayWin?.close) {
