@@ -57,11 +57,21 @@ const DAY_ALIASES: [RegExp, DayKey][] = [
   [/\bsat\w*\b|\bs[aá]bado\b/i, 'saturday'],
 ]
 
-/** First weekday explicitly named in a question, if any. */
-function requestedDay(question: string): DayKey | null {
+const TOMORROW_RE = /\btomorrow\b|\bma[ñn]ana\b/i
+const YESTERDAY_RE = /\byesterday\b|\bayer\b/i
+
+/**
+ * The weekday a question is actually asking about, if it names one — either
+ * explicitly ("Friday", "el domingo") or relatively ("tomorrow", "mañana").
+ * `todayIndex` is `zonedNow`'s 0=Sunday..6=Saturday index, needed to resolve
+ * the relative terms into an actual day.
+ */
+function requestedDay(question: string, todayIndex: number): DayKey | null {
   for (const [re, day] of DAY_ALIASES) {
     if (re.test(question)) return day
   }
+  if (TOMORROW_RE.test(question)) return DAY_KEYS[(todayIndex + 1) % 7]
+  if (YESTERDAY_RE.test(question)) return DAY_KEYS[(todayIndex + 6) % 7]
   return null
 }
 
@@ -98,7 +108,7 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
   // A specific day other than today was named ("Friday hours?") — answer
   // that day's own published window. "Right now" framing only makes sense
   // for the current day, so this branch never claims open/closed-right-now.
-  const askedDay = requestedDay(question)
+  const askedDay = requestedDay(question, dayIndex)
   if (askedDay && askedDay !== todayKey) {
     const win = windowFor(r, askedDay)
     const parts: string[] = []
@@ -210,10 +220,13 @@ function availabilityAnswer(r: Resource): string | null {
     full: "They're currently marked full.",
     closed: "They're currently marked closed.",
   }
-  // A `closed` operational status can outlive a shelter's last-known bed
-  // count, so it must be checked before falling back to that count — a
-  // provider marking a shelter closed shouldn't still be told "beds available".
-  if (r.availability_status === 'closed') return labels.closed!
+  // A `closed` or `full` operational status can outlive a shelter's
+  // last-known bed count (the two are saved independently), so both must be
+  // checked before falling back to that count — a shelter marked closed or
+  // full shouldn't still be told "beds available".
+  if (r.availability_status === 'closed' || r.availability_status === 'full') {
+    return labels[r.availability_status]!
+  }
   if (r.category === 'shelter' && r.beds_total != null) {
     const avail = r.beds_available != null ? String(r.beds_available) : 'an unknown number of'
     return `${avail} of ${r.beds_total} beds are currently listed as available.`
