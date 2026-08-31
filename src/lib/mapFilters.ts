@@ -488,8 +488,8 @@ export const DISTANCE_OPTIONS_MI = [5, 10, 25, 50]
 
 export const RESOURCE_TIME_ZONE = 'America/New_York'
 
-const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
-type DayKey = (typeof DAY_KEYS)[number]
+export const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+export type DayKey = (typeof DAY_KEYS)[number]
 
 /** Minutes past midnight, or null when the value isn't a usable HH:MM. */
 function toMinutes(value: string | undefined): number | null {

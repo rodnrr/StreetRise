@@ -1,0 +1,311 @@
+// ============================================================
+// StreetRise — Deterministic resource FAQ
+// ============================================================
+//
+// Powers the "Ask a Question" instant-answer panel. Given a free-text
+// question and a resource, this returns zero or more answers built only from
+// fields already on the resource — hours, address, distance, contact info,
+// eligibility, intake conditions, facilities. No network call, no model, no
+// invented facts: a rule that has nothing to say returns null and is simply
+// omitted, so this can never fabricate an answer the data doesn't support.
+//
+// This deliberately sits alongside the existing human-routed question form,
+// not in place of it — anything not covered here (cost, specific intake
+// steps, anything the data doesn't record) still goes to the provider.
+
+import { distanceKm, formatDistance, type LatLng } from '@/lib/geo'
+import {
+  DAY_KEYS,
+  GENDER_POLICY_LABEL,
+  POPULATION_FOCUS_LABEL,
+  hasKnownHours,
+  isOpenNow,
+  zonedNow,
+} from '@/lib/mapFilters'
+import type { DayHours, Resource } from '@/types'
+
+export interface FaqAnswer {
+  key: string
+  /** Short label for what was answered, e.g. "Hours". */
+  label: string
+  answer: string
+}
+
+export interface FaqContext {
+  /** Visitor's location, when granted — powers the distance answer. */
+  origin: LatLng | null
+  now: Date
+}
+
+const DAY_LABEL: Record<(typeof DAY_KEYS)[number], string> = {
+  sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday',
+  thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday',
+}
+
+/** "18:00" → "6:00 PM". Falls back to the raw string if it isn't HH:MM. */
+function formatClock(value: string): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(value.trim())
+  if (!m) return value
+  let hour = Number(m[1])
+  const minute = m[2]
+  if (hour >= 24) return '11:59 PM'
+  const suffix = hour >= 12 ? 'PM' : 'AM'
+  hour = hour % 12 || 12
+  return `${hour}:${minute} ${suffix}`
+}
+
+function isConfidential(r: Resource): boolean {
+  return r.access_type === 'confidential_address' || r.access_type === 'phone_intake'
+}
+
+function hidesAddress(r: Resource): boolean {
+  return isConfidential(r) && (r.population_focus?.includes('domestic_violence') ?? false)
+}
+
+// ── Individual answer builders ──────────────────────────────────────
+
+function hoursAnswer(r: Resource, ctx: FaqContext): string | null {
+  const hours = r.hours_of_operation
+  const notes = hours?.notes?.trim()
+  if (!hasKnownHours(r) && !notes) return null
+
+  const { dayIndex } = zonedNow(ctx.now)
+  const todayKey = DAY_KEYS[dayIndex]
+  const today: DayHours | undefined = hours?.[todayKey]
+
+  const parts: string[] = []
+  if (today) {
+    if (today.closed) {
+      parts.push(`They're closed today (${DAY_LABEL[todayKey]}).`)
+    } else if (today.open && today.close) {
+      const openNow = isOpenNow(r, ctx.now)
+      parts.push(
+        `Today (${DAY_LABEL[todayKey]}) they're open ${formatClock(today.open)}–${formatClock(today.close)} — ${openNow ? 'open right now.' : 'closed right now.'}`,
+      )
+    }
+  } else if (hasKnownHours(r)) {
+    parts.push(`No hours are published for ${DAY_LABEL[todayKey]}.`)
+  }
+  if (notes) parts.push(notes)
+
+  return parts.length ? parts.join(' ') : null
+}
+
+function distanceAnswer(r: Resource, ctx: FaqContext): string | null {
+  if (r.lat == null || r.lng == null) return null
+  if (!ctx.origin) {
+    return "We don't have your location yet — share it on the map (the locate button) to see the distance here, or use Directions on the listing."
+  }
+  const km = distanceKm(ctx.origin, { lat: r.lat, lng: r.lng })
+  return `${r.name} is about ${formatDistance(km)} from your current location.`
+}
+
+function locationAnswer(r: Resource): string | null {
+  if (hidesAddress(r)) {
+    return `For safety, this address isn't published — ${r.phone ? `call ${r.phone}` : 'contact them'} for the location and intake details.`
+  }
+  if (isConfidential(r)) {
+    return `They don't publish a walk-in address — ${r.phone ? `call ${r.phone}` : 'contact them'} to get started.`
+  }
+  const addr = [r.address?.street, r.address?.city, r.address?.state, r.address?.zip].filter(Boolean).join(', ')
+  return addr ? `They're located at ${addr}.` : null
+}
+
+function contactAnswer(r: Resource): string | null {
+  const bits: string[] = []
+  if (r.phone) bits.push(`call them at ${r.phone}`)
+  if (r.website) bits.push(`visit their website (${r.website.replace(/^https?:\/\//, '')})`)
+  return bits.length ? `You can ${bits.join(' or ')}.` : null
+}
+
+function aboutAnswer(r: Resource): string | null {
+  const d = r.description?.trim()
+  return d ? d : null
+}
+
+function eligibilityAnswer(r: Resource): string | null {
+  const bits: string[] = []
+  if (r.gender_policy && r.gender_policy !== 'unknown') {
+    bits.push(GENDER_POLICY_LABEL[r.gender_policy] ?? r.gender_policy)
+  }
+  if (r.population_focus?.length) {
+    bits.push(`Serves: ${r.population_focus.map((t) => POPULATION_FOCUS_LABEL[t] ?? t).join(', ')}`)
+  }
+  if (r.age_min != null) {
+    bits.push(`Ages ${r.age_min}${r.age_max ? `–${r.age_max}` : '+'}`)
+  }
+  return bits.length ? bits.join('. ') + '.' : null
+}
+
+function intakeAnswer(r: Resource): string {
+  const bits = [
+    r.walk_ins_accepted ? 'Walk-ins are accepted' : 'No walk-ins — call ahead',
+    r.requires_id ? 'ID is required' : 'No ID required',
+    r.requires_referral ? 'A referral is required' : 'No referral needed',
+    r.phone_required_before_arrival ? 'Call before visiting' : 'No need to call first',
+  ]
+  return bits.join('; ') + '.'
+}
+
+function availabilityAnswer(r: Resource): string | null {
+  if (r.category === 'shelter' && r.beds_total != null) {
+    const avail = r.beds_available != null ? String(r.beds_available) : 'an unknown number of'
+    return `${avail} of ${r.beds_total} beds are currently listed as available.`
+  }
+  const labels: Partial<Record<Resource['availability_status'], string>> = {
+    available: "They're currently marked open / available.",
+    limited: 'Availability is currently marked as limited.',
+    full: "They're currently marked full.",
+    closed: "They're currently marked closed.",
+  }
+  return labels[r.availability_status] ?? null
+}
+
+function facilityAnswer(condition: boolean, yes: string, no: string): string {
+  return condition ? yes : no
+}
+
+function languagesAnswer(r: Resource): string | null {
+  return r.languages_spoken?.length ? `Languages spoken: ${r.languages_spoken.join(', ')}.` : null
+}
+
+// ── Rules ─────────────────────────────────────────────────────────
+//
+// Every rule whose keyword pattern matches the question runs; a question
+// can trigger several at once ("hours and address?"). Order controls the
+// order answers are shown in, not which ones fire.
+
+interface FaqRule {
+  key: string
+  label: string
+  keywords: RegExp
+  answer: (r: Resource, ctx: FaqContext) => string | null
+}
+
+const RULES: FaqRule[] = [
+  {
+    key: 'hours',
+    label: 'Hours',
+    keywords: /\b(hours?|open(s|ing)?|close[sd]?|closing|late|schedule)\b/i,
+    answer: hoursAnswer,
+  },
+  {
+    key: 'availability',
+    label: 'Availability',
+    keywords: /\b(bed|beds|spot|spots|room|vacan\w*|availab\w*)\b/i,
+    answer: availabilityAnswer,
+  },
+  {
+    key: 'distance',
+    label: 'Distance',
+    keywords: /\b(how far|distance|miles?|near(by|\s?me)?)\b/i,
+    answer: distanceAnswer,
+  },
+  {
+    key: 'location',
+    label: 'Location',
+    keywords: /\b(where|address|located|location|directions)\b/i,
+    answer: locationAnswer,
+  },
+  {
+    key: 'contact',
+    label: 'Contact',
+    keywords: /\b(phone|call|number|contact|reach|email|website)\b/i,
+    answer: contactAnswer,
+  },
+  {
+    key: 'eligibility',
+    label: 'Who it serves',
+    keywords: /\b(who can|eligib\w*|qualify|men\b|women\b|famil\w*|veteran\w*|lgbtq\w*|youth|senior\w*|age\b|ages\b|allowed)\b/i,
+    answer: eligibilityAnswer,
+  },
+  {
+    key: 'intake',
+    label: 'Getting in',
+    keywords: /\b(id\b|identification|referral|walk[\s-]?in\w*|appointment|call first|need to call)\b/i,
+    answer: intakeAnswer,
+  },
+  {
+    key: 'showers',
+    label: 'Showers',
+    keywords: /\bshower\w*\b/i,
+    answer: (r) => facilityAnswer(r.has_showers, 'Yes, showers are available.', "They don't list showers as available."),
+  },
+  {
+    key: 'restrooms',
+    label: 'Restrooms',
+    keywords: /\b(restroom\w*|bathroom\w*|toilet\w*)\b/i,
+    answer: (r) => facilityAnswer(r.has_restrooms, 'Yes, restrooms are available.', "They don't list restrooms as available."),
+  },
+  {
+    key: 'meals',
+    label: 'Meals',
+    keywords: /\b(meal\w*|food|eat\w*|lunch|dinner|breakfast)\b/i,
+    answer: (r) => facilityAnswer(r.serves_meals, 'Yes, meals are served here.', "They don't list meals as served here."),
+  },
+  {
+    key: 'laundry',
+    label: 'Laundry',
+    keywords: /\blaundry\b/i,
+    answer: (r) => facilityAnswer(r.has_laundry, 'Yes, laundry is available.', "They don't list laundry as available."),
+  },
+  {
+    key: 'pets',
+    label: 'Pets',
+    keywords: /\b(pet\w*|dog\w*|cat\w*)\b/i,
+    answer: (r) => facilityAnswer(r.pet_friendly, 'Yes, pets are welcome.', "They don't list themselves as pet-friendly."),
+  },
+  {
+    key: 'accessibility',
+    label: 'Accessibility',
+    keywords: /\b(wheelchair\w*|accessib\w*)\b/i,
+    answer: (r) => facilityAnswer(r.wheelchair_accessible, 'Yes, this location is wheelchair accessible.', "They don't list wheelchair accessibility."),
+  },
+  {
+    key: 'transit',
+    label: 'Transit',
+    keywords: /\b(bus\w*|transit|transportation)\b/i,
+    answer: (r) => facilityAnswer(r.public_transit_accessible, "Yes, it's near public transit.", "They don't list themselves as near public transit."),
+  },
+  {
+    key: 'languages',
+    label: 'Languages',
+    keywords: /\blanguages?\b|\bspeak\w*\b/i,
+    answer: languagesAnswer,
+  },
+  {
+    key: 'about',
+    label: 'About',
+    keywords: /\b(what (is|do|are)|who (are|is)|about|services)\b/i,
+    answer: aboutAnswer,
+  },
+]
+
+/**
+ * Match a free-text question against every rule and return the answers for
+ * the rules that both match the question's keywords AND have something to
+ * say. A rule matching keywords but returning null (data not recorded) is
+ * dropped rather than shown as an empty or apologetic card.
+ */
+export function findFaqAnswers(resource: Resource, question: string, ctx: FaqContext): FaqAnswer[] {
+  const q = question.trim()
+  if (q.length < 2) return []
+
+  const out: FaqAnswer[] = []
+  for (const rule of RULES) {
+    if (!rule.keywords.test(q)) continue
+    const answer = rule.answer(resource, ctx)
+    if (answer) out.push({ key: rule.key, label: rule.label, answer })
+  }
+  return out
+}
+
+/** Suggestion chips shown before the visitor types anything. */
+export const FAQ_SUGGESTIONS: { label: string; query: string }[] = [
+  { label: 'Hours', query: 'What time do they open and close today?' },
+  { label: 'Distance', query: 'How far is this from me?' },
+  { label: 'Address', query: 'Where are they located?' },
+  { label: 'Contact', query: 'What is their phone number?' },
+  { label: 'Requirements', query: 'Do I need an ID or referral, or can I just walk in?' },
+  { label: 'Availability', query: 'Do they have space available right now?' },
+]

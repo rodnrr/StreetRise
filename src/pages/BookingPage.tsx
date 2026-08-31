@@ -4,11 +4,12 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { CheckCircle, ArrowLeft, Users, Calendar, MessageSquare, BedDouble } from 'lucide-react'
+import { CheckCircle, ArrowLeft, Users, Calendar, MessageSquare, BedDouble, Sparkles } from 'lucide-react'
 import clsx from 'clsx'
 import { db } from '@/lib/supabase'
-import { useToast } from '@/lib/store'
+import { useToast, useMapStore } from '@/lib/store'
 import { useI18n } from '@/lib/i18n'
+import { findFaqAnswers, FAQ_SUGGESTIONS } from '@/lib/resourceFaq'
 import type { Resource } from '@/types'
 
 // Validation messages are built from the active locale so error text matches
@@ -93,7 +94,7 @@ export default function BookingPage() {
     enabled: !!resourceId,
   })
 
-  const { register, handleSubmit, trigger, formState: { errors, isSubmitting, submitCount } } =
+  const { register, handleSubmit, trigger, setValue, setFocus, formState: { errors, isSubmitting, submitCount } } =
     useForm<FormData>({
       resolver: zodResolver(schema),
       defaultValues: { adults: 1, children: 0, contact_preference: 'either', contact_consent: false },
@@ -105,6 +106,18 @@ export default function BookingPage() {
   useEffect(() => {
     if (submitCount > 0) trigger()
   }, [lang, submitCount, trigger])
+
+  // Instant-answer FAQ panel (question flow only) — see @/lib/resourceFaq.
+  const userLocation = useMapStore((s) => s.userLocation)
+  const [faqQuery, setFaqQuery] = useState('')
+  const faqAnswers = useMemo(
+    () => (resource ? findFaqAnswers(resource, faqQuery, { origin: userLocation, now: new Date() }) : []),
+    [resource, faqQuery, userLocation],
+  )
+  const fillFaqQueryIntoNotes = () => {
+    setValue('notes', faqQuery, { shouldValidate: true, shouldDirty: true })
+    setFocus('notes')
+  }
 
   const submit = useMutation({
     mutationFn: async (data: FormData) => {
@@ -176,6 +189,54 @@ export default function BookingPage() {
           </div>
         )}
       </div>
+      {isQuestion && (
+        <div className="card mb-5">
+          <h2 className="font-bold text-gray-900 text-base mb-1 flex items-center gap-1.5">
+            <Sparkles size={16} className="text-primary-600" /> {t('booking.faq.title')}
+          </h2>
+          <p className="text-sm text-gray-500 mb-3">{t('booking.faq.subtitle')}</p>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {FAQ_SUGGESTIONS.map((s) => (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => setFaqQuery(s.query)}
+                className="badge bg-gray-100 text-gray-700 hover:bg-gray-200"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <input
+            value={faqQuery}
+            onChange={(e) => setFaqQuery(e.target.value)}
+            className="input"
+            placeholder={t('booking.faq.placeholder')}
+          />
+          {faqQuery.trim().length > 1 && (
+            faqAnswers.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {faqAnswers.map((a) => (
+                  <div key={a.key} className="rounded-xl bg-primary-50 p-3">
+                    <p className="text-xs font-semibold text-primary-700 mb-0.5">{a.label}</p>
+                    <p className="text-sm text-gray-700">{a.answer}</p>
+                  </div>
+                ))}
+                <button type="button" onClick={fillFaqQueryIntoNotes} className="text-sm font-medium text-primary-600 hover:underline">
+                  {t('booking.faq.stillAsk')}
+                </button>
+              </div>
+            ) : (
+              <div className="mt-3 space-y-2">
+                <p className="text-sm text-gray-500">{t('booking.faq.noMatch')}</p>
+                <button type="button" onClick={fillFaqQueryIntoNotes} className="text-sm font-medium text-primary-600 hover:underline">
+                  {t('booking.faq.fillIn')}
+                </button>
+              </div>
+            )
+          )}
+        </div>
+      )}
       <div className="card">
         <h1 className="font-bold text-gray-900 text-lg mb-2">
           {isQuestion ? t('booking.askQuestion') : t(getBookingLabelKey(resource, isFull))}

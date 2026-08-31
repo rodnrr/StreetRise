@@ -117,6 +117,14 @@ const en: Dict = {
   'booking.err.adult': 'At least 1 adult',
   'booking.err.contactRequired': 'Phone or email required',
   'booking.err.questionRequired': 'Type your question so the provider can answer it',
+
+  // Instant-answer FAQ panel (Ask a Question)
+  'booking.faq.title': 'Ask about this listing',
+  'booking.faq.subtitle': "Try hours, distance, requirements, or contact info — we'll answer instantly from what we know.",
+  'booking.faq.placeholder': 'e.g. How late are you open?',
+  'booking.faq.noMatch': "We don't have an instant answer for that — send it to them below and they'll reply directly.",
+  'booking.faq.stillAsk': 'Still want to ask them directly?',
+  'booking.faq.fillIn': 'Fill this into my question below',
 }
 
 const es: Dict = {
@@ -212,6 +220,14 @@ const es: Dict = {
   'booking.err.adult': 'Al menos 1 adulto',
   'booking.err.contactRequired': 'Se requiere teléfono o correo',
   'booking.err.questionRequired': 'Escribe tu pregunta para que el proveedor pueda responderla',
+
+  // Panel de respuestas instantáneas (Hacer una Pregunta)
+  'booking.faq.title': 'Pregunta sobre este lugar',
+  'booking.faq.subtitle': 'Prueba con horarios, distancia, requisitos o datos de contacto — responderemos al instante con lo que sabemos.',
+  'booking.faq.placeholder': 'Ej. ¿Hasta qué hora están abiertos?',
+  'booking.faq.noMatch': 'No tenemos una respuesta instantánea para eso — envíala abajo y te responderán directamente.',
+  'booking.faq.stillAsk': '¿Aún quieres preguntarles directamente?',
+  'booking.faq.fillIn': 'Usar esto como mi pregunta abajo',
 }
 
 export const translations: Record<Lang, Dict> = { en, es }
