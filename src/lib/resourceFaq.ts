@@ -224,6 +224,7 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
     const todayLine = t(lang, 'faq.hours.todayWindow', { day: todayName, open: formatClock(todayWin.open), close: formatClock(todayWin.close) })
     parts.push(`${todayLine}${openNow ? t(lang, 'faq.hours.rightNowOpen') : t(lang, 'faq.hours.rightNowClosed')}`)
   } else if (hasKnownHours(r)) {
+    if (closedNotice) parts.push(closedNotice)
     parts.push(t(lang, 'faq.hours.noHoursFor', { day: todayName }))
   } else if (summary) {
     if (closedNotice) parts.push(closedNotice)
@@ -389,10 +390,13 @@ const RULES: FaqRule[] = [
     // hours, but "Are you open?" (no "to" following) still matches.
     // (?<!how )close[sd]? excludes "How close is this to me?" (proximity,
     // not hours) — that phrasing belongs to the distance rule instead.
-    // schedule(?!\s+an?\b) excludes "schedule an/a appointment" (the verb
-    // sense, about booking) while "What is your schedule?" (the noun sense)
-    // still matches.
-    keywords: /\b(hours?|open(?!\s+to\b)(s|ing)?|(?<!how )close[sd]?|closing|late|schedule(?!\s+an?\b)|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*|tarde)\b/i,
+    // "schedule" is ambiguous between the noun (hours) and verb (booking)
+    // senses, and the verb sense takes too many determiners ("schedule
+    // an/a/my/the/our appointment") to exclude by enumeration — a negative
+    // lookahead for just "a"/"an" still let "schedule my/the X" through.
+    // Flipped to a positive match instead: only "your/their/the schedule"
+    // (asking about it as a noun) fires this rule.
+    keywords: /\b(hours?|open(?!\s+to\b)(s|ing)?|(?<!how )close[sd]?|closing|late|(your|their|the) schedule\b|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*|tarde)\b/i,
     answer: hoursAnswer,
   },
   {
@@ -419,8 +423,11 @@ const RULES: FaqRule[] = [
     key: 'location',
     labelKey: 'faq.label.location',
     // Bare "where"/"dónde" fired on any where-question ("Where can I
-    // park?"), not just ones about the listing's own location.
-    keywords: /\b(where (is|are|do) (it|this|they|you)|where('?s)? (it|this|they) located|address|located|location|directions|dónde (est[aá]n|est[aá]|queda|se encuentra)|direcci[oó]n|ubicad\w*|ubicaci[oó]n)\b/i,
+    // park?"), not just ones about the listing's own location. Bare
+    // "located" had the same problem the other way ("Are the showers
+    // located downstairs?") — restricted to phrasing whose subject is the
+    // listing itself.
+    keywords: /\b(where (is|are|do) (it|this|they|you)|where('?s)? (it|this|they) located|(you|it|they|this)( is| are)? located|address|location|directions|dónde (est[aá]n|est[aá]|queda|se encuentra)|direcci[oó]n|ubicad\w*|ubicaci[oó]n)\b/i,
     answer: locationAnswer,
   },
   {
