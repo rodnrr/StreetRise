@@ -116,11 +116,14 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
     ? "They're currently marked closed — check before planning around this schedule."
     : null
 
-  // A specific day other than today was named ("Friday hours?") — answer
-  // that day's own published window. "Right now" framing only makes sense
-  // for the current day, so this branch never claims open/closed-right-now.
+  // A specific day was named ("Friday hours?", "Monday hours?") — answer
+  // that day's own published window, even when it happens to equal today:
+  // at 2am Monday with a Sunday-night spillover window still active, "What
+  // are your Monday hours?" means Monday's own 9-5 schedule, not "you're
+  // currently open because of last night". "Right now" framing only makes
+  // sense for the undirected/no-day-named case below.
   const askedDay = requestedDay(question, dayIndex)
-  if (askedDay && askedDay !== todayKey) {
+  if (askedDay) {
     const win = windowFor(r, askedDay)
     const parts: string[] = []
     if (closedNotice) parts.push(closedNotice)
@@ -319,7 +322,10 @@ const RULES: FaqRule[] = [
   {
     key: 'contact',
     label: 'Contact',
-    keywords: /\b(phone|call|number|contact|reach|email|website|tel[eé]fono|llamar|n[uú]mero|contacto|correo|sitio\s?web)\b/i,
+    // Bare "number"/"número" fired on any other numeric question ("What
+    // number of beds are available?") whenever the resource had contact
+    // data — "phone" alone already covers real phone-number questions.
+    keywords: /\b(phone|call|contact|reach|email|website|tel[eé]fono|llamar|contacto|correo|sitio\s?web)\b/i,
     answer: contactAnswer,
   },
   {
@@ -361,7 +367,9 @@ const RULES: FaqRule[] = [
   {
     key: 'pets',
     label: 'Pets',
-    keywords: /\b(pet\w*|dog\w*|cat\w*|mascotas?|perros?|gatos?)\b/i,
+    // Whole words only — pet\w*/dog\w*/cat\w* also matched "petition",
+    // "dogma", "catering", "category".
+    keywords: /\b(pet|pets|dog|dogs|cat|cats|mascotas?|perros?|gatos?)\b/i,
     answer: (r) => facilityAnswer(r.pet_friendly, 'Yes, pets are welcome.', "They don't list themselves as pet-friendly."),
   },
   {
