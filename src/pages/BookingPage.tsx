@@ -207,7 +207,7 @@ export default function BookingPage() {
       </div>
       {isQuestion && (
         <div className="card mb-5">
-          <h2 className="font-bold text-gray-900 text-base mb-1 flex items-center gap-1.5">
+          <h2 id="faq-panel-heading" className="font-bold text-gray-900 text-base mb-1 flex items-center gap-1.5">
             <Sparkles size={16} className="text-primary-600" /> {t('booking.faq.title')}
           </h2>
           <p className="text-sm text-gray-500 mb-3">{t('booking.faq.subtitle')}</p>
@@ -228,6 +228,7 @@ export default function BookingPage() {
             onChange={(e) => setFaqQuery(e.target.value)}
             className="input"
             placeholder={t('booking.faq.placeholder')}
+            aria-labelledby="faq-panel-heading"
           />
           {faqQuery.trim().length > 1 && (
             faqAnswers.length > 0 ? (

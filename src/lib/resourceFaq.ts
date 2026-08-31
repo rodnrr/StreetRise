@@ -265,8 +265,10 @@ function availabilityAnswer(r: Resource): string | null {
     return labels[r.availability_status]!
   }
   if (r.category === 'shelter' && r.beds_total != null) {
-    const avail = r.beds_available != null ? String(r.beds_available) : 'an unknown number of'
-    return `${avail} of ${r.beds_total} beds are currently listed as available.`
+    if (r.beds_available != null) {
+      return `${r.beds_available} of ${r.beds_total} beds are currently listed as available.`
+    }
+    return `Bed availability isn't currently listed (${r.beds_total} beds total).`
   }
   return labels[r.availability_status] ?? null
 }
