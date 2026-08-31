@@ -429,7 +429,9 @@ const RULES: FaqRule[] = [
     // open(?!\s+(bed|room|spot)s?\b) excludes "an open bed/room/spot" — that
     // "open" describes availability, not the hours this rule answers, and
     // the availability rule already covers "bed"/"room"/"spot" on its own.
-    keywords: /\b(hours?|open(?!\s+to\b)(?!\s+(bed|room|spot)s?\b)(s|ing)?|(?<!how )close[sd]?|closing|how late|open late|(your|their|the) schedule\b|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*)\b/i,
+    // (?<!job\s)open...ing excludes "a job opening" — that's the employment
+    // noun sense, not this listing's own hours.
+    keywords: /\b(hours?|(?<!job\s)open(?!\s+to\b)(?!\s+(bed|room|spot)s?\b)(s|ing)?|(?<!how )close[sd]?|closing|how late|open late|(your|their|the) schedule\b|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*)\b/i,
     answer: hoursAnswer,
   },
   {
@@ -450,7 +452,11 @@ const RULES: FaqRule[] = [
     // nearby amenity ("Is there a pharmacy nearby?"), answering with this
     // listing's own distance instead. Restricted to phrasing that compares
     // the listing to the visitor ("near me", "cerca de mí").
-    keywords: /\b(how far|how close|distance|miles?|near me|qué tan lejos|que tan lejos|distancia|millas?|cerca de m[ií])\b/i,
+    // \b relies on JS's ASCII-only \w, so it isn't actually a boundary right
+    // after an accented letter (í here) when followed by punctuation/space —
+    // both sides read as "non-word", so \b never fires and "¿Está cerca de
+    // mí?" silently fails to match. Custom Unicode-aware boundaries instead.
+    keywords: /(?<![a-zA-ZÀ-ÿ0-9_])(how far|how close|distance|miles?|near me|qué tan lejos|que tan lejos|distancia|millas?|cerca de m[ií])(?![a-zA-ZÀ-ÿ0-9_])/i,
     answer: distanceAnswer,
   },
   {
@@ -468,7 +474,9 @@ const RULES: FaqRule[] = [
     // están...") or are unambiguous nouns ("ubicación").
     // Bare "address" fired on its verb sense ("Can you address dietary
     // restrictions?") — restricted to noun-phrase usage.
-    keywords: /\b(where (is|are|do) (it|this|they|you)|where('?s)? (it|this|they) located|(you|it|they|this)( is| are)? located|(the|your|their|an?) address|location|directions|dónde (est[aá]n|est[aá]|queda|se encuentra)|direcci[oó]n|ubicaci[oó]n)\b/i,
+    // Same ASCII-only-\b issue as the distance rule above — "está" (no "n")
+    // and other accented endings need Unicode-aware boundaries instead of \b.
+    keywords: /(?<![a-zA-ZÀ-ÿ0-9_])(where (is|are|do) (it|this|they|you)|where('?s)? (it|this|they) located|(you|it|they|this)( is| are)? located|(the|your|their|an?) address|location|directions|dónde (est[aá]n|est[aá]|queda|se encuentra)|direcci[oó]n|ubicaci[oó]n)(?![a-zA-ZÀ-ÿ0-9_])/i,
     answer: locationAnswer,
   },
   {
@@ -527,7 +535,10 @@ const RULES: FaqRule[] = [
     // term for a mental-health question, not a question about this rule's
     // food service — while "Where can I eat?"/"Do you serve food?" etc.
     // still match.
-    keywords: /\b(meal\w*|food|eat\w*(?!\s+disorders?\b)|lunch|dinner|breakfast|comidas?|almuerzo|cena|desayuno|comer)\b/i,
+    // food(?!\s+stamps?\b) excludes "food stamps" — that's asking about a
+    // benefits program this field (whether meals are served on-site) can't
+    // establish either way.
+    keywords: /\b(meal\w*|food(?!\s+stamps?\b)|eat\w*(?!\s+disorders?\b)|lunch|dinner|breakfast|comidas?|almuerzo|cena|desayuno|comer)\b/i,
     answer: (r, ctx) => facilityAnswer(ctx.lang, r.serves_meals, 'faq.facility.mealsYes', 'faq.facility.mealsNo'),
   },
   {
@@ -541,7 +552,11 @@ const RULES: FaqRule[] = [
     labelKey: 'faq.label.pets',
     // Whole words only — pet\w*/dog\w*/cat\w* also matched "petition",
     // "dogma", "catering", "category".
-    keywords: /\b(pet|pets|dog|dogs|cat|cats|mascotas?|perros?|gatos?)\b/i,
+    // (?<!service\s)dogs? excludes "service dog(s)" — that's an
+    // accessibility/service-animal policy question `pet_friendly` (a general
+    // no-pets-vs-pets-welcome field) can't actually answer, and answering it
+    // anyway could wrongly discourage someone with a real accessibility need.
+    keywords: /\b(pet|pets|(?<!service\s)dogs?|cat|cats|mascotas?|(?<!servicio\s)perros?|gatos?)\b/i,
     answer: (r, ctx) => facilityAnswer(ctx.lang, r.pet_friendly, 'faq.facility.petsYes', 'faq.facility.petsNo'),
   },
   {
@@ -560,7 +575,9 @@ const RULES: FaqRule[] = [
     // Bare "transportation"/"transporte" fired on a service-offering
     // question ("Do you provide transportation?") that this field (public
     // transit *proximity*, not rides the org offers) can't actually answer.
-    keywords: /\b(bus|buses|bus stop|bus route|transit|public transportation|autob[uú]s\w*|transporte p[uú]blico)\b/i,
+    // bus(es)?(?!\s+pass...) excludes "bus pass(es)" — that's asking about a
+    // fare-assistance program, not whether this location is near a bus.
+    keywords: /\b(bus(?!\s+pass(es)?\b)|buses(?!\s+pass(es)?\b)|bus stop|bus route|transit|public transportation|autob[uú]s\w*|transporte p[uú]blico)\b/i,
     answer: (r, ctx) => facilityAnswer(ctx.lang, r.public_transit_accessible, 'faq.facility.transitYes', 'faq.facility.transitNo'),
   },
   {
