@@ -204,6 +204,10 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
     : null
 
   const parts: string[] = []
+  // Applies to every branch below, not just the no-structured-hours
+  // fallbacks — an operational closure needs to read as a closure, not as
+  // a routine after-hours gap in an otherwise-normal published schedule.
+  if (closedNotice) parts.push(closedNotice)
   if (namedToday && todayWin?.closed) {
     parts.push(t(lang, 'faq.hours.closedToday', { day: todayName }))
     if (stillOpenFromLastNight) parts.push(stillOpenFromLastNight)
@@ -224,10 +228,8 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
     const todayLine = t(lang, 'faq.hours.todayWindow', { day: todayName, open: formatClock(todayWin.open), close: formatClock(todayWin.close) })
     parts.push(`${todayLine}${openNow ? t(lang, 'faq.hours.rightNowOpen') : t(lang, 'faq.hours.rightNowClosed')}`)
   } else if (hasKnownHours(r)) {
-    if (closedNotice) parts.push(closedNotice)
     parts.push(t(lang, 'faq.hours.noHoursFor', { day: todayName }))
   } else if (summary) {
-    if (closedNotice) parts.push(closedNotice)
     parts.push(summary)
   }
   if (notes) parts.push(notes)
@@ -412,9 +414,14 @@ const RULES: FaqRule[] = [
     // as abr\w* — that also matched unrelated "abr"-prefixed words like
     // "abrigo(s)" (coat/coats), and even a narrower abr[i]\w* would still
     // collide with "abrigo" since "abri" is a shared prefix.
-    // open(?!\s+to\b) excludes "open to volunteers"/"open to referrals" etc.
-    // — that sense of "open" (receptive/accepting) has nothing to do with
-    // hours, but "Are you open?" (no "to" following) still matches.
+    // "open" alone kept colliding with unrelated senses no matter how many
+    // were enumerated away — "open to volunteers", "an open bed", "a job
+    // opening", "Are applications open?"/"Is enrollment open?" (service
+    // availability, not this listing's hours). Rather than keep excluding
+    // one new sense per round, flipped to a positive match: only fires when
+    // "open" is a predicate about the listing itself (a pronoun for it
+    // directly before "open") or paired with a time word — the phrasing an
+    // hours question actually uses.
     // (?<!how )close[sd]? excludes "How close is this to me?" (proximity,
     // not hours) — that phrasing belongs to the distance rule instead.
     // "schedule" is ambiguous between the noun (hours) and verb (booking)
@@ -425,13 +432,9 @@ const RULES: FaqRule[] = [
     // (asking about it as a noun) fires this rule.
     // Bare "late"/"tarde" fired on non-schedule uses ("Do you accept late
     // arrivals?", "¿Aceptan llegadas tarde?") — "tarde" is doubly ambiguous
-    // since it also means "afternoon". Restricted to "how late"/"open late".
-    // open(?!\s+(bed|room|spot)s?\b) excludes "an open bed/room/spot" — that
-    // "open" describes availability, not the hours this rule answers, and
-    // the availability rule already covers "bed"/"room"/"spot" on its own.
-    // (?<!job\s)open...ing excludes "a job opening" — that's the employment
-    // noun sense, not this listing's own hours.
-    keywords: /\b(hours?|(?<!job\s)open(?!\s+to\b)(?!\s+(bed|room|spot)s?\b)(s|ing)?|(?<!how )close[sd]?|closing|how late|open late|(your|their|the) schedule\b|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*)\b/i,
+    // since it also means "afternoon". Restricted to "how late"/"open late"
+    // (folded into the "open ..." time-word group below).
+    keywords: /\b(hours?|(you|it|they|this)\s+(?:is\s+|are\s+)?open\b(?!\s+to\b)|open\s+(now|right now|late|early|today)\b|(?<!how )close[sd]?|closing|how late|(your|their|the) schedule\b|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*)\b/i,
     answer: hoursAnswer,
   },
   {
@@ -507,10 +510,14 @@ const RULES: FaqRule[] = [
     // Bare "men"/"women" fired on questions about goods/services, not
     // eligibility ("Do you have women's clothing?") — since gender_policy is
     // specifically who the resource serves, restricted to phrasing that
-    // actually ties the gender word to eligibility ("serve/for/only/eligible
-    // men/women", "men/women only/allowed/welcome/eligible") rather than any
-    // sentence containing the word.
-    keywords: /\b(who can (stay|use|access|come|apply|get)|who(?:'s|\s+is|\s+are)\s+(?:this|it|they)\s+for|eligib\w*|qualify|(?:serve|for|only|eligible|accept)\s+(?:men|women)\b|(?:men|women)\s+(?:only|allowed|welcome|eligible)\b|famil(y|ies)|familias?|veteran\w*|lgbtq\w*|youth|senior\w*|age\b|ages\b|calificar|(?:para|solo|s[oó]lo)\s+(?:hombres|mujeres)\b|(?:hombres|mujeres)\s+(?:solamente|[uú]nicamente)\b|j[oó]ven(es)?|edad\w*|para qui[eé]n)\b/i,
+    // actually ties the gender word to eligibility rather than any sentence
+    // containing the word. "for"/"accept" turned out to be just as generic
+    // as the bare noun — "clothing for women"/"accept men's clothing
+    // donations" describe goods too — so dropped in favor of only "serve"
+    // and "only"/"eligible" (before or after), which aren't natural ways to
+    // talk about goods. Same reasoning drops Spanish "para" in favor of
+    // "solo"/"sólo" only.
+    keywords: /\b(who can (stay|use|access|come|apply|get)|who(?:'s|\s+is|\s+are)\s+(?:this|it|they)\s+for|eligib\w*|qualify|(?:serve|only|eligible)\s+(?:men|women)\b|(?:men|women)\s+(?:only|allowed|welcome|eligible)\b|famil(y|ies)|familias?|veteran\w*|lgbtq\w*|youth|senior\w*|age\b|ages\b|calificar|(?:solo|s[oó]lo)\s+(?:hombres|mujeres)\b|(?:hombres|mujeres)\s+(?:solamente|[uú]nicamente)\b|j[oó]ven(es)?|edad\w*|para qui[eé]n)\b/i,
     answer: eligibilityAnswer,
   },
   {
@@ -541,10 +548,10 @@ const RULES: FaqRule[] = [
     // term for a mental-health question, not a question about this rule's
     // food service — while "Where can I eat?"/"Do you serve food?" etc.
     // still match.
-    // food(?!\s+stamps?\b) excludes "food stamps" — that's asking about a
-    // benefits program this field (whether meals are served on-site) can't
-    // establish either way.
-    keywords: /\b(meal\w*|food(?!\s+stamps?\b)|eat\w*(?!\s+disorders?\b)|lunch|dinner|breakfast|comidas?|almuerzo|cena|desayuno|comer)\b/i,
+    // food(?!\s+(stamps?|pantry)\b) excludes "food stamps"/"food pantry" —
+    // a benefits program and a take-home-groceries program, neither of
+    // which this field (whether meals are served on-site) can establish.
+    keywords: /\b(meal\w*|food(?!\s+(stamps?|pantry)\b)|eat\w*(?!\s+disorders?\b)|lunch|dinner|breakfast|comidas?|almuerzo|cena|desayuno|comer)\b/i,
     answer: (r, ctx) => facilityAnswer(ctx.lang, r.serves_meals, 'faq.facility.mealsYes', 'faq.facility.mealsNo'),
   },
   {
