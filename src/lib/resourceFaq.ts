@@ -344,7 +344,11 @@ const RULES: FaqRule[] = [
   {
     key: 'availability',
     label: 'Availability',
-    keywords: /\b(bed|beds|spot|spots|room|vacan\w*|availab\w*|cama\w*|lugar\w*|cupo\w*|disponib\w*)\b/i,
+    // Bare "lugar" ("place") is too generic — it matches any question about
+    // the place at all, not just availability ("¿Qué tipo de lugar es
+    // este?"). Restricted to the actual availability phrasing ("hay lugar",
+    // "lugar disponible", "queda lugar" — "is there room/space?").
+    keywords: /\b(bed|beds|spot|spots|room|vacan\w*|availab\w*|cama\w*|hay lugar|lugar disponible|queda\w* lugar|cupo\w*|disponib\w*)\b/i,
     answer: availabilityAnswer,
   },
   {
@@ -374,7 +378,9 @@ const RULES: FaqRule[] = [
     // Bare "allowed"/"permitido" fired on any permission question ("Is
     // parking allowed?"), not just eligibility ones — the concrete
     // population/gender/age terms already cover real eligibility questions.
-    keywords: /\b(who can|eligib\w*|qualify|men\b|women\b|famil\w*|veteran\w*|lgbtq\w*|youth|senior\w*|age\b|ages\b|calificar|hombres|mujeres|j[oó]ven(es)?|edad\w*)\b/i,
+    // famil\w* also matched "familiar"/"familiarized" (staff being familiar
+    // with something, not a family), so family forms are listed explicitly.
+    keywords: /\b(who can|eligib\w*|qualify|men\b|women\b|famil(y|ies)|familias?|veteran\w*|lgbtq\w*|youth|senior\w*|age\b|ages\b|calificar|hombres|mujeres|j[oó]ven(es)?|edad\w*)\b/i,
     answer: eligibilityAnswer,
   },
   {
