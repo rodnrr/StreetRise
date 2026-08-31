@@ -100,10 +100,20 @@ function hidesAddress(r: Resource): boolean {
 function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | null {
   const hours = r.hours_of_operation
   const notes = hours?.notes?.trim()
-  if (!hasKnownHours(r) && !notes) return null
+  // `summary` isn't in the HoursOfOperation type but is a real, commonly-seeded
+  // field (see ResourceSheet's own hours display) — many listings carry only
+  // this free-text sentence with no structured per-day windows at all.
+  const summary = (hours as { summary?: string } | null | undefined)?.summary?.trim()
+  if (!hasKnownHours(r) && !notes && !summary) return null
 
   const { dayIndex, minutes } = zonedNow(ctx.now)
   const todayKey = DAY_KEYS[dayIndex]
+  // An operational `closed` status is independent of the weekly schedule (an
+  // unplanned closure, say) and must be surfaced regardless of which day —
+  // today or a named one — the schedule below describes.
+  const closedNotice = r.availability_status === 'closed'
+    ? "They're currently marked closed — check before planning around this schedule."
+    : null
 
   // A specific day other than today was named ("Friday hours?") — answer
   // that day's own published window. "Right now" framing only makes sense
@@ -112,12 +122,15 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
   if (askedDay && askedDay !== todayKey) {
     const win = windowFor(r, askedDay)
     const parts: string[] = []
+    if (closedNotice) parts.push(closedNotice)
     if (win?.closed) {
       parts.push(`They're closed on ${DAY_LABEL[askedDay]}.`)
     } else if (win?.open && win?.close) {
       parts.push(`On ${DAY_LABEL[askedDay]} they're open ${formatClock(win.open)}–${formatClock(win.close)}.`)
     } else if (hasKnownHours(r)) {
       parts.push(`No hours are published for ${DAY_LABEL[askedDay]}.`)
+    } else if (summary) {
+      parts.push(summary)
     }
     if (notes) parts.push(notes)
     return parts.length ? parts.join(' ') : null
@@ -132,9 +145,6 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
   // rather than always narrating today's (possibly unrelated) hours.
   const openViaToday = coversMinute(todayWin, minutes, false)
   const openViaYesterday = !openViaToday && coversMinute(yesterdayWin, minutes, true)
-  // A provider-set `closed` status is an operational override independent of
-  // the weekly schedule (an unplanned closure, say), so it must win over a
-  // schedule that would otherwise say "open right now".
   const openNow = (openViaToday || openViaYesterday) && r.availability_status !== 'closed'
 
   const parts: string[] = []
@@ -150,6 +160,9 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
     )
   } else if (hasKnownHours(r)) {
     parts.push(`No hours are published for ${DAY_LABEL[todayKey]}.`)
+  } else if (summary) {
+    if (closedNotice) parts.push(closedNotice)
+    parts.push(summary)
   }
   if (notes) parts.push(notes)
 
@@ -204,8 +217,15 @@ function eligibilityAnswer(r: Resource): string | null {
 }
 
 function intakeAnswer(r: Resource): string {
+  // "No walk-ins" shouldn't itself invent a phone call as the alternative —
+  // some resources reject walk-ins but also don't require calling first
+  // (access arranged through a website or another site instead), and saying
+  // "call ahead" there would contradict the "no need to call first" bit below.
+  const noWalkIns = r.phone_required_before_arrival
+    ? 'No walk-ins — call ahead'
+    : 'No walk-ins — contact them to arrange access'
   const bits = [
-    r.walk_ins_accepted ? 'Walk-ins are accepted' : 'No walk-ins — call ahead',
+    r.walk_ins_accepted ? 'Walk-ins are accepted' : noWalkIns,
     r.requires_id ? 'ID is required' : 'No ID required',
     r.requires_referral ? 'A referral is required' : 'No referral needed',
     r.phone_required_before_arrival ? 'Call before visiting' : 'No need to call first',
