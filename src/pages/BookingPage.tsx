@@ -108,11 +108,18 @@ export default function BookingPage() {
   }, [lang, submitCount, trigger])
 
   // Instant-answer FAQ panel (question flow only) — see @/lib/resourceFaq.
+  // `now` ticks like MapPage's own open-now clock so an answer left on screen
+  // across an opening/closing boundary (or midnight) doesn't go stale.
   const userLocation = useMapStore((s) => s.userLocation)
   const [faqQuery, setFaqQuery] = useState('')
+  const [faqNow, setFaqNow] = useState(() => new Date())
+  useEffect(() => {
+    const tick = setInterval(() => setFaqNow(new Date()), 60_000)
+    return () => clearInterval(tick)
+  }, [])
   const faqAnswers = useMemo(
-    () => (resource ? findFaqAnswers(resource, faqQuery, { origin: userLocation, now: new Date() }) : []),
-    [resource, faqQuery, userLocation],
+    () => (resource ? findFaqAnswers(resource, faqQuery, { origin: userLocation, now: faqNow }) : []),
+    [resource, faqQuery, userLocation, faqNow],
   )
   const fillFaqQueryIntoNotes = () => {
     setValue('notes', faqQuery, { shouldValidate: true, shouldDirty: true })

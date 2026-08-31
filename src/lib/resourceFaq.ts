@@ -22,6 +22,7 @@ import {
   hasKnownHours,
   windowFor,
   zonedNow,
+  type DayKey,
 } from '@/lib/mapFilters'
 import type { Resource } from '@/types'
 
@@ -38,9 +39,30 @@ export interface FaqContext {
   now: Date
 }
 
-const DAY_LABEL: Record<(typeof DAY_KEYS)[number], string> = {
+const DAY_LABEL: Record<DayKey, string> = {
   sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday',
   thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday',
+}
+
+// English and Spanish weekday names/abbreviations a visitor might name
+// explicitly ("Friday hours?", "¿el domingo?"). Matched with \w* so common
+// abbreviations and conjugated forms still hit ("tues", "miércoles").
+const DAY_ALIASES: [RegExp, DayKey][] = [
+  [/\bsun\w*\b|\bdomingo\b/i, 'sunday'],
+  [/\bmon\w*\b|\blunes\b/i, 'monday'],
+  [/\btue\w*\b|\bmartes\b/i, 'tuesday'],
+  [/\bwed\w*\b|\bmi[eé]rcoles\b/i, 'wednesday'],
+  [/\bthu\w*\b|\bjueves\b/i, 'thursday'],
+  [/\bfri\w*\b|\bviernes\b/i, 'friday'],
+  [/\bsat\w*\b|\bs[aá]bado\b/i, 'saturday'],
+]
+
+/** First weekday explicitly named in a question, if any. */
+function requestedDay(question: string): DayKey | null {
+  for (const [re, day] of DAY_ALIASES) {
+    if (re.test(question)) return day
+  }
+  return null
 }
 
 /** "18:00" → "6:00 PM". Falls back to the raw string if it isn't HH:MM. */
@@ -65,13 +87,32 @@ function hidesAddress(r: Resource): boolean {
 
 // ── Individual answer builders ──────────────────────────────────────
 
-function hoursAnswer(r: Resource, ctx: FaqContext): string | null {
+function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | null {
   const hours = r.hours_of_operation
   const notes = hours?.notes?.trim()
   if (!hasKnownHours(r) && !notes) return null
 
   const { dayIndex, minutes } = zonedNow(ctx.now)
   const todayKey = DAY_KEYS[dayIndex]
+
+  // A specific day other than today was named ("Friday hours?") — answer
+  // that day's own published window. "Right now" framing only makes sense
+  // for the current day, so this branch never claims open/closed-right-now.
+  const askedDay = requestedDay(question)
+  if (askedDay && askedDay !== todayKey) {
+    const win = windowFor(r, askedDay)
+    const parts: string[] = []
+    if (win?.closed) {
+      parts.push(`They're closed on ${DAY_LABEL[askedDay]}.`)
+    } else if (win?.open && win?.close) {
+      parts.push(`On ${DAY_LABEL[askedDay]} they're open ${formatClock(win.open)}–${formatClock(win.close)}.`)
+    } else if (hasKnownHours(r)) {
+      parts.push(`No hours are published for ${DAY_LABEL[askedDay]}.`)
+    }
+    if (notes) parts.push(notes)
+    return parts.length ? parts.join(' ') : null
+  }
+
   const yesterdayKey = DAY_KEYS[(dayIndex + 6) % 7]
   const todayWin = windowFor(r, todayKey)
   const yesterdayWin = windowFor(r, yesterdayKey)
@@ -81,17 +122,21 @@ function hoursAnswer(r: Resource, ctx: FaqContext): string | null {
   // rather than always narrating today's (possibly unrelated) hours.
   const openViaToday = coversMinute(todayWin, minutes, false)
   const openViaYesterday = !openViaToday && coversMinute(yesterdayWin, minutes, true)
+  // A provider-set `closed` status is an operational override independent of
+  // the weekly schedule (an unplanned closure, say), so it must win over a
+  // schedule that would otherwise say "open right now".
+  const openNow = (openViaToday || openViaYesterday) && r.availability_status !== 'closed'
 
   const parts: string[] = []
   if (openViaYesterday && yesterdayWin?.open && yesterdayWin?.close) {
     parts.push(
-      `They opened yesterday (${DAY_LABEL[yesterdayKey]}) at ${formatClock(yesterdayWin.open)} and are open until ${formatClock(yesterdayWin.close)} — open right now.`,
+      `They opened yesterday (${DAY_LABEL[yesterdayKey]}) at ${formatClock(yesterdayWin.open)} and are open until ${formatClock(yesterdayWin.close)}${openNow ? ' — open right now.' : ', but they are currently marked closed.'}`,
     )
   } else if (todayWin?.closed) {
     parts.push(`They're closed today (${DAY_LABEL[todayKey]}).`)
   } else if (todayWin?.open && todayWin?.close) {
     parts.push(
-      `Today (${DAY_LABEL[todayKey]}) they're open ${formatClock(todayWin.open)}–${formatClock(todayWin.close)} — ${openViaToday ? 'open right now.' : 'closed right now.'}`,
+      `Today (${DAY_LABEL[todayKey]}) they're open ${formatClock(todayWin.open)}–${formatClock(todayWin.close)} — ${openNow ? 'open right now.' : 'closed right now.'}`,
     )
   } else if (hasKnownHours(r)) {
     parts.push(`No hours are published for ${DAY_LABEL[todayKey]}.`)
@@ -159,15 +204,19 @@ function intakeAnswer(r: Resource): string {
 }
 
 function availabilityAnswer(r: Resource): string | null {
-  if (r.category === 'shelter' && r.beds_total != null) {
-    const avail = r.beds_available != null ? String(r.beds_available) : 'an unknown number of'
-    return `${avail} of ${r.beds_total} beds are currently listed as available.`
-  }
   const labels: Partial<Record<Resource['availability_status'], string>> = {
     available: "They're currently marked open / available.",
     limited: 'Availability is currently marked as limited.',
     full: "They're currently marked full.",
     closed: "They're currently marked closed.",
+  }
+  // A `closed` operational status can outlive a shelter's last-known bed
+  // count, so it must be checked before falling back to that count — a
+  // provider marking a shelter closed shouldn't still be told "beds available".
+  if (r.availability_status === 'closed') return labels.closed!
+  if (r.category === 'shelter' && r.beds_total != null) {
+    const avail = r.beds_available != null ? String(r.beds_available) : 'an unknown number of'
+    return `${avail} of ${r.beds_total} beds are currently listed as available.`
   }
   return labels[r.availability_status] ?? null
 }
@@ -190,7 +239,8 @@ interface FaqRule {
   key: string
   label: string
   keywords: RegExp
-  answer: (r: Resource, ctx: FaqContext) => string | null
+  /** `question` is the raw (trimmed) query — only `hoursAnswer` uses it, to spot a named weekday. */
+  answer: (r: Resource, ctx: FaqContext, question: string) => string | null
 }
 
 // Keyword patterns match English and Spanish: the app's own UI (including this
@@ -309,7 +359,7 @@ export function findFaqAnswers(resource: Resource, question: string, ctx: FaqCon
   const out: FaqAnswer[] = []
   for (const rule of RULES) {
     if (!rule.keywords.test(q)) continue
-    const answer = rule.answer(resource, ctx)
+    const answer = rule.answer(resource, ctx, q)
     if (answer) out.push({ key: rule.key, label: rule.label, answer })
   }
   return out
