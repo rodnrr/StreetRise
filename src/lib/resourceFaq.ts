@@ -504,7 +504,13 @@ const RULES: FaqRule[] = [
     // serves — eligibility, not a description — so it's matched here (and
     // excluded from the About rule below) rather than left to the generic
     // "who is this" phrasing that would otherwise route it to About.
-    keywords: /\b(who can (stay|use|access|come|apply|get)|who(?:'s|\s+is|\s+are)\s+(?:this|it|they)\s+for|eligib\w*|qualify|men\b|women\b|famil(y|ies)|familias?|veteran\w*|lgbtq\w*|youth|senior\w*|age\b|ages\b|calificar|hombres|mujeres|j[oó]ven(es)?|edad\w*|para qui[eé]n)\b/i,
+    // Bare "men"/"women" fired on questions about goods/services, not
+    // eligibility ("Do you have women's clothing?") — since gender_policy is
+    // specifically who the resource serves, restricted to phrasing that
+    // actually ties the gender word to eligibility ("serve/for/only/eligible
+    // men/women", "men/women only/allowed/welcome/eligible") rather than any
+    // sentence containing the word.
+    keywords: /\b(who can (stay|use|access|come|apply|get)|who(?:'s|\s+is|\s+are)\s+(?:this|it|they)\s+for|eligib\w*|qualify|(?:serve|for|only|eligible|accept)\s+(?:men|women)\b|(?:men|women)\s+(?:only|allowed|welcome|eligible)\b|famil(y|ies)|familias?|veteran\w*|lgbtq\w*|youth|senior\w*|age\b|ages\b|calificar|(?:para|solo|s[oó]lo)\s+(?:hombres|mujeres)\b|(?:hombres|mujeres)\s+(?:solamente|[uú]nicamente)\b|j[oó]ven(es)?|edad\w*|para qui[eé]n)\b/i,
     answer: eligibilityAnswer,
   },
   {
