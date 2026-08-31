@@ -171,6 +171,13 @@ function hoursAnswer(r: Resource, ctx: FaqContext, question: string): string | n
 }
 
 function distanceAnswer(r: Resource, ctx: FaqContext): string | null {
+  // A phone-intake/confidential-address resource's coordinates are often an
+  // administrative office or mobile-service base, not a walk-in destination —
+  // ResourceSheet suppresses Directions for the same reason, so a distance
+  // figure here would be equally misleading.
+  if (isConfidential(r)) {
+    return `This isn't a walk-in location, so distance doesn't apply — ${r.phone ? `call ${r.phone}` : 'contact them'} to get connected.`
+  }
   if (r.lat == null || r.lng == null) return null
   if (!ctx.origin) {
     return "We don't have your location yet — share it on the map (the locate button) to see the distance here, or use Directions on the listing."
@@ -366,7 +373,8 @@ const RULES: FaqRule[] = [
   {
     key: 'transit',
     label: 'Transit',
-    keywords: /\b(bus\w*|transit|transportation|autob[uú]s\w*|transporte\w*)\b/i,
+    // "bus" as a whole word, not a prefix — bus\w* also matched "business".
+    keywords: /\b(bus|buses|bus stop|bus route|transit|transportation|autob[uú]s\w*|transporte\w*)\b/i,
     answer: (r) => facilityAnswer(r.public_transit_accessible, "Yes, it's near public transit.", "They don't list themselves as near public transit."),
   },
   {
@@ -378,7 +386,11 @@ const RULES: FaqRule[] = [
   {
     key: 'about',
     label: 'About',
-    keywords: /\b(what (is|do|are)|who (are|is)|about|services|qu[eé] es|qu[eé] hacen|acerca de|servicios)\b/i,
+    // Deliberately specific phrasing, not bare "what is"/"who is" — those
+    // matched as a prefix of unrelated questions ("What is their phone
+    // number?", "What are your Friday hours?"), firing this rule alongside
+    // whichever one the visitor actually meant.
+    keywords: /\b(tell me about|what (is|are) (this|it|they)\b|what do(es)? (they|this|it) do|who (are|is) (they|this)|about (this|them)\b|acerca de|qu[eé] hacen|cu[eé]ntame)\b/i,
     answer: aboutAnswer,
   },
 ]
