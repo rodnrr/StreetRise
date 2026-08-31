@@ -334,7 +334,15 @@ function availabilityAnswer(r: Resource, ctx: FaqContext): string | null {
     if (r.beds_available != null) {
       return t(lang, 'faq.availability.bedsKnown', { available: String(r.beds_available), total: String(r.beds_total) })
     }
-    return t(lang, 'faq.availability.bedsUnknown', { total: String(r.beds_total) })
+    // No current count, but availability_status (only 'available' or
+    // 'limited' can reach here — closed/full/unknown already returned
+    // above) is saved independently in ProviderListingEdit and may still
+    // say something real, so don't discard it in favor of a bare "not
+    // listed" — a listing marked available shouldn't read as unknown.
+    const total = String(r.beds_total)
+    return r.availability_status === 'limited'
+      ? t(lang, 'faq.availability.limitedNoCount', { total })
+      : t(lang, 'faq.availability.availableNoCount', { total })
   }
   const key = statusKeys[r.availability_status]
   return key ? t(lang, key) : null
@@ -381,7 +389,10 @@ const RULES: FaqRule[] = [
     // hours, but "Are you open?" (no "to" following) still matches.
     // (?<!how )close[sd]? excludes "How close is this to me?" (proximity,
     // not hours) — that phrasing belongs to the distance rule instead.
-    keywords: /\b(hours?|open(?!\s+to\b)(s|ing)?|(?<!how )close[sd]?|closing|late|schedule|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*|tarde)\b/i,
+    // schedule(?!\s+an?\b) excludes "schedule an/a appointment" (the verb
+    // sense, about booking) while "What is your schedule?" (the noun sense)
+    // still matches.
+    keywords: /\b(hours?|open(?!\s+to\b)(s|ing)?|(?<!how )close[sd]?|closing|late|schedule(?!\s+an?\b)|hora\w*|abre|abren|abrimos|abrir|abriendo|abiert\w*|cierr\w*|cerrad\w*|tarde)\b/i,
     answer: hoursAnswer,
   },
   {

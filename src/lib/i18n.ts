@@ -216,6 +216,8 @@ const en: Dict = {
   'faq.availability.unknown': "Availability isn't currently confirmed for this listing.",
   'faq.availability.bedsKnown': '{available} of {total} beds are currently listed as available.',
   'faq.availability.bedsUnknown': "Bed availability isn't currently listed ({total} beds total).",
+  'faq.availability.availableNoCount': "They're currently marked open / available, though the exact bed count isn't listed ({total} beds total).",
+  'faq.availability.limitedNoCount': "Availability is currently marked as limited, though the exact bed count isn't listed ({total} beds total).",
 
   'faq.facility.showersYes': 'Yes, showers are available.',
   'faq.facility.showersNo': "They don't list showers as available.",
@@ -424,6 +426,8 @@ const es: Dict = {
   'faq.availability.unknown': 'La disponibilidad no está confirmada actualmente para este lugar.',
   'faq.availability.bedsKnown': '{available} de {total} camas están listadas como disponibles actualmente.',
   'faq.availability.bedsUnknown': 'La disponibilidad de camas no está listada actualmente ({total} camas en total).',
+  'faq.availability.availableNoCount': 'Actualmente están marcados como abiertos / disponibles, aunque no se indica el número exacto de camas ({total} camas en total).',
+  'faq.availability.limitedNoCount': 'La disponibilidad está marcada como limitada actualmente, aunque no se indica el número exacto de camas ({total} camas en total).',
 
   'faq.facility.showersYes': 'Sí, hay duchas disponibles.',
   'faq.facility.showersNo': 'No indican que haya duchas disponibles.',
