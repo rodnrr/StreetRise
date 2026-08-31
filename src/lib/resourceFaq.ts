@@ -60,6 +60,10 @@ const DAY_ALIASES: [RegExp, DayKey][] = [
 
 const TOMORROW_RE = /\btomorrow\b|\bma[ñn]ana\b/i
 const YESTERDAY_RE = /\byesterday\b|\bayer\b/i
+// "mañana" is ambiguous in Spanish — bare it means "tomorrow", but "en/por/de
+// la mañana" and "esta mañana" mean "(this) morning" and must NOT be read as
+// a day shift ("¿A qué hora abren en la mañana?" is asking about today).
+const MORNING_PHRASE_RE = /\b(en|por|de) la ma[ñn]ana\b|\besta ma[ñn]ana\b/i
 
 /**
  * The weekday a question is actually asking about, if it names one — either
@@ -71,7 +75,9 @@ function requestedDay(question: string, todayIndex: number): DayKey | null {
   for (const [re, day] of DAY_ALIASES) {
     if (re.test(question)) return day
   }
-  if (TOMORROW_RE.test(question)) return DAY_KEYS[(todayIndex + 1) % 7]
+  if (TOMORROW_RE.test(question) && !MORNING_PHRASE_RE.test(question)) {
+    return DAY_KEYS[(todayIndex + 1) % 7]
+  }
   if (YESTERDAY_RE.test(question)) return DAY_KEYS[(todayIndex + 6) % 7]
   return null
 }
@@ -331,7 +337,10 @@ const RULES: FaqRule[] = [
   {
     key: 'eligibility',
     label: 'Who it serves',
-    keywords: /\b(who can|eligib\w*|qualify|men\b|women\b|famil\w*|veteran\w*|lgbtq\w*|youth|senior\w*|age\b|ages\b|allowed|calificar|hombres|mujeres|j[oó]ven(es)?|edad\w*|permitid\w*)\b/i,
+    // Bare "allowed"/"permitido" fired on any permission question ("Is
+    // parking allowed?"), not just eligibility ones — the concrete
+    // population/gender/age terms already cover real eligibility questions.
+    keywords: /\b(who can|eligib\w*|qualify|men\b|women\b|famil\w*|veteran\w*|lgbtq\w*|youth|senior\w*|age\b|ages\b|calificar|hombres|mujeres|j[oó]ven(es)?|edad\w*)\b/i,
     answer: eligibilityAnswer,
   },
   {
