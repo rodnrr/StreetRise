@@ -28,13 +28,18 @@ Known open items (verified 2026-07-31; migration 036 added 2026-08-18):
 - **Therefore: a seed migration MUST set `claim_status='unclaimed'` and `source_type='seeded'` explicitly.** Those column defaults exist for the signup path above, so an INSERT that omits them marks a seeded org as though a person had registered and claimed it — false provenance, and a dead end, because a `claimed` org can never be claimed at `/claim`. Migration 027 exists because this went wrong once; it happened again while applying 036 and was caught by diffing live against the migration file. Every seeded provider on live should be `unclaimed`/`seeded` with `user_id IS NULL`.
 - ~~Claiming an org hides it from `/work`~~ — **fixed by migration 033**, which adds `providers_pending_claim_read` so a mid-claim org stays publicly visible.
 - ~~Default map center still points at Tampa Bay~~ — **mitigated by the map revamp (2026-08-17)**. `useMapStore` still opens at `{ lat: 28.2, lng: -81.9 }` zoom 9, but `MapPage` now auto-fits the map to the current result set on load and whenever the need chip or search changes, so a Miami visitor who grants nothing still lands on a view containing pins. The stored centre follows the fit, so distances are measured from where the map actually is. Changing the literal default is no longer urgent.
+- **Domain consolidation is real but unfinished** (verified 2026-09-01, see Mission & Domain Split). `streetrise.org` now redirects to `app.streetrise.org` instead of being a separate Wix site — the two-site split described in older docs (`LAUNCH_REVIEW.md`) is obsolete. The maintainer wants the app to eventually live at `streetrise.org` directly; that's a Cloudflare Pages custom-domain change plus a sweep of hardcoded `app.streetrise.org` references (`public/sitemap.xml`, `public/robots.txt`, `wrangler.jsonc` comment, `src/lib/seo/`) that nobody has scoped yet.
+- **`/community-voices` (`CommunityVoicesPage`) is routed in `App.tsx` but missing from `public/sitemap.xml`** — verified 2026-09-01. Either add it to the sitemap or confirm it's intentionally unlisted (e.g. not ready for indexing).
 
 ---
 
 ## Mission & Domain Split
 
-- **app.streetrise.org** — this React SPA (the resource-finder app)
-- **streetrise.org** — separate marketing/org site (not in this repo)
+**This is now one site, not two.** Earlier versions of this file described `streetrise.org` as a separate Wix-hosted marketing site outside this repo, with the app living only at `app.streetrise.org`. That split is gone: the Wix site was dropped, its marketing content (mission/About, Partners, donate context) was migrated into this repo's `src/pages/marketing/` pages, and `streetrise.org` now redirects to `app.streetrise.org` — confirmed by the maintainer 2026-09-01, not independently verified from this session (sandboxed sessions can't reach either domain to check headers directly; verify with `curl -sSI https://streetrise.org/` from a machine with real network access if you need to double check).
+
+- **app.streetrise.org** — where this repo actually deploys today (Cloudflare Pages custom domain; see Deployment). This is the single site: map, booking, provider portal, admin, and all marketing/about/partner content.
+- **streetrise.org** — the bare domain; redirects to `app.streetrise.org`. Not a separate codebase or CMS anymore.
+- **Desired future state (not yet done):** the maintainer wants the app to live directly on `streetrise.org` instead of the `app.` subdomain, with the redirect reversed or removed. This needs a Cloudflare Pages custom-domain change (and probably an `VITE_APP_URL`/canonical-URL sweep across `src/lib/seo/`, `public/sitemap.xml`, and `public/robots.txt`, all of which currently hardcode `app.streetrise.org`) — nobody has scoped or started this yet. Treat any reference to "streetrise.org vs app.streetrise.org" as separate sites in older docs (`LAUNCH_REVIEW.md`) as historical, not current.
 
 StreetRise connects people in need with local service providers (shelters, food pantries, clinics, legal aid, etc.). Original coverage was Tampa Bay, FL; seed migrations 017/020/022 expanded to Central Florida (Orlando, Hernando, Pasco, Manatee/Bradenton); migration 032 added South Florida (Miami-Dade + South Broward/Hollywood). Public copy says "Tampa Bay, Orlando, and Miami" — `HomePage`'s `CITIES` array is the source of truth for which metros read as live, and a metro is only flipped to `live: true` once it has publicly visible seeded listings. Providers manage listings; the public searches the map; no sign-up required to find resources.
 
@@ -128,7 +133,7 @@ src/
     ProviderLandingPage.tsx # Public provider onboarding pitch (/provider/onboarding)
 
     marketing/              # AboutPage, ContactPage, PartnersPage, PrivacyPage,
-                            # TermsPage, AccessibilityPage
+                            # TermsPage, AccessibilityPage, CommunityVoicesPage
     blog/                   # BlogIndexPage, BlogPostPage (markdown NOT yet rendered)
     categories/             # CategoryPage — one component, parameterized by lib/categories.ts
 
@@ -223,7 +228,7 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/provider/onboarding` | `ProviderLandingPage` | Public pitch page |
 | `/claim` | `ClaimIndexPage` | Lazy; public directory of `unclaimed` orgs |
 | `/claim/:id` | `ClaimDetailPage` | Lazy; claim submission (auth required to submit) |
-| `/about`, `/contact`, `/partner-with-us`, `/privacy`, `/terms`, `/accessibility` | marketing pages | Lazy |
+| `/about`, `/contact`, `/partner-with-us`, `/privacy`, `/terms`, `/accessibility`, `/community-voices` | marketing pages | Lazy. `/community-voices` (`CommunityVoicesPage`) exists in `App.tsx` but is **not** in `public/sitemap.xml` — verified 2026-09-01, unclear if that's deliberate or a gap |
 | `/blog`, `/blog/:slug` | blog pages | Lazy; backed by `blog_posts` |
 | `/food-pantries`, `/shelters`, `/medical`, `/employment`, `/hygiene`, `/showers`, `/legal`, `/veterans`, `/youth`, `/families`, `/students` | `CategoryPage` | Presentation-only aliases over existing `/map` filters via `lib/categories.ts` — never introduce new category values here |
 | `/404` | `NotFoundPage` | Wildcard `*` redirects here |
@@ -443,7 +448,7 @@ Later migrations (past the 001–011 core): 014/015/018/030 conversations system
 
 ## Deployment
 
-- **Platform**: Cloudflare Pages (`wrangler.jsonc`, project name `streetrise`), production at app.streetrise.org
+- **Platform**: Cloudflare Pages (`wrangler.jsonc`, project name `streetrise`), production at app.streetrise.org. `streetrise.org` redirects there (see Mission & Domain Split) — the maintainer's goal is to swap this so the app is served from `streetrise.org` directly, but that migration hasn't been scoped or started.
 - **Build output**: `dist/`; SPA fallback via `public/_redirects`
 - **CI**: `.github/workflows/deploy.yml` (named "CI") runs typecheck + build on push/PR to `main`. The workflow itself contains no deploy step; pushes to `main` reach production via the Pages integration — treat **merging to `main` as a production deploy** and never merge with red CI.
 - **Manual deploy**: `npm run deploy` (needs `CLOUDFLARE_API_TOKEN` + 32-char `CLOUDFLARE_ACCOUNT_ID`)
