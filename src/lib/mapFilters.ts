@@ -488,8 +488,8 @@ export const DISTANCE_OPTIONS_MI = [5, 10, 25, 50]
 
 export const RESOURCE_TIME_ZONE = 'America/New_York'
 
-const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
-type DayKey = (typeof DAY_KEYS)[number]
+export const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+export type DayKey = (typeof DAY_KEYS)[number]
 
 /** Minutes past midnight, or null when the value isn't a usable HH:MM. */
 function toMinutes(value: string | undefined): number | null {
@@ -526,9 +526,9 @@ export function zonedNow(now: Date): { dayIndex: number; minutes: number } {
   }
 }
 
-interface DayWindow { open?: string; close?: string; closed?: boolean }
+export interface DayWindow { open?: string; close?: string; closed?: boolean }
 
-function windowFor(r: Resource, day: DayKey): DayWindow | null {
+export function windowFor(r: Resource, day: DayKey): DayWindow | null {
   const hours = r.hours_of_operation as Record<string, unknown> | null | undefined
   if (!hours) return null
   const win = hours[day]
@@ -551,7 +551,7 @@ export function hasKnownHours(r: Resource): boolean {
  * whether a window that opened *yesterday* and runs past midnight still covers
  * this morning.
  */
-function coversMinute(win: DayWindow | null, minutes: number, spillover: boolean): boolean {
+export function coversMinute(win: DayWindow | null, minutes: number, spillover: boolean): boolean {
   if (!win || win.closed) return false
   const open = toMinutes(win.open)
   let close = toMinutes(win.close)
