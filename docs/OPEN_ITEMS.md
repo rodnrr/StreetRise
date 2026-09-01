@@ -27,11 +27,22 @@ Ran at the maintainer's request: cross-check `CLAUDE.md`/`README.md`/this file a
 
 **Still open after this pass** (not fixed, just documented — see `CLAUDE.md` for full detail on each):
 - `VITE_BLOG_WORKER_URL` in Cloudflare Pages — unconfirmed whether it's set / the Pages deployment retried since the Worker started deploying successfully.
-- The four Supabase advisory findings above.
+- The security and performance advisory findings above (RLS `auth_rls_initplan` re-eval pattern, `multiple_permissive_policies`, duplicate/unused indexes, mutable `search_path`, `SECURITY DEFINER` exposure, leaked-password protection).
 - `resource_import_staging`'s actual purpose.
 - Whether `/community-voices` belongs in the sitemap.
 - The `streetrise.org` → app-serves-directly domain migration the maintainer wants (Cloudflare custom-domain change, not scoped).
-- Everything already tracked below from the 2026-07-29 session that this pass didn't specifically re-verify (blog markdown rendering, internal-tag leak, `conversations` RLS column-agnostic issue, `booking_status` enum reconciliation) — spot-checked where called out above, otherwise assumed still accurate; re-verify before relying on anything not touched by this session's findings.
+- `Privacy`/`Terms`/`Accessibility` pages picked up large diffs in the same window as everything else (328/497/234 lines respectively) that this pass never actually read — only saw them in a `git diff --stat`. Unread, unverified; if anything in them makes a legal/compliance claim, it hasn't been checked.
+- `CommunityVoicesPage`'s actual content was never read, only that the route exists and isn't in the sitemap.
+
+**Follow-up pass (2026-09-01, same day) — re-verified rather than assumed, per the maintainer's ask to close specific gaps from the first pass:**
+- **New bug found: declining a booking fails on live.** `BookingStatus` in `src/types/index.ts` includes `'declined'`; both `AdminBookings.tsx` and `ProviderBookings.tsx` have a "Decline" action that sets `status: 'declined'`. Queried `enum_range(null::booking_status)` on live directly: `declined` is not a member. Every "Decline" click sends an `UPDATE` Postgres rejects with an enum error. Not fixed here — needs a product call (add `declined` to the live enum via migration, or repoint the two Decline actions at an existing status like `closed`).
+- **Chat unread-on-send bug: re-confirmed in code, still present.** Read `AdminChat.tsx` and `ProviderChat.tsx` directly — neither `sendMessage` mutation's `onSuccess` calls `markConversationRead`. Not a leftover assumption; the code was actually read this time.
+- **`conversations_update` RLS gap: re-confirmed against live `pg_policies`, still present.** `USING`/`WITH CHECK` are both `provider_id = my_provider_id() OR is_admin()` — identical to read/insert, no column restriction.
+- **`booking_status` re-verified, found worse than documented**: the previously-documented drift (live has `needs_info | contacted | no_response | closed` beyond the original six) is correct, but the doc's further claim that "the TS type matches live" was wrong — see the `declined` bug above.
+- **RLS Policy Summary table in `CLAUDE.md` corrected**: it said `providers`' public read was "verified only," but `providers_pending_claim_read` and `providers_unclaimed_read` also grant public read (this is what keeps a claiming org visible per migration 033) — the table undersold what's actually public. Also flagged that `bookings`' summary column can't express "a logged-in user reads their own booking," which is a real path (`bookings_user_read`) the three-column table structure hides.
+- **`get_advisors` type=performance run for the first time** — wasn't checked in the first pass. ~80 `multiple_permissive_policies` warnings (expected, given the public/provider/admin-policy-per-concern RLS design), 8 RLS policies using the slower per-row `auth.<fn>()` eval pattern instead of `(select auth.<fn>())`, 2 duplicate indexes (one of them — `resources`' `idx_resources_confidence` vs. `idx_resources_confidence_score` — traces to the same unreconciled dual-confidence-scoring issue already tracked below), ~24 unused indexes (mostly on the empty `resource_import_staging`), 2 unindexed foreign keys.
+- **Edge Functions spot-checked**: `create-checkout-session` and `notify-claim` both exist on live, both `ACTIVE` — matches what `CLAUDE.md`'s Tech Stack table already claimed, no drift found.
+- **CLAUDE.md's blog-publisher-Worker entry trimmed** — the saga narrative was accurate but had grown to one giant paragraph; condensed to the essentials with a pointer to `docs/deploy-blog-worker.md` for the full story.
 
 ---
 

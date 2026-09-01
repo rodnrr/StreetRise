@@ -153,13 +153,13 @@ Shipped and live:
 
 Tracked in detail in `docs/OPEN_ITEMS.md` and `CLAUDE.md`'s Known Open Items; the short list as of 2026-09-01:
 
+- [ ] **Fix "Decline" on bookings — it's broken on live.** `BookingStatus` includes `'declined'`, and both `AdminBookings.tsx`/`ProviderBookings.tsx` have a Decline action that writes it, but the live `booking_status` enum doesn't have that value — every click fails with a Postgres enum error. Needs a migration to add it, or the two Decline actions repointed at an existing status.
 - [ ] **Confirm `VITE_BLOG_WORKER_URL` is set in Cloudflare Pages** and the Pages deployment retried — the Worker itself deploys successfully now, but the AI Draft panel on `/admin/blog` stays hidden until that env var is set and picked up.
-- [ ] **Finish chat unread tracking** — migration 030 is applied to live. Opening a thread marks it read, but sending into the open thread re-marks it unread for the sender — neither chat page marks read on send success.
+- [ ] **Finish chat unread tracking** — migration 030 is applied to live. Opening a thread marks it read, but sending into the open thread re-marks it unread for the sender — neither chat page marks read on send success (re-confirmed in code 2026-09-01).
 - [ ] **Render blog markdown** — `BlogPostPage` currently shows raw `body_markdown`.
 - [ ] **Filter internal tags from public pages** — `subcategory:`/`service_area:`/`import:`/`access_src:` tags render as public badges on `ResourceDetailPage`.
-- [ ] **Tighten `conversations` UPDATE RLS** — currently column-agnostic (low severity).
-- [ ] **Reconcile `booking_status`** — live enum has values (`declined`, `needs_info`, `contacted`, `no_response`, `closed`) that no repo migration adds.
+- [ ] **Tighten `conversations` UPDATE RLS** — currently column-agnostic (low severity, re-confirmed against live policies 2026-09-01).
 - [ ] **Decide on migration 037's backfill** (confidence-trigger parity) — its DDL is a no-op on live, but the backfill re-scores 66 stale rows; read `docs/apply-migration-037.md` first.
-- [ ] **Supabase hardening**: `resource_import_staging` has RLS enabled with no policies (verify it's meant to be API-inert), several functions have mutable `search_path`, and leaked-password protection is off in Auth — see `CLAUDE.md`'s Known Open Items for the full list.
+- [ ] **Supabase hardening**: `resource_import_staging` has RLS enabled with no policies (verify it's meant to be API-inert), several functions have mutable `search_path`, some RLS policies re-evaluate `auth.<fn>()` per-row instead of the faster `(select auth.<fn>())` pattern, and leaked-password protection is off in Auth — see `CLAUDE.md`'s Known Open Items for the full list (security + performance).
 - [ ] **Domain migration** — move the app from `app.streetrise.org` to `streetrise.org` directly (Cloudflare custom-domain change + a sweep of hardcoded `app.streetrise.org` references). Not scoped yet.
 - [ ] **Branch cleanup** — not currently needed (only 5 branches exist as of 2026-09-01); re-run the `BRANCH_FRESHNESS_AUDIT.md` runbook once a stale-branch backlog builds up again.
