@@ -153,6 +153,7 @@ Shipped and live:
 
 Tracked in detail in `docs/OPEN_ITEMS.md` and `CLAUDE.md`'s Known Open Items; the short list as of 2026-09-01:
 
+- [ ] **Confirm the Privacy Policy and Terms of Use were actually reviewed by an attorney.** Both pages previously carried an explicit "not reviewed by an attorney" disclaimer; that's gone as of a 2026-08-26 rewrite that added specific, formal legal language (liability limits, data-retention periods, a children's-privacy clause). If it wasn't reviewed, restore the disclaimer or get it reviewed — the platform routinely handles health/disability/domestic-violence information in requests.
 - [ ] **Fix "Decline" on bookings — it's broken on live.** `BookingStatus` includes `'declined'`, and both `AdminBookings.tsx`/`ProviderBookings.tsx` have a Decline action that writes it, but the live `booking_status` enum doesn't have that value — every click fails with a Postgres enum error. Needs a migration to add it, or the two Decline actions repointed at an existing status.
 - [ ] **Confirm `VITE_BLOG_WORKER_URL` is set in Cloudflare Pages** and the Pages deployment retried — the Worker itself deploys successfully now, but the AI Draft panel on `/admin/blog` stays hidden until that env var is set and picked up.
 - [ ] **Finish chat unread tracking** — migration 030 is applied to live. Opening a thread marks it read, but sending into the open thread re-marks it unread for the sender — neither chat page marks read on send success (re-confirmed in code 2026-09-01).
