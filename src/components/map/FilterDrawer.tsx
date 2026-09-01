@@ -14,6 +14,7 @@ import {
   type ToggleKey,
 } from '@/lib/mapFilters'
 import { milesToKm } from '@/lib/geo'
+import { useI18n } from '@/lib/i18n'
 import type { GenderPolicy } from '@/types'
 
 function SectionHeader({ title, note }: { title: string; note?: string }) {
@@ -95,6 +96,7 @@ interface Props {
 
 export default function FilterDrawer({ open, onClose, counts, hasOrigin }: Props) {
   const { filters, setFilters, clearRefinements } = useMapStore()
+  const { t } = useI18n()
 
   useEffect(() => {
     if (!open) return
@@ -174,7 +176,7 @@ export default function FilterDrawer({ open, onClose, counts, hasOrigin }: Props
           {toggles.map((def) => (
             <ToggleRow
               key={def.key}
-              label={def.label}
+              label={def.icon ? `${def.icon} ${t(def.labelKey)}` : t(def.labelKey)}
               count={counts.toggles[def.key] ?? 0}
               checked={!!filters[def.key]}
               onChange={(v) => setFilters({ [def.key]: v || undefined } as Partial<Record<ToggleKey, boolean>>)}
@@ -191,7 +193,7 @@ export default function FilterDrawer({ open, onClose, counts, hasOrigin }: Props
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Filters"
+        aria-label={t('filterDrawer.ariaLabel')}
         className={clsx(
           'fixed z-[75] bg-white shadow-2xl flex flex-col animate-slide-up',
           'inset-x-0 bottom-0 rounded-t-3xl max-h-[86dvh]',
@@ -203,14 +205,14 @@ export default function FilterDrawer({ open, onClose, counts, hasOrigin }: Props
 
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
-          <h2 className="font-bold text-gray-900 text-lg">Narrow it down</h2>
+          <h2 className="font-bold text-gray-900 text-lg">{t('filterDrawer.title')}</h2>
           <div className="flex gap-1 items-center">
             {activeCount > 0 && (
               <button onClick={clearRefinements} className="text-sm text-danger-600 font-medium px-2">
-                Reset
+                {t('filterDrawer.reset')}
               </button>
             )}
-            <button onClick={onClose} className="btn-icon text-gray-500" aria-label="Close filters">
+            <button onClick={onClose} className="btn-icon text-gray-500" aria-label={t('filterDrawer.closeAria')}>
               <X size={18} />
             </button>
           </div>
@@ -220,18 +222,17 @@ export default function FilterDrawer({ open, onClose, counts, hasOrigin }: Props
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {nothingToRefine && (
             <p className="text-sm text-gray-500 py-6 text-center">
-              No further filters would change these results. Try a different need
-              or a wider search area.
+              {t('filterDrawer.nothingToRefine')}
             </p>
           )}
 
           {/* Distance */}
           {hasOrigin && distanceOptions.length > 0 && (
             <section className="mb-5">
-              <SectionHeader title="Distance" note="Measured from your location or the map centre." />
+              <SectionHeader title={t('filterDrawer.distanceTitle')} note={t('filterDrawer.distanceNote')} />
               <div className="flex flex-wrap gap-2">
                 <Pill
-                  label="Any distance"
+                  label={t('filterDrawer.anyDistance')}
                   count={counts.distance.any ?? 0}
                   active={filters.radius == null}
                   onClick={() => setFilters({ radius: undefined })}
@@ -252,15 +253,15 @@ export default function FilterDrawer({ open, onClose, counts, hasOrigin }: Props
             </section>
           )}
 
-          {section('access', 'Getting in', 'Conditions to meet before you arrive.', accessToggles)}
-          {section('facility', 'What they have', undefined, facilityToggles, true)}
+          {section('access', t('filterDrawer.accessTitle'), t('filterDrawer.accessNote'), accessToggles)}
+          {section('facility', t('filterDrawer.facilityTitle'), undefined, facilityToggles, true)}
 
           {/* Eligibility */}
           {(genderOptions.length > 0 || populationOptions.length > 0) && (
             <section className="mb-5">
               <SectionHeader
-                title="Who they serve"
-                note="Listings with unrecorded eligibility always stay visible."
+                title={t('filterDrawer.eligibilityTitle')}
+                note={t('filterDrawer.eligibilityNote')}
               />
               <div className="flex flex-wrap gap-2">
                 {genderOptions.map((gp) => (
@@ -289,15 +290,15 @@ export default function FilterDrawer({ open, onClose, counts, hasOrigin }: Props
             </section>
           )}
 
-          {section('trust', 'Trust', undefined, trustToggles)}
+          {section('trust', t('filterDrawer.trustTitle'), undefined, trustToggles)}
         </div>
 
         {/* Footer */}
         <div className="shrink-0 border-t border-gray-100 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <button onClick={onClose} className="btn-primary w-full">
             {counts.total === 0
-              ? 'No matches — adjust filters'
-              : `Show ${counts.total} ${counts.total === 1 ? 'place' : 'places'}`}
+              ? t('filterDrawer.noMatches')
+              : `${t('filterDrawer.show')} ${counts.total} ${counts.total === 1 ? t('filterDrawer.place') : t('filterDrawer.places')}`}
           </button>
         </div>
       </div>

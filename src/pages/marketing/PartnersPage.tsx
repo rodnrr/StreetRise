@@ -5,26 +5,29 @@ import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import EmptyState from '@/components/ui/EmptyState'
 import SeoHead from '@/lib/seo/SeoHead'
-
-const WAYS_TO_PARTNER = [
-  {
-    icon: Building2,
-    title: 'Corporate & Foundation Partners',
-    description: 'Fund verification, outreach, and expansion into new Florida cities.',
-  },
-  {
-    icon: Users2,
-    title: 'Community Organizations',
-    description: 'Co-host events, referral partnerships, and volunteer drives with StreetRise.',
-  },
-  {
-    icon: HandCoins,
-    title: 'In-Kind & Grant Support',
-    description: "Donated services, tools, or grant funding that helps StreetRise reach more people.",
-  },
-]
+import { useI18n } from '@/lib/i18n'
 
 export default function PartnersPage() {
+  const { t } = useI18n()
+
+  const WAYS_TO_PARTNER = [
+    {
+      icon: Building2,
+      title: t('marketing.partners.way1Title'),
+      description: t('marketing.partners.way1Desc'),
+    },
+    {
+      icon: Users2,
+      title: t('marketing.partners.way2Title'),
+      description: t('marketing.partners.way2Desc'),
+    },
+    {
+      icon: HandCoins,
+      title: t('marketing.partners.way3Title'),
+      description: t('marketing.partners.way3Desc'),
+    },
+  ]
+
   return (
     <div className="bg-white dark:bg-slate-900">
       <SeoHead
@@ -35,9 +38,9 @@ export default function PartnersPage() {
 
       <Section containerSize="prose" className="text-center">
         <SectionHeading
-          eyebrow="Partner with us"
-          title="Help StreetRise Reach More People"
-          subtitle="StreetRise partners with foundations, businesses, and community organizations to expand real-time resource access across Florida."
+          eyebrow={t('marketing.partners.eyebrow')}
+          title={t('marketing.partners.title')}
+          subtitle={t('marketing.partners.subtitle')}
         />
       </Section>
 
@@ -56,17 +59,17 @@ export default function PartnersPage() {
       </Section>
 
       <Section containerSize="prose">
-        <SectionHeading title="Our Current Partners" align="left" />
+        <SectionHeading title={t('marketing.partners.currentPartnersTitle')} align="left" />
         <EmptyState
           icon={Users2}
-          title="Partner list coming soon"
-          description="We're building out this page as new partnerships are confirmed."
+          title={t('marketing.partners.emptyTitle')}
+          description={t('marketing.partners.emptyDesc')}
         />
       </Section>
 
       <Section tone="primary" containerSize="prose" className="text-center">
-        <SectionHeading title="Ready to Talk?" />
-        <Button to="/contact">Contact Us</Button>
+        <SectionHeading title={t('marketing.partners.readyTitle')} />
+        <Button to="/contact">{t('marketing.partners.contactBtn')}</Button>
       </Section>
     </div>
   )

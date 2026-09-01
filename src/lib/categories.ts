@@ -28,11 +28,15 @@ export type CategoryMapLink =
 export interface CategoryPageConfig {
   slug: string
   displayName: string
+  /** i18n.ts key for the translated display name — use via `t(displayNameKey)`. */
+  displayNameKey: string
   emoji: string
   mode: CategoryPageMode
   /** Filter to deep-link into /map with the equivalent view pre-applied. */
   mapLink: CategoryMapLink
   description: string
+  /** i18n.ts key for the translated description — use via `t(descriptionKey)`. */
+  descriptionKey: string
   /** Snapshot resource count backing the `mode` decision — see file header. */
   liveResourceCountSnapshot: number
 }
@@ -41,42 +45,51 @@ export const CATEGORY_PAGES: CategoryPageConfig[] = [
   {
     slug: 'food-pantries',
     displayName: 'Food Pantries',
+    displayNameKey: 'categoryPage.food-pantries.name',
     emoji: '🍽️',
     mode: 'live',
     mapLink: { category: 'food' },
     description: 'Food pantries, hot meals, and food assistance across Tampa Bay, Orlando, and South Florida.',
+    descriptionKey: 'categoryPage.food-pantries.description',
     liveResourceCountSnapshot: 26,
   },
   {
     slug: 'shelters',
     displayName: 'Shelters',
+    displayNameKey: 'categoryPage.shelters.name',
     emoji: '🏠',
     mode: 'live',
     mapLink: { category: 'shelter' },
     description: 'Emergency and transitional shelter listings with real-time bed availability.',
+    descriptionKey: 'categoryPage.shelters.description',
     liveResourceCountSnapshot: 23,
   },
   {
     slug: 'medical',
     displayName: 'Medical Care',
+    displayNameKey: 'categoryPage.medical.name',
     emoji: '⚕️',
     mode: 'live',
     mapLink: { category: 'medical' },
     description: 'Free and low-cost medical clinics and healthcare services.',
+    descriptionKey: 'categoryPage.medical.description',
     liveResourceCountSnapshot: 9,
   },
   {
     slug: 'employment',
     displayName: 'Employment & Work Exchange',
+    displayNameKey: 'categoryPage.employment.name',
     emoji: '💼',
     mode: 'live',
     mapLink: { category: 'work_exchange' }, // site copy says "Employment" — schema value stays work_exchange
     description: 'Job training, career centers, and work-exchange opportunities.',
+    descriptionKey: 'categoryPage.employment.description',
     liveResourceCountSnapshot: 16,
   },
   {
     slug: 'hygiene',
     displayName: 'Hygiene',
+    displayNameKey: 'categoryPage.hygiene.name',
     emoji: '🚿',
     mode: 'live',
     // 'hygiene' as a category has 0 direct rows; fetchMapResources() already special-cases
@@ -84,30 +97,36 @@ export const CATEGORY_PAGES: CategoryPageConfig[] = [
     // Passing category=hygiene here reuses that existing logic, not a new query.
     mapLink: { category: 'hygiene' },
     description: 'Places to shower, use a restroom, or access hygiene supplies.',
+    descriptionKey: 'categoryPage.hygiene.description',
     liveResourceCountSnapshot: 14,
   },
   {
     slug: 'showers',
     displayName: 'Showers',
+    displayNameKey: 'categoryPage.showers.name',
     emoji: '🚿',
     mode: 'live',
     // Distinct from /hygiene: has_showers only, not the broader showers-OR-restrooms set.
     mapLink: { hasShowers: true },
     description: 'Find a place to shower today.',
+    descriptionKey: 'categoryPage.showers.description',
     liveResourceCountSnapshot: 9,
   },
   {
     slug: 'legal',
     displayName: 'Legal Help',
+    displayNameKey: 'categoryPage.legal.name',
     emoji: '⚖️',
     mode: 'static',
     mapLink: { category: 'legal' },
     description: 'Legal aid and services for people facing housing or benefits issues.',
+    descriptionKey: 'categoryPage.legal.description',
     liveResourceCountSnapshot: 0,
   },
   {
     slug: 'veterans',
     displayName: 'Veterans',
+    displayNameKey: 'categoryPage.veterans.name',
     emoji: '🎖️',
     mode: 'static',
     // Precise filter (population_focus contains 'veterans') — real but thin (2 resources).
@@ -115,11 +134,13 @@ export const CATEGORY_PAGES: CategoryPageConfig[] = [
     // see MapPage.tsx:93-98) before this CTA can deep-link. Needed in Phase 6.
     mapLink: { quickFilter: 'veteran_support' },
     description: 'Resources with veteran-specific support.',
+    descriptionKey: 'categoryPage.veterans.description',
     liveResourceCountSnapshot: 2,
   },
   {
     slug: 'youth',
     displayName: 'Youth',
+    displayNameKey: 'categoryPage.youth.name',
     emoji: '🧑',
     mode: 'static',
     // Precise filter via the subcategory column (not resource_type — that field is
@@ -129,11 +150,13 @@ export const CATEGORY_PAGES: CategoryPageConfig[] = [
     // and is NOT an honest count for marketing copy, so it's not used here.
     mapLink: { subcategory: ['youth_shelter'] },
     description: 'Support for youth experiencing homelessness or housing instability.',
+    descriptionKey: 'categoryPage.youth.description',
     liveResourceCountSnapshot: 1,
   },
   {
     slug: 'students',
     displayName: 'Students & School Support',
+    displayNameKey: 'categoryPage.students.name',
     emoji: '🎒',
     // 'live' from the moment migration 036 is applied: 20 seeded rows, every
     // one tagged population_focus ∋ 'students'. Until then this page renders
@@ -142,11 +165,13 @@ export const CATEGORY_PAGES: CategoryPageConfig[] = [
     mapLink: { populationFocus: ['students'] },
     description:
       'Free school clothing, uniforms, shoes and student support for families in Tampa Bay, Orlando, and Miami. Some are walk-in; some are arranged through your school counsellor or social worker.',
+    descriptionKey: 'categoryPage.students.description',
     liveResourceCountSnapshot: 20,
   },
   {
     slug: 'families',
     displayName: 'Families',
+    displayNameKey: 'categoryPage.families.name',
     emoji: '👨‍👩‍👧',
     mode: 'static',
     // Precise filter via subcategory. gender_policy = 'family_only' is 0 rows
@@ -154,6 +179,7 @@ export const CATEGORY_PAGES: CategoryPageConfig[] = [
     // (≈104 of 111 resources via gender_inclusive/unknown) — neither is honest here.
     mapLink: { subcategory: ['family_support', 'women_children_shelter'] },
     description: 'Shelter and support services for families in crisis.',
+    descriptionKey: 'categoryPage.families.description',
     liveResourceCountSnapshot: 6,
   },
 ]

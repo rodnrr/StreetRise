@@ -3,8 +3,16 @@ import { Link } from 'react-router-dom'
 import { Search, Building2, ArrowRight, ShieldCheck, AlertTriangle } from 'lucide-react'
 import SeoHead from '@/lib/seo/SeoHead'
 import { useClaimableProviders } from '@/lib/claims'
+import { useI18n, translate } from '@/lib/i18n'
 
 export default function ClaimIndexPage() {
+  const { t, lang } = useI18n()
+  /** `translate` plus `{placeholder}` substitution, matching @/lib/resourceFaq's pattern. */
+  const tv = (key: string, vars: Record<string, string> = {}) => {
+    let s = translate(lang, key)
+    for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(v)
+    return s
+  }
   const [search, setSearch] = useState('')
   const { data: orgs = [], isLoading, isError } = useClaimableProviders()
 
@@ -20,25 +28,21 @@ export default function ClaimIndexPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 pb-28 md:pb-12">
       <SeoHead
-        title="Claim Your Organization — StreetRise"
-        description="StreetRise lists local shelters, pantries, clinics, and legal aid from public information. If you work at one of these organizations, claim it to keep your own listing accurate."
+        title={t('claim.index.seoTitle')}
+        description={t('claim.index.seoDescription')}
         path="/claim"
       />
 
       {/* ── Header ── */}
       <div className="text-center space-y-4 mb-9">
         <div className="inline-flex items-center gap-1.5 bg-primary-50 text-primary-700 text-xs font-semibold rounded-full px-3 py-1.5">
-          <ShieldCheck size={13} /> Free for local service providers
+          <ShieldCheck size={13} /> {t('claim.index.badge')}
         </div>
         <h1 className="text-3xl font-extrabold text-gray-900 leading-tight">
-          Is your organization listed here?
+          {t('claim.index.heading')}
         </h1>
         <p className="text-gray-500 leading-relaxed">
-          We built these listings from public information so people could find help
-          today. They are marked <strong>Community Listed</strong> because no one from
-          the organization has confirmed them yet. If you work at one, claim it — you
-          will be able to correct the details, update hours and availability, and
-          manage requests yourself.
+          {t('claim.index.introBefore')} <strong>{t('badge.communityListed')}</strong> {t('claim.index.introAfter')}
         </p>
       </div>
 
@@ -48,8 +52,8 @@ export default function ClaimIndexPage() {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search by organization name…"
-          aria-label="Search unclaimed organizations"
+          placeholder={t('claim.index.searchPlaceholder')}
+          aria-label={t('claim.index.searchAria')}
           className="bg-transparent text-sm text-gray-800 placeholder:text-gray-400 outline-none w-full"
         />
       </div>
@@ -63,14 +67,14 @@ export default function ClaimIndexPage() {
       {isError && (
         <div className="text-center py-14 text-gray-500">
           <AlertTriangle size={26} className="mx-auto mb-2 text-gray-400" />
-          <p className="text-sm">We couldn’t load the directory. Please try again in a moment.</p>
+          <p className="text-sm">{t('claim.index.loadError')}</p>
         </div>
       )}
 
       {!isLoading && !isError && (
         <>
           <p className="text-xs text-gray-400 mb-3">
-            {filtered.length} organization{filtered.length === 1 ? '' : 's'} available to claim
+            {tv(filtered.length === 1 ? 'claim.index.countOne' : 'claim.index.countOther', { count: String(filtered.length) })}
           </p>
 
           {filtered.length === 0 && (
@@ -78,13 +82,13 @@ export default function ClaimIndexPage() {
               <Building2 size={26} className="mx-auto mb-2 text-gray-300" />
               <p className="text-sm">
                 {search
-                  ? <>No unclaimed organization matches “{search}”.</>
-                  : <>Every listed organization has been claimed.</>}
+                  ? tv('claim.index.noMatchSearch', { search })
+                  : t('claim.index.noMatchEmpty')}
               </p>
               <p className="text-sm mt-3">
-                Not finding yours?{' '}
+                {t('claim.index.notFindingYours')}{' '}
                 <Link to="/login?signup=1" className="text-primary-600 font-medium hover:underline">
-                  Register it as a new provider
+                  {t('claim.index.registerNewProvider')}
                 </Link>.
               </p>
             </div>
@@ -122,10 +126,10 @@ export default function ClaimIndexPage() {
 
       <div className="mt-10 rounded-2xl bg-gray-50 border border-gray-100 p-5 text-center">
         <p className="text-sm text-gray-600">
-          Don’t see your organization?
+          {t('claim.index.dontSeeOrg')}
         </p>
         <Link to="/provider/onboarding" className="btn-primary btn-sm mt-3 gap-1.5">
-          Register as a new provider <ArrowRight size={14} />
+          {t('claim.index.registerAsProvider')} <ArrowRight size={14} />
         </Link>
       </div>
     </div>

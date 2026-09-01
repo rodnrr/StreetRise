@@ -1,12 +1,15 @@
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { ArrowLeft } from 'lucide-react'
 import { fetchPostBySlug } from '@/lib/blog'
 import Section from '@/components/ui/Section'
 import SeoHead from '@/lib/seo/SeoHead'
 import { articleSchema } from '@/lib/seo/structuredData'
 import NotFoundPage from '@/pages/NotFoundPage'
+import { useI18n } from '@/lib/i18n'
 
 export default function BlogPostPage() {
+  const { t, lang } = useI18n()
   const { slug } = useParams<{ slug: string }>()
 
   const { data: post, isLoading } = useQuery({
@@ -52,9 +55,15 @@ export default function BlogPostPage() {
       </SeoHead>
 
       <Section containerSize="prose">
+        <Link
+          to="/blog"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 mb-6"
+        >
+          <ArrowLeft size={15} /> {t('blog.post.backToBlog')}
+        </Link>
         <p className="text-xs font-semibold uppercase tracking-widest text-primary-600 dark:text-primary-400">
           {post.author_name}
-          {post.published_at && ` · ${new Date(post.published_at).toLocaleDateString()}`}
+          {post.published_at && ` · ${new Date(post.published_at).toLocaleDateString(lang === 'es' ? 'es' : 'en-US')}`}
         </p>
         <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{post.title}</h1>
         {post.cover_image_url && (

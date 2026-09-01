@@ -6,6 +6,7 @@ import {
   useEnabledOAuthProviders, signInWithProvider, sendMagicLink,
   applySessionAndResolveDestination, PROVIDER_LABEL, type OAuthProvider,
 } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 /** Enough to catch a typo and enable the button; the server does the real check. */
 const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
@@ -28,6 +29,7 @@ function ProviderIcon({ provider }: { provider: OAuthProvider }) {
 }
 
 export default function LoginPage() {
+  const { t }          = useI18n()
   const [params]      = useSearchParams()
   const initialMode   = params.get('signup') === '1' ? 'signup' : 'login'
   const [email, setEmail]       = useState('')
@@ -62,7 +64,7 @@ export default function LoginPage() {
       // With email confirmation enabled, signUp returns a user but no session.
       // Routing into the portal here would land them on a signed-out screen.
       if (mode === 'signup' && !data.session) {
-        setNotice('Check your email to confirm your account, then sign in.')
+        setNotice(t('login.confirmEmailNotice'))
         setMode('login')
         return
       }
@@ -72,7 +74,7 @@ export default function LoginPage() {
         navigate(dest, { replace: true })
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Authentication failed')
+      setError(err instanceof Error ? err.message : t('login.err.authFailed'))
     } finally {
       setLoading(false)
     }
@@ -94,8 +96,8 @@ export default function LoginPage() {
       // Anything else is reported generically so this can't be used to test
       // which addresses have accounts.
       setError(/rate|limit|too many|seconds/i.test(err.message)
-        ? 'Too many requests. Wait a minute and try again.'
-        : 'We couldn’t send the link. Check the address and try again.')
+        ? t('login.err.rateLimited')
+        : t('login.err.magicLinkFailed'))
       return
     }
     setMagicSentTo(email.trim())
@@ -108,17 +110,16 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="card w-full max-w-sm text-center">
         <MailCheck size={44} className="text-success-600 mx-auto mb-4" />
-        <h1 className="text-xl font-bold text-gray-900 mb-2">Check your email</h1>
+        <h1 className="text-xl font-bold text-gray-900 mb-2">{t('login.checkEmailTitle')}</h1>
         <p className="text-sm text-gray-500 mb-5">
-          We sent a sign-in link to <strong className="break-all">{magicSentTo}</strong>.
-          Open it on this device and you’ll be signed straight in — no password needed.
+          {t('login.magicLinkSentTo')} <strong className="break-all">{magicSentTo}</strong>.{' '}
+          {t('login.magicLinkOpenOnDevice')}
         </p>
         <p className="text-xs text-gray-400 mb-6">
-          The link works once and expires in about an hour. If it doesn’t arrive,
-          check your spam folder.
+          {t('login.magicLinkExpiry')}
         </p>
         <button onClick={() => setMagicSentTo(null)} className="btn-secondary w-full">
-          Use a different email
+          {t('login.useDifferentEmail')}
         </button>
       </div>
     </div>
@@ -130,9 +131,9 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center text-white font-black text-sm mx-auto mb-3">SR</div>
           <h1 className="text-xl font-bold text-gray-900">
-            {mode === 'login' ? 'Provider Sign In' : 'Create Provider Account'}
+            {mode === 'login' ? t('login.signInTitle') : t('login.signUpTitle')}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">StreetRise Provider Portal</p>
+          <p className="text-sm text-gray-500 mt-1">{t('login.portalSubtitle')}</p>
         </div>
 
         {providers.length > 0 && (
@@ -147,13 +148,13 @@ export default function LoginPage() {
                   className="btn-secondary w-full flex items-center justify-center gap-2.5"
                 >
                   <ProviderIcon provider={p} />
-                  {oauthBusy === p ? 'Redirecting…' : `Continue with ${PROVIDER_LABEL[p]}`}
+                  {oauthBusy === p ? t('login.redirecting') : `${t('login.continueWith')} ${PROVIDER_LABEL[p]}`}
                 </button>
               ))}
             </div>
             <div className="flex items-center gap-3 my-5">
               <div className="h-px bg-gray-200 flex-1" />
-              <span className="text-xs text-gray-400">or</span>
+              <span className="text-xs text-gray-400">{t('login.or')}</span>
               <div className="h-px bg-gray-200 flex-1" />
             </div>
           </>
@@ -161,7 +162,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="login-email" className="label">Email</label>
+            <label htmlFor="login-email" className="label">{t('login.email')}</label>
             <input
               id="login-email" type="email" className="input" value={email}
               onChange={e => setEmail(e.target.value)} autoComplete="email" required
@@ -169,13 +170,13 @@ export default function LoginPage() {
           </div>
           <div>
             <div className="flex items-baseline justify-between">
-              <label htmlFor="login-password" className="label">Password</label>
+              <label htmlFor="login-password" className="label">{t('login.password')}</label>
               {mode === 'login' && (
                 <Link
                   to={`/forgot-password${email ? `?email=${encodeURIComponent(email)}` : ''}`}
                   className="text-xs text-primary-600 font-medium hover:underline"
                 >
-                  Forgot password?
+                  {t('login.forgotPassword')}
                 </Link>
               )}
             </div>
@@ -189,7 +190,7 @@ export default function LoginPage() {
           {notice && <p className="text-sm text-center text-primary-700 bg-primary-50 rounded-xl py-2 px-3">{notice}</p>}
           {error && <p className="error-text text-center">{error}</p>}
           <button type="submit" disabled={loading || !!oauthBusy || magicBusy} className="btn-primary w-full">
-            {loading ? 'Please wait…' : mode === 'login' ? 'Sign In' : 'Create Account'}
+            {loading ? t('login.pleaseWait') : mode === 'login' ? t('login.signIn') : t('login.createAccount')}
           </button>
         </form>
 
@@ -199,24 +200,24 @@ export default function LoginPage() {
           type="button"
           onClick={handleMagicLink}
           disabled={!emailValid || magicBusy || loading || !!oauthBusy}
-          title={emailValid ? undefined : 'Enter your email address first'}
+          title={emailValid ? undefined : t('login.enterEmailFirst')}
           className="btn-secondary w-full mt-2.5 flex items-center justify-center gap-2 disabled:opacity-55"
         >
           <MailCheck size={15} />
-          {magicBusy ? 'Sending…' : 'Email me a sign-in link'}
+          {magicBusy ? t('login.sending') : t('login.emailMeSignInLink')}
         </button>
         <p className="text-xs text-gray-400 text-center mt-2">
-          No password needed — we’ll send a link that signs you in.
+          {t('login.noPasswordNeeded')}
         </p>
 
         <p className="text-center text-sm text-gray-500 mt-4">
-          {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}
+          {mode === 'login' ? t('login.noAccount') : t('login.haveAccount')}
           {' '}
           <button
             onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setNotice('') }}
             className="text-primary-600 font-medium hover:underline"
           >
-            {mode === 'login' ? 'Sign up' : 'Sign in'}
+            {mode === 'login' ? t('login.signUp') : t('login.signIn')}
           </button>
         </p>
       </div>

@@ -10,6 +10,7 @@ import EmptyState from '@/components/ui/EmptyState'
 import SeoHead from '@/lib/seo/SeoHead'
 import { breadcrumbSchema } from '@/lib/seo/structuredData'
 import NotFoundPage from '@/pages/NotFoundPage'
+import { useI18n } from '@/lib/i18n'
 
 interface Props {
   slug: string
@@ -17,6 +18,7 @@ interface Props {
 
 export default function CategoryPage({ slug }: Props) {
   const config = getCategoryPage(slug)
+  const { t } = useI18n()
 
   const { data: resources, isLoading } = useQuery({
     queryKey: ['category-resources', slug],
@@ -46,8 +48,8 @@ export default function CategoryPage({ slug }: Props) {
 
       <Section containerSize="prose" className="pb-4 text-center">
         <span className="text-4xl">{config.emoji}</span>
-        <h1 className="mt-3 text-3xl font-bold text-slate-900 dark:text-white">{config.displayName}</h1>
-        <p className="mt-2 text-slate-500 dark:text-slate-400">{config.description}</p>
+        <h1 className="mt-3 text-3xl font-bold text-slate-900 dark:text-white">{t(config.displayNameKey)}</h1>
+        <p className="mt-2 text-slate-500 dark:text-slate-400">{t(config.descriptionKey)}</p>
       </Section>
 
       {config.mode === 'live' ? (
@@ -61,9 +63,9 @@ export default function CategoryPage({ slug }: Props) {
           {!isLoading && resources && resources.length === 0 && (
             <EmptyState
               icon={SearchX}
-              title="Nothing listed here yet"
-              description="Nothing currently matches this need. Check the full map — new listings are added regularly."
-              action={<Button to="/map">View Full Map</Button>}
+              title={t('categoryPage.emptyTitle')}
+              description={t('categoryPage.emptyDescription')}
+              action={<Button to="/map">{t('categoryPage.viewFullMap')}</Button>}
             />
           )}
 
@@ -87,10 +89,10 @@ export default function CategoryPage({ slug }: Props) {
                         an address as an invitation to turn up. */}
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <span className={r.verification_status === 'verified' ? 'badge-verified' : 'badge-pending'}>
-                        {r.verification_status === 'verified' ? 'Staff Verified' : 'Community Listed'}
+                        {r.verification_status === 'verified' ? t('badge.staffVerified') : t('badge.communityListed')}
                       </span>
                       {r.requires_referral && (
-                        <span className="badge bg-amber-50 text-amber-700">Referral needed</span>
+                        <span className="badge bg-amber-50 text-amber-700">{t('status.referralNeeded')}</span>
                       )}
                     </div>
                   </Card>
@@ -98,7 +100,7 @@ export default function CategoryPage({ slug }: Props) {
               </div>
               <div className="mt-6 text-center">
                 <Button to={mapHref} variant="secondary" className="gap-2">
-                  View on Map <ArrowRight size={16} />
+                  {t('categoryPage.viewOnMap')} <ArrowRight size={16} />
                 </Button>
               </div>
             </>
@@ -107,11 +109,11 @@ export default function CategoryPage({ slug }: Props) {
       ) : (
         <Section containerSize="prose" className="pt-0 text-center">
           <SectionHeading
-            title="Not seeing enough listings?"
-            subtitle="We're actively onboarding more providers in this category. In the meantime, search the full map — it includes resources that may still help even if they're not listed specifically here."
+            title={t('categoryPage.notEnoughTitle')}
+            subtitle={t('categoryPage.notEnoughSubtitle')}
           />
           <Button to={mapHref} className="gap-2">
-            Search the Map <ArrowRight size={16} />
+            {t('categoryPage.searchTheMap')} <ArrowRight size={16} />
           </Button>
         </Section>
       )}

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { applySessionAndResolveDestination } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 /**
  * Landing point after a social sign-in round trip.
@@ -13,6 +14,7 @@ import { applySessionAndResolveDestination } from '@/lib/auth'
  * the same helper so they cannot diverge.
  */
 export default function AuthCallbackPage() {
+  const { t }       = useI18n()
   const navigate    = useNavigate()
   const [params]    = useSearchParams()
   const [failed, setFailed] = useState<string | null>(null)
@@ -36,7 +38,7 @@ export default function AuthCallbackPage() {
 
       const { data } = await supabase.auth.getSession()
       if (cancelled) return
-      if (!data.session?.user) { setFailed('We could not complete the sign-in.'); return }
+      if (!data.session?.user) { setFailed(t('authCallback.err.couldNotComplete')); return }
 
       const dest = await applySessionAndResolveDestination(
         data.session.user,
@@ -52,9 +54,9 @@ export default function AuthCallbackPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="card w-full max-w-sm text-center">
         <AlertTriangle size={44} className="text-amber-500 mx-auto mb-4" />
-        <h1 className="text-xl font-bold text-gray-900 mb-2">Sign-in didn’t finish</h1>
+        <h1 className="text-xl font-bold text-gray-900 mb-2">{t('authCallback.notFinishedTitle')}</h1>
         <p className="text-sm text-gray-500 mb-6 break-words">{failed}</p>
-        <Link to="/login" className="btn-primary w-full">Back to sign in</Link>
+        <Link to="/login" className="btn-primary w-full">{t('authCallback.backToSignIn')}</Link>
       </div>
     </div>
   )
@@ -63,7 +65,7 @@ export default function AuthCallbackPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="flex flex-col items-center gap-3">
         <div className="w-9 h-9 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-gray-500">Signing you in…</p>
+        <p className="text-sm text-gray-500">{t('authCallback.signingIn')}</p>
       </div>
     </div>
   )

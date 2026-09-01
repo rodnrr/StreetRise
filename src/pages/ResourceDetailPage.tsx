@@ -10,20 +10,22 @@ import {
   getTrustInfo,
   TRUST_LEVEL_CLASSES,
 } from '@/lib/mapFilters'
+import { useI18n } from '@/lib/i18n'
 import type { Resource } from '@/types'
 
 function VerificationBadge({ status }: { status: string }) {
+  const { t } = useI18n()
   if (status === 'verified') {
     return (
       <span className="badge-verified shrink-0 flex items-center gap-1">
-        <CheckCircle size={12} /> Staff Verified
+        <CheckCircle size={12} /> {t('badge.staffVerified')}
       </span>
     )
   }
   if (status === 'pending') {
     return (
       <span className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 rounded-full px-2.5 py-1">
-        <Clock size={12} /> Community Listed
+        <Clock size={12} /> {t('badge.communityListed')}
       </span>
     )
   }
@@ -31,12 +33,13 @@ function VerificationBadge({ status }: { status: string }) {
 }
 
 function TrustAlert({ resource }: { resource: Resource }) {
+  const { t } = useI18n()
   const { label, level } = getTrustInfo(resource)
   if (level === 'fresh' || level === 'recent') return null
   return (
     <div className={`flex items-start gap-2.5 rounded-xl p-3 mb-4 ${TRUST_LEVEL_CLASSES[level]}`}>
       <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-      <p className="text-sm font-medium">{label} — confirm details before visiting.</p>
+      <p className="text-sm font-medium">{label} — {t('resourceDetail.confirmBeforeVisiting')}</p>
     </div>
   )
 }
@@ -49,19 +52,32 @@ const STATUS_COLOR: Record<string, string> = {
   closed:    'badge-unknown',
 }
 
-function getAvailabilityLabel(resource: Resource): string {
+function getAvailabilityLabel(resource: Resource, t: (key: string) => string): string {
   if (resource.category === 'shelter') {
-    const labels: Record<string, string> = { available: 'Beds Available', limited: 'Limited Beds', full: 'Shelter Full', unknown: 'Availability Unknown', closed: 'Closed' }
-    return labels[resource.availability_status] ?? 'Availability Unknown'
+    const labels: Record<string, string> = {
+      available: t('status.bedsAvailableTitle'),
+      limited: t('status.limitedBedsTitle'),
+      full: t('status.shelterFull'),
+      unknown: t('status.availabilityUnknown'),
+      closed: t('status.closed'),
+    }
+    return labels[resource.availability_status] ?? t('status.availabilityUnknown')
   }
-  const labels: Record<string, string> = { available: 'Open Now', limited: 'Limited Availability', full: 'Unavailable', unknown: 'Availability Unknown', closed: 'Closed' }
-  return labels[resource.availability_status] ?? 'Availability Unknown'
+  const labels: Record<string, string> = {
+    available: t('status.openNowTitle'),
+    limited: t('status.limitedAvailability'),
+    full: t('status.unavailable'),
+    unknown: t('status.availabilityUnknown'),
+    closed: t('status.closed'),
+  }
+  return labels[resource.availability_status] ?? t('status.availabilityUnknown')
 }
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
 
 export default function ResourceDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const { t } = useI18n()
 
   const { data: resource, isLoading } = useQuery<Resource | null>({
     queryKey: ['resource', id],
@@ -95,8 +111,8 @@ export default function ResourceDetailPage() {
   if (!resource) {
     return (
       <div className="max-w-2xl mx-auto px-4 pt-20 text-center">
-        <p className="text-gray-500">Resource not found.</p>
-        <Link to="/map" className="btn-primary mt-4">Back to Map</Link>
+        <p className="text-gray-500">{t('resourceDetail.notFound')}</p>
+        <Link to="/map" className="btn-primary mt-4">{t('resourceDetail.backToMapButton')}</Link>
       </div>
     )
   }
@@ -111,22 +127,22 @@ export default function ResourceDetailPage() {
   const hideAddress    = isDVResource && isConfidential
 
   // Facility items
-  const facilities: { show: boolean; label: string }[] = [
-    { show: resource.has_showers,               label: '🚿 Showers available' },
-    { show: resource.has_restrooms,             label: '🚻 Restrooms available' },
-    { show: resource.serves_meals,              label: '🍽️ Meals served' },
-    { show: resource.has_laundry,               label: '🫧 Laundry available' },
-    { show: resource.pet_friendly,              label: '🐾 Pets welcome' },
-    { show: resource.wheelchair_accessible,     label: '♿ Wheelchair accessible' },
-    { show: resource.public_transit_accessible, label: '🚌 Near public transit' },
-    { show: resource.overnight_allowed === true,label: '🌙 Overnight stays allowed' },
+  const facilities: { show: boolean; emoji: string; labelKey: string }[] = [
+    { show: resource.has_showers,               emoji: '🚿', labelKey: 'resourceDetail.facility.showersAvailable' },
+    { show: resource.has_restrooms,             emoji: '🚻', labelKey: 'resourceDetail.facility.restroomsAvailable' },
+    { show: resource.serves_meals,              emoji: '🍽️', labelKey: 'resourceDetail.facility.mealsServed' },
+    { show: resource.has_laundry,               emoji: '🫧', labelKey: 'resourceDetail.facility.laundryAvailable' },
+    { show: resource.pet_friendly,              emoji: '🐾', labelKey: 'resourceDetail.facility.petsWelcome' },
+    { show: resource.wheelchair_accessible,     emoji: '♿', labelKey: 'resourceDetail.facility.wheelchairAccessible' },
+    { show: resource.public_transit_accessible, emoji: '🚌', labelKey: 'resourceDetail.facility.nearPublicTransit' },
+    { show: resource.overnight_allowed === true,emoji: '🌙', labelKey: 'resourceDetail.facility.overnightStaysAllowed' },
   ]
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 pb-32 md:pb-8 space-y-5">
       {/* Back */}
       <Link to="/map" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
-        <ChevronLeft size={16} /> Back to map
+        <ChevronLeft size={16} /> {t('resourceDetail.backToMap')}
       </Link>
 
       {/* Trust alert (aging/stale resources) */}
@@ -137,13 +153,13 @@ export default function ResourceDetailPage() {
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
             <span className={`${STATUS_COLOR[resource.availability_status]} mb-2 inline-flex`}>
-              {getAvailabilityLabel(resource)}
+              {getAvailabilityLabel(resource, t)}
             </span>
             <h1 className="text-2xl font-bold text-gray-900">
               {emoji} {resource.name}
             </h1>
             {hideAddress ? (
-              <p className="text-sm text-gray-500 mt-1">📞 Contact for location and intake process</p>
+              <p className="text-sm text-gray-500 mt-1">📞 {t('resourceDetail.contactForLocationProcess')}</p>
             ) : (
               <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
                 <MapPin size={13} /> {resource.address.street}, {resource.address.city}, {resource.address.state}
@@ -185,11 +201,11 @@ export default function ResourceDetailPage() {
             <div>
               <p className="font-semibold text-gray-900">
                 {resource.beds_available ?? '?'}{' '}
-                <span className="text-gray-400 font-normal">/ {resource.beds_total} beds available</span>
+                <span className="text-gray-400 font-normal">/ {resource.beds_total} {t('resourceSheet.bedsAvailableLabel')}</span>
               </p>
               {resource.beds_updated_at && (
                 <p className="text-xs text-gray-400">
-                  Updated {new Date(resource.beds_updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {t('resourceDetail.updated')} {new Date(resource.beds_updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>
               )}
             </div>
@@ -199,11 +215,11 @@ export default function ResourceDetailPage() {
         {/* CTA */}
         <div className="mt-4 flex gap-3">
           <Link to={`/book/${resource.id}`} className="btn-primary flex-1">
-            {resource.category === 'shelter' ? 'Request a Spot' : 'Request Help'}
+            {resource.category === 'shelter' ? t('booking.requestSpot') : t('booking.requestHelp')}
           </Link>
           {resource.phone && (
             <a href={`tel:${resource.phone}`} className="btn-secondary flex-1 text-center">
-              Call
+              {t('resourceSheet.call')}
             </a>
           )}
         </div>
@@ -211,28 +227,28 @@ export default function ResourceDetailPage() {
 
       {/* Intake requirements */}
       <div className="card">
-        <h2 className="font-semibold text-gray-900 mb-3">Intake Requirements</h2>
+        <h2 className="font-semibold text-gray-900 mb-3">{t('resourceDetail.intakeRequirements')}</h2>
         <div className="space-y-2">
           {(
             [
-              [resource.walk_ins_accepted,              'Walk-ins accepted',   'No walk-ins — call ahead'],
-              [!resource.requires_id,                   'No ID required',      'ID required to enter'],
-              [!resource.requires_referral,             'No referral needed',  'Referral required'],
-              [!resource.phone_required_before_arrival, 'No need to call first','Call before visiting'],
+              [resource.walk_ins_accepted,              'resourceDetail.walkInsAccepted',   'faq.intake.noWalkInsCallAhead'],
+              [!resource.requires_id,                   'faq.intake.noIdRequired',           'resourceDetail.idRequiredToEnter'],
+              [!resource.requires_referral,             'faq.intake.noReferralRequired',     'resourceDetail.referralRequired'],
+              [!resource.phone_required_before_arrival, 'faq.intake.noNeedToCallFirst',      'faq.intake.callBeforeVisiting'],
             ] as [boolean, string, string][]
-          ).map(([ok, yes, no]) => (
-            <div key={yes} className="flex items-center gap-2.5 text-sm">
+          ).map(([ok, yesKey, noKey]) => (
+            <div key={yesKey} className="flex items-center gap-2.5 text-sm">
               {ok
                 ? <CheckCircle size={16} className="text-success-600 shrink-0" />
                 : <XCircle     size={16} className="text-danger-500 shrink-0"  />}
-              <span className={ok ? 'text-gray-700' : 'text-gray-500'}>{ok ? yes : no}</span>
+              <span className={ok ? 'text-gray-700' : 'text-gray-500'}>{t(ok ? yesKey : noKey)}</span>
             </div>
           ))}
           {resource.age_min != null && (
-            <p className="text-sm text-gray-600">🎂 Ages {resource.age_min}{resource.age_max ? `–${resource.age_max}` : '+'}</p>
+            <p className="text-sm text-gray-600">🎂 {t('resourceDetail.ages')} {resource.age_min}{resource.age_max ? `–${resource.age_max}` : '+'}</p>
           )}
           {resource.languages_spoken?.length > 0 && (
-            <p className="text-sm text-gray-600">🗣 Languages: {resource.languages_spoken.join(', ')}</p>
+            <p className="text-sm text-gray-600">🗣 {t('resourceDetail.languagesLabel')} {resource.languages_spoken.join(', ')}</p>
           )}
         </div>
       </div>
@@ -240,14 +256,14 @@ export default function ResourceDetailPage() {
       {/* Facilities */}
       {facilities.some((f) => f.show) && (
         <div className="card">
-          <h2 className="font-semibold text-gray-900 mb-3">Facilities & Amenities</h2>
+          <h2 className="font-semibold text-gray-900 mb-3">{t('resourceDetail.facilitiesAmenities')}</h2>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
             {facilities
               .filter((f) => f.show)
-              .map(({ label }) => (
-                <div key={label} className="flex items-center gap-2 text-sm text-gray-700">
+              .map(({ emoji: fEmoji, labelKey }) => (
+                <div key={labelKey} className="flex items-center gap-2 text-sm text-gray-700">
                   <CheckCircle size={14} className="text-success-600 shrink-0" />
-                  {label}
+                  {fEmoji} {t(labelKey)}
                 </div>
               ))}
           </div>
@@ -258,16 +274,16 @@ export default function ResourceDetailPage() {
       {Object.keys(hours).some((d) => hours[d as keyof typeof hours]) && (
         <div className="card">
           <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-            <Clock size={16} /> Hours of Operation
+            <Clock size={16} /> {t('resourceDetail.hoursOfOperation')}
           </h2>
           <div className="space-y-1">
             {DAYS.map((day) => {
               const h = hours[day]
               return (
                 <div key={day} className="flex justify-between text-sm py-1 border-b border-gray-50 last:border-0">
-                  <span className="text-gray-600 capitalize">{day}</span>
+                  <span className="text-gray-600">{t(`faq.day.${day}`)}</span>
                   <span className={h?.closed ? 'text-gray-400' : 'text-gray-900 font-medium'}>
-                    {h?.closed ? 'Closed' : h ? `${h.open} – ${h.close}` : '—'}
+                    {h?.closed ? t('status.closed') : h ? `${h.open} – ${h.close}` : '—'}
                   </span>
                 </div>
               )
@@ -281,7 +297,7 @@ export default function ResourceDetailPage() {
 
       {/* Contact */}
       <div className="card">
-        <h2 className="font-semibold text-gray-900 mb-3">Contact</h2>
+        <h2 className="font-semibold text-gray-900 mb-3">{t('resourceDetail.contact')}</h2>
         <div className="space-y-2">
           {resource.phone && (
             <a href={`tel:${resource.phone}`} className="flex items-center gap-2.5 text-sm text-primary-600 font-medium hover:underline">
@@ -313,8 +329,8 @@ export default function ResourceDetailPage() {
       {/* Tags */}
       {resource.tags?.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {resource.tags.map((t) => (
-            <span key={t} className="badge bg-gray-100 text-gray-600">{t}</span>
+          {resource.tags.map((tag) => (
+            <span key={tag} className="badge bg-gray-100 text-gray-600">{tag}</span>
           ))}
         </div>
       )}
@@ -326,15 +342,14 @@ export default function ResourceDetailPage() {
       {owner?.claim_status === 'unclaimed' && (
         <div className="rounded-2xl border border-primary-100 bg-primary-50/60 p-4">
           <p className="text-sm text-gray-700">
-            <strong>Do you work at {owner.organization_name}?</strong> This listing was
-            built from public information. Claim it to keep the hours, availability,
-            and contact details accurate.
+            <strong>{t('resourceDetail.claimQuestion').replace('{org}', owner.organization_name)}</strong>{' '}
+            {t('resourceDetail.claimBody')}
           </p>
           <Link
             to={`/claim/${owner.id}`}
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:underline mt-2"
           >
-            Claim this listing <ArrowRight size={14} />
+            {t('resourceDetail.claimThisListing')} <ArrowRight size={14} />
           </Link>
         </div>
       )}
@@ -342,7 +357,7 @@ export default function ResourceDetailPage() {
       {/* Sticky CTA (mobile) */}
       <div className="fixed bottom-16 md:hidden inset-x-4 z-30">
         <Link to={`/book/${resource.id}`} className="btn-primary w-full btn-lg shadow-lg">
-          {resource.category === 'shelter' ? 'Request a Spot' : 'Request Help'}
+          {resource.category === 'shelter' ? t('booking.requestSpot') : t('booking.requestHelp')}
         </Link>
       </div>
     </div>

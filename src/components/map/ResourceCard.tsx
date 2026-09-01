@@ -6,6 +6,7 @@ import {
   getTrustInfo,
 } from '@/lib/mapFilters'
 import { formatDistance } from '@/lib/geo'
+import { useI18n } from '@/lib/i18n'
 import type { Resource } from '@/types'
 
 const STATUS_DOT: Record<string, string> = {
@@ -24,12 +25,24 @@ const STATUS_TEXT: Record<string, string> = {
   unknown:   'text-gray-400',
 }
 
-function statusLabel(r: Resource) {
+function statusLabel(r: Resource, t: (key: string) => string) {
   const shelter = r.category === 'shelter'
   const labels: Record<string, string> = shelter
-    ? { available: 'Beds available', limited: 'Limited beds', full: 'Full', unknown: 'Call to check', closed: 'Closed' }
-    : { available: 'Open now', limited: 'Limited', full: 'Unavailable', unknown: 'Call to check', closed: 'Closed' }
-  return labels[r.availability_status] ?? 'Call to check'
+    ? {
+        available: t('status.bedsAvailable'),
+        limited: t('status.limitedBeds'),
+        full: t('status.full'),
+        unknown: t('status.callToCheck'),
+        closed: t('status.closed'),
+      }
+    : {
+        available: t('status.openNow'),
+        limited: t('status.limited'),
+        full: t('status.unavailable'),
+        unknown: t('status.callToCheck'),
+        closed: t('status.closed'),
+      }
+  return labels[r.availability_status] ?? t('status.callToCheck')
 }
 
 interface Props {
@@ -45,6 +58,7 @@ interface Props {
  * separate modes.
  */
 export default function ResourceCard({ resource: r, distanceKm, isSelected, onClick }: Props) {
+  const { t } = useI18n()
   const trust = getTrustInfo(r)
 
   return (
@@ -72,11 +86,11 @@ export default function ResourceCard({ resource: r, distanceKm, isSelected, onCl
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5">
           <span className={clsx('inline-flex items-center gap-1 text-xs font-medium', STATUS_TEXT[r.availability_status])}>
             <span className={clsx('w-1.5 h-1.5 rounded-full', STATUS_DOT[r.availability_status])} />
-            {statusLabel(r)}
+            {statusLabel(r, t)}
           </span>
 
           {r.walk_ins_accepted && (
-            <span className="text-xs text-gray-500">Walk-ins OK</span>
+            <span className="text-xs text-gray-500">{t('status.walkInsOk')}</span>
           )}
           {/* The row already promised "Walk-ins OK" but said nothing about the
               opposite case, so a referral-only listing — a school clothing
@@ -84,7 +98,7 @@ export default function ResourceCard({ resource: r, distanceKm, isSelected, onCl
               coordinated-entry line — read as somewhere you could just turn up
               to. This is the list's counterpart to the sheet's badge. */}
           {r.requires_referral && (
-            <span className="text-xs font-medium text-amber-700">Referral needed</span>
+            <span className="text-xs font-medium text-amber-700">{t('status.referralNeeded')}</span>
           )}
           {/* Same reasoning, second condition: "Walk-ins OK" and "you must ring
               ahead" are both true of plenty of listings, and showing only the
@@ -93,11 +107,11 @@ export default function ResourceCard({ resource: r, distanceKm, isSelected, onCl
               staleness, a different claim entirely, so a fresh listing that
               requires a call showed nothing at all. */}
           {r.phone_required_before_arrival && (
-            <span className="text-xs font-medium text-amber-700">Call first</span>
+            <span className="text-xs font-medium text-amber-700">{t('status.callFirst')}</span>
           )}
           {r.phone && (
             <span className="text-xs text-gray-400 inline-flex items-center gap-0.5">
-              <Phone size={10} /> Phone
+              <Phone size={10} /> {t('resourceCard.phone')}
             </span>
           )}
           {/* Staleness, not a requirement — worded to match getTrustInfo's own
@@ -105,11 +119,11 @@ export default function ResourceCard({ resource: r, distanceKm, isSelected, onCl
               collided with the real requirement above and made one string mean
               two different things. */}
           {trust.level === 'stale' && (
-            <span className="text-xs text-red-600">May be outdated</span>
+            <span className="text-xs text-red-600">{t('status.mayBeOutdated')}</span>
           )}
           {(r.access_type === 'confidential_address' || r.access_type === 'phone_intake') && (
             <span className="text-xs text-gray-400 inline-flex items-center gap-0.5">
-              <MapPin size={10} /> Call for location
+              <MapPin size={10} /> {t('status.callForLocation')}
             </span>
           )}
         </div>
