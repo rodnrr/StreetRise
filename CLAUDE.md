@@ -10,11 +10,13 @@ The maintainer often works from an **iPhone** with no terminal access. At the st
 
 The pre-debut launch review described in earlier versions of this file is **done** — its findings and applied fixes are recorded in `LAUNCH_REVIEW.md` (footer, contact info, sitemap corrections, honest copy, "Become a Provider" nav entry all shipped). Open work is tracked in:
 
-- `docs/OPEN_ITEMS.md` — session log of open items (blog gaps, internal-tag leak on `ResourceDetailPage`, lint debt; the migration 030 item is now closed)
-- `BRANCH_FRESHNESS_AUDIT.md` — runbook for cleaning up stale AI session branches
+- `docs/OPEN_ITEMS.md` — session log of open items, most recently added to 2026-09-01
+- `BRANCH_FRESHNESS_AUDIT.md` — runbook for cleaning up stale AI session branches. **Not currently needed**: verified 2026-09-01, the repo has only 5 branches total — `main`, 2 open Dependabot PR branches, one unmerged human commit (`rodnrr-patch-1`, a trivial `.github/FUNDING.yml` add), and whatever this session's own working branch is. No stale `claude/*`/`codex/*` backlog exists right now; keep the runbook for when one accumulates again.
 - `LAUNCH_REVIEW.md` — the completed launch assessment, kept for reference
 
-Known open items (verified 2026-07-31; migration 036 added 2026-08-18):
+**A full cross-reference audit against live main, GitHub, and Supabase ran 2026-09-01** (this session). Two features shipped since the last full doc pass and were previously undocumented here: the **EN/ES language toggle** (see Internationalization) and the **deterministic instant-answer FAQ** on the booking flow's "Ask a Question" mode (see Deterministic Resource FAQ) — both merged over 2026-08-24 through 2026-08-31 (PRs #86 and #91), the latter refined through ~25 "Codex review round" follow-up commits. Also found and fixed in this pass: `AboutPage.tsx`'s "Partner with StreetRise" button linked to `/partners`, a route that doesn't exist (the real route is `/partner-with-us`) — every visitor clicking it hit `/404`. Public map resource count re-verified 2026-09-01: **165** (was 166 as of migration 036 on 2026-08-18; small net change from normal churn, not a regression signal by itself).
+
+Known open items (most recently verified 2026-09-01 unless a line says otherwise):
 
 - **The blog publisher Worker deployed successfully for the first time on 2026-08-26**, via `.github/workflows/deploy-blog-worker.yml`. Three runs that day (one triggered by PR #88's merge, two manual `workflow_dispatch`) all completed with every step green, including "Deploy Worker with secrets" (type-check, then an atomic `wrangler deploy --secrets-file`) — see the Actions run history for "Deploy Blog Publisher Worker" to confirm. This closes out a saga worth knowing the shape of: the Worker (`streetrise-blog-publisher`, created 2026-08-21 right after PRs #81/#82 merged) sat on Cloudflare's stock `"Hello world"` placeholder for five days because its native "Workers Builds" Git integration kept running against the **repo root** instead of `workers/blog-publisher/` — its Root Directory dashboard setting reverted to `/` even after repeated saves, so every build ran the main SPA's `npm run build` and then failed wrangler with `Missing entry-point to Worker script`. `docs/deploy-blog-worker.md` now documents that dashboard path only as a fallback; the GitHub Actions workflow (which points wrangler at `workers/blog-publisher/wrangler.jsonc` via `--config` regardless of the runner's cwd, so there's no Root Directory to misconfigure) is the active deploy path, gated on two repo secrets (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) that are now set. **Not yet independently re-verified against live Cloudflare** in a session with Cloudflare access — the Actions logs are strong evidence but confirm `wrangler deploy` exited 0, not what `workers_get_worker_code` shows today; check that (or hit the Worker's `/health` endpoint) before trusting this note blindly. **Still needs confirming**: whether `VITE_BLOG_WORKER_URL` is set in Cloudflare Pages and the Pages deployment retried — until both are done, the AI Draft panel on `/admin/blog` stays hidden even with the Worker itself live. Note for future sessions: a Claude Code remote session cannot deploy this itself or read Cloudflare build logs directly — the sandbox's egress policy blocks direct calls to `api.cloudflare.com` (confirmed 403 from the agent proxy), and the Cloudflare MCP connector available here is read-only for Workers (list/get/get-code, no deploy, no build-log access, no secret-write) when it's connected at all. GitHub Actions runs aren't behind that restriction, which is why routing the deploy through a workflow instead of the dashboard integration was the fix.
 
@@ -30,6 +32,8 @@ Known open items (verified 2026-07-31; migration 036 added 2026-08-18):
 - ~~Default map center still points at Tampa Bay~~ — **mitigated by the map revamp (2026-08-17)**. `useMapStore` still opens at `{ lat: 28.2, lng: -81.9 }` zoom 9, but `MapPage` now auto-fits the map to the current result set on load and whenever the need chip or search changes, so a Miami visitor who grants nothing still lands on a view containing pins. The stored centre follows the fit, so distances are measured from where the map actually is. Changing the literal default is no longer urgent.
 - **Domain consolidation is real but unfinished** (verified 2026-09-01, see Mission & Domain Split). `streetrise.org` now redirects to `app.streetrise.org` instead of being a separate Wix site — the two-site split described in older docs (`LAUNCH_REVIEW.md`) is obsolete. The maintainer wants the app to eventually live at `streetrise.org` directly; that's a Cloudflare Pages custom-domain change plus a sweep of hardcoded `app.streetrise.org` references (`public/sitemap.xml`, `public/robots.txt`, `wrangler.jsonc` comment, `src/lib/seo/`) that nobody has scoped yet.
 - **`/community-voices` (`CommunityVoicesPage`) is routed in `App.tsx` but missing from `public/sitemap.xml`** — verified 2026-09-01. Either add it to the sitemap or confirm it's intentionally unlisted (e.g. not ready for indexing).
+- **Migrations 038/039 added to the repo 2026-08-24 (PR #85) — nothing to apply.** Both are backfills that already ran against live in May/June 2026 via a since-deleted session branch; the files are reproduced verbatim from live's migration history for repo completeness and are idempotent no-ops if re-run. See Database Migrations for detail and the `supabase_migrations.schema_migrations` drift this surfaced.
+- **`get_advisors` (security) surfaced items not previously logged here** — verified 2026-09-01, none blocking, worth a deliberate look: (1) `public.resource_import_staging` has RLS enabled with zero policies, which blocks all `/rest/v1/` access to it entirely (see that table's entry in Data Model); (2) eight functions (`is_verified_provider`, `is_admin`, `my_provider_id`, `bump_conversation_on_message`, `update_updated_at`, `fn_update_resource_confidence`, `compute_confidence_score`, `conversation_messages_broadcast_trigger`) have a mutable `search_path`, standard Postgres hardening advice is to pin it; (3) several `SECURITY DEFINER` functions are callable by `anon`/`authenticated` over the API — the RLS-helper ones (`is_admin`, `my_provider_id`, `is_verified_provider`) are meant to be, but `booking_update_preserves_request_fields`, `resource_update_preserves_admin_fields`, and `rls_auto_enable` should each be checked against what they're actually meant to allow before assuming that's fine; (4) leaked-password protection (HaveIBeenPwned check) is disabled in Supabase Auth — a one-click enable in the dashboard, not a schema change.
 
 ---
 
@@ -82,7 +86,8 @@ Deploy only: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (32-char hex; valid
 | Build tool | Vite 5 + vite-plugin-pwa |
 | Styling | Tailwind CSS 3 + custom component classes in `globals.css` |
 | Routing | react-router-dom v6 |
-| State | Zustand (map, auth, toasts) |
+| State | Zustand (map, auth, toasts, EN/ES language) |
+| i18n | Hand-written EN/ES dictionary (`src/lib/i18n.ts`), not a library — see Internationalization |
 | Data fetching | TanStack Query v5 (React Query) |
 | Forms | react-hook-form + Zod |
 | SEO | react-helmet-async (`SeoHead` + structured data in `src/lib/seo/`) |
@@ -118,6 +123,8 @@ src/
     adminCounts.ts          # Shared pending-count queries for admin nav badges
     auth.ts                 # OAuth-provider probe, magic link, shared post-login routing
     lazyWithReload.ts       # React.lazy that survives a deploy under an open tab
+    i18n.ts                 # EN/ES dictionary + useI18n() hook — see State Management
+    resourceFaq.ts          # Deterministic instant-answer FAQ engine — see below
     seo/                    # SeoHead.tsx, structuredData.ts
 
   pages/
@@ -157,7 +164,7 @@ src/
 
   components/
     shared/                 # RootLayout (nav, footer, Get Help Now CTA, mobile tab bar),
-                            # Footer, ToastContainer
+                            # Footer, ToastContainer, LangToggle (EN/ES switch)
     provider/               # ProviderLayout, BedCountUpdater
     admin/                  # AdminLayout (mobile nav, pending-count badges)
     map/                    # ResourceMarker (cached div icons), ResourceCard (list row),
@@ -170,19 +177,27 @@ data/
   seed/streetrise_seed_candidates_batch_2_normalized.csv
 
 docs/
-  OPEN_ITEMS.md             # Open items from 2026-07-29 session
+  OPEN_ITEMS.md             # Session log of open items — most recently verified 2026-09-01
   apply-migration-029.md    # Hand-apply runbook (029 = blog_posts)
   apply-migration-030.md    # Hand-apply runbook (030 = conversation read tracking)
+  apply-migration-031.md    # Hand-apply runbook (031 = blog-images storage bucket) — APPLIED,
+                            # verified live 2026-09-01 (bucket exists, public=true)
   apply-migration-035.md    # Hand-apply runbook (035 = work exchange agent)
   apply-migration-036.md    # Hand-apply runbook (036 = student clothing seed)
   apply-migration-037.md    # Hand-apply runbook (037 = confidence trigger parity; DDL is a
                             # no-op on live, but its backfill re-scores 66 rows — read first)
-  deploy-blog-worker.md     # Dashboard-only runbook for shipping the blog publisher Worker
-                            # (merging the PR does not deploy it)
+  auth-setup.md             # Password reset, magic link, and social sign-in: what ships in
+                            # code vs. what needs dashboard configuration (all web-UI steps)
+  deploy-blog-worker.md     # How the blog publisher Worker deploys — GitHub Actions workflow
+                            # is now the primary path (see Deployment); dashboard steps are the fallback
   student-resources-outreach.md  # Partnership leads deliberately NOT on the public map
   work-exchange-agent.md    # What the agent does, how to run it, review workflow
   data-dictionary.md
   import-seed-candidates.md
+  claim-flow.md              # Provider claim flow (migrations 033/034): submissions, notifications
+  r2-blog-images.md          # R2-hosted launch/legacy blog images (separate from the
+                            # migration-031 Supabase Storage bucket new uploads use)
+  apply-migrations-023-027.md  # Provider claim flow + RLS hardening hand-apply runbook
 
 scripts/
   deploy-pages.sh           # Cloudflare Pages deploy (validates env vars)
@@ -193,11 +208,12 @@ scripts/
 workers/
   blog-publisher/           # Cloudflare Worker: generates an UNPUBLISHED blog draft +
                             # cover image with Workers AI. Deployed separately from the
-                            # app; runs on the caller's admin token, holds no service-role
-                            # key. Covers go to the Supabase `blog-images` bucket, not R2.
-                            # Reached from the AI Draft panel on /admin/blog.
+                            # main app build, via its own GitHub Actions workflow — see
+                            # Deployment. Runs on the caller's admin token, holds no
+                            # service-role key. Covers go to the Supabase `blog-images`
+                            # bucket, not R2. Reached from the AI Draft panel on /admin/blog.
 
-supabase/migrations/        # 001–037 with gaps: NO 012, 013, or 021 exist.
+supabase/migrations/        # 001–039 with gaps: NO 012, 013, or 021 exist.
                             # See Migrations section — applied to live BY HAND.
 
 public/
@@ -303,6 +319,9 @@ CMS-managed FAQ items served to `/faq`.
 ### `donation_campaigns`
 Stripe-backed campaigns; `provider_id = null` means platform-level campaign.
 
+### `resource_import_staging`
+Exists on live (verified 2026-09-01), no rows currently, no migration file in the repo creates it — same "live carries schema objects no migration creates" class as the confidence trigger (see migration 037's history) and the OB3 provider row (migration 036). RLS is enabled with **zero policies**, which blocks all access via `/rest/v1/` for every role including `anon` and `authenticated` — effectively inert over the public API. Presumably a landing table for `scripts/import-seed-candidates.ts` or a similar import path, written to directly with the service-role key (which bypasses RLS). Not referenced anywhere in current app code — confirm its purpose before writing a migration that assumes it doesn't exist, or before dropping it.
+
 ---
 
 ## RLS Policy Summary
@@ -312,6 +331,9 @@ Defined in `002_rls_policies.sql`, extended in `006` (verified-provider gate), `
 Key SQL helpers:
 - `is_admin()` — returns `true` if current user has `role IN ('admin','super_admin')` AND `verification_status = 'verified'`
 - `my_provider_id()` — returns the `providers.id` for the current user
+- `is_verified_provider()` (migration 006) — gates provider-only writes on `verification_status = 'verified'` for the current user's own provider row
+
+All three are `SECURITY DEFINER` and callable via `/rest/v1/rpc/...` by `anon`/`authenticated` (flagged by `get_advisors` — verified 2026-09-01). That's the intended shape for RLS helper functions meant to be called from policies, but confirm before assuming any *other* `SECURITY DEFINER` function callable this way is equally intentional — see Known Open Items.
 
 | Table | Public read | Provider read | Admin |
 |---|---|---|---|
@@ -333,7 +355,7 @@ Known RLS gap (low severity, `docs/OPEN_ITEMS.md`): the `conversations` UPDATE p
 
 ## State Management
 
-Three Zustand stores in `src/lib/store.ts`:
+Four Zustand stores in `src/lib/store.ts`:
 
 **`useMapStore`** (persisted as `streetrise-map-v4`)
 - `mapCenter` / `mapZoom` — the map's initial view, then updated from every settled move (dragged **and** programmatic, so the distance origin tracks the real view)
@@ -351,6 +373,31 @@ Three Zustand stores in `src/lib/store.ts`:
 **`useToastStore`** (not persisted)
 - Use via `useToast()` convenience hook: `toast.success(title, message)`, `toast.error(...)`, etc.
 - Auto-dismisses after 4000 ms
+
+**`useLangStore`** (persisted as `streetrise-lang`) — added for the EN/ES toggle (merged 2026-08-24), see Internationalization below
+- `lang: 'en' | 'es'`, `setLang(lang)`. Defaults to `'en'`.
+
+---
+
+## Internationalization (EN/ES)
+
+`src/lib/i18n.ts` is a lightweight, hand-written EN/ES dictionary — not a library like `react-i18next`. `useI18n()` (built on `useLangStore`) returns `{ t, lang, setLang }`; `t('nav.findResources')` looks up the active-language string, falling back to English and then to the raw key so a partially translated string never renders blank.
+
+- **Scope is deliberately narrow**: static UI chrome only — nav, footer, homepage hero, map controls, booking form, and the FAQ-engine's rule labels/sentences (see below). Database-driven content — resource names/descriptions, blog posts, FAQ table rows, category labels — is English-only and does not translate.
+- `LangToggle` (`src/components/shared/LangToggle.tsx`) is the EN/ES switch, rendered in the public UI chrome (not on `/map`'s full-screen layout by default — check current placement before assuming).
+- Landed as PR #86, then hardened through ~13 follow-up "Codex review round" commits fixing Spanish-specific matching edge cases (accents, weekday names, false-positive keyword collisions) — most of that hardening happened inside the FAQ engine's Spanish question-matching, not the static dictionary.
+- When adding a new user-facing string in scope, add both the `en` and `es` entries in `i18n.ts` — don't hardcode English text in a component that's meant to be translated.
+
+---
+
+## Deterministic Resource FAQ (`src/lib/resourceFaq.ts`)
+
+Powers the instant-answer panel on the booking flow's "Ask a Question" mode (`/book/:resourceId?intent=question`, merged as PR #91). Given a free-text question and a `Resource`, `findFaqAnswers(resource, query, { origin, now, lang })` returns zero or more answers built **only from fields already on the resource** — hours, address, distance, contact info, eligibility, intake conditions, facilities. No network call, no model, no invented facts: a rule with nothing to say returns `null` and is simply omitted.
+
+- **Sits alongside, not in place of, the human-routed question form** — anything not covered here (cost, specific intake steps, anything the data doesn't record) still goes to the provider via the normal booking/question submission.
+- Rule labels and generated answer sentences are localized via `i18n`'s `faq.*` keys (matching the active locale). The one exception is `aboutAnswer`, which is literally the provider-authored `description` field and stays untranslated — consistent with resource descriptions being English-only DB content everywhere else in the app. `gender_policy`/`population_focus` labels also stay English-only, matching how those badges render elsewhere (map chips, `ResourceSheet`, category pages).
+- 644 lines as of 2026-08-31, after ~25 "Codex review round" commits on PR #91 fixing matching collisions (e.g. "who is this for" vs. gender-policy questions, "abrigo"/"abrir" Spanish collisions, weekday/"today" disambiguation, closed-status edge cases). If you touch matching logic, expect subtle regressions in adjacent rules — read a few of those commit messages first to see the shape of prior bugs.
+- Depends on `mapFilters.ts` (hours/timezone helpers — same `America/New_York` evaluation as the map's "Open right now" filter) and `geo.ts` (distance formatting).
 
 ---
 
@@ -434,13 +481,15 @@ Font: Inter (via `@fontsource/inter`). Dark-mode variants exist on most componen
 
 ## Database Migrations — READ THIS BEFORE TOUCHING THE SCHEMA
 
-Migrations live in `supabase/migrations/`, numbered 001–037 **with gaps: 012, 013, and 021 do not exist** (023 and 027 were renumbered from 010/021 to resolve collisions — see their headers).
+Migrations live in `supabase/migrations/`, numbered 001–039 **with gaps: 012, 013, and 021 do not exist** (023 and 027 were renumbered from 010/021 to resolve collisions — see their headers).
 
 **How they are actually applied:** by hand, in the Supabase SQL editor, against live project `mldatfcwnmvrmxumzxyb`. NOT by the deploy pipeline and not reliably by `supabase db push` — filenames have no timestamp prefixes, so repo and live migration history **drift**. Treat live as a separate source of truth; verify actual live state with read-only SQL before assuming a migration's effect exists. Runbooks for the most recent applies are in `docs/apply-migration-032.md`, `docs/apply-migrations-023-027.md`, and `docs/claim-flow.md` (033/034).
 
+**`mcp__Supabase__list_migrations` (i.e. `supabase_migrations.schema_migrations`) is drifted far beyond what earlier notes here said.** Checked 2026-09-01: repo migrations **008, 022, 024, 028, 029, 032, 036, 037 have no entry at all**; several rows are recorded with no number prefix (`conversations_system` = repo's 014, `conversations_fixes` = 015, `backfill_gender_policy_from_public_data` = repo's 039, `provider_claim_status` = 023, `clarify_claim_submit_rls` = 025, `lock_claim_status_self_update` = 026, `fix_seeded_provider_claim_status` = 027, `provider_claims` = 033, `claim_contact_and_notifications` = 034, `work_exchange_agent` = 035); and there are two different entries both numbered `012` (`012_backfill_taxonomy` = repo's 038, and `012_stable_external_ids_and_deduplication` = repo's 016) plus one numbered `013` for what the repo calls 017 (`013_batch4_seed_import`). **Do not use this table to answer "has migration N been applied" for any N** — verify the actual columns/rows/functions that migration creates instead, per the rest of this section.
+
 **Do not regenerate `src/lib/database.types.ts` from the CLI** unless you have confirmed live has every migration the code depends on — the `blog_posts` block and the two conversation read columns were hand-written to match intended state, and a regen against a lagging DB would delete them.
 
-Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage, 032 South Florida seed, 033/034 claim submissions + notification fields, 035 work exchange provenance + agent review queue, 036 student clothing seed + `students` population tag, 037 confidence-trigger parity.
+Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage (**applied — verified live 2026-09-01**, `blog-images` bucket exists with `public=true`), 032 South Florida seed, 033/034 claim submissions + notification fields, 035 work exchange provenance + agent review queue, 036 student clothing seed + `students` population tag, 037 confidence-trigger parity, **038/039 (added 2026-08-24, PR #85) are repo-completeness re-adds only** — both are backfills that were run against live back in May/June 2026 (038 on 2026-05-25, 039 on 2026-06-18) via a now-deleted session branch and never made it into the repo; the SQL files are reproduced verbatim from live's migration history and are idempotent/guarded, so re-running either is a safe no-op. There is nothing to "apply" for 038/039 — they already happened.
 
 **Live carries schema objects that no migration creates.** Two were found on PR #79: the `trg_resource_confidence` trigger + `fn_update_resource_confidence()` function (captured by migration 037) and the Christian Service Center provider row created by the OB3 import script (captured by 036 section 1b). Verifying a change against live cannot detect this class by construction — live is the environment that hides it. Before writing a migration that depends on a trigger, function, policy or row, confirm a migration actually creates it.
 

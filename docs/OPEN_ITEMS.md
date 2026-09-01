@@ -1,3 +1,40 @@
+# Open Items
+
+## Session of 2026-09-01 — full cross-reference audit (GitHub, Supabase, main)
+
+Ran at the maintainer's request: cross-check `CLAUDE.md`/`README.md`/this file against actual `main`, all GitHub branches/PRs, and live Supabase (project `mldatfcwnmvrmxumzxyb`), since two weeks of merged work (2026-08-19 through 08-31) had never been reflected in the docs. `CLAUDE.md` and `README.md` were rewritten to match; this entry records what changed and what's still open from that pass.
+
+**Previously undocumented features found live on `main`:**
+- EN/ES language toggle for public UI chrome (`src/lib/i18n.ts`, `LangToggle`, `useLangStore`) — PR #86, merged 2026-08-24.
+- Deterministic instant-answer FAQ on the booking flow's "Ask a Question" mode (`src/lib/resourceFaq.ts`, 644 lines) — PR #91, merged 2026-08-31 after ~25 "Codex review round" follow-up commits fixing EN/ES matching edge cases.
+- Blog publisher Worker **now actually deploys** — first successful deploy 2026-08-26 via `.github/workflows/deploy-blog-worker.yml` (PRs #88/#89/#90), after five days stuck on Cloudflare's stock placeholder script due to a Workers Builds Root Directory misconfiguration. `CLAUDE.md`'s prior "written but NOT deployed" note was stale.
+- `AboutPage.tsx` was redesigned with a founder story/photo (direct commit by the maintainer, 2026-08-26, not a PR) — and its "Partner with StreetRise" button linked to `/partners`, a route that doesn't exist (`/partner-with-us` is the real one). **Fixed in this session.**
+- Migrations 038 (`backfill_taxonomy`) and 039 (`backfill_gender_policy_from_public_data`) were added to the repo 2026-08-24 (PR #85) — repo-completeness re-adds of backfills already run against live in May/June 2026. Nothing to apply.
+
+**Live Supabase findings not previously logged anywhere:**
+- `resource_import_staging` table exists on live, RLS enabled with zero policies (blocks all `/rest/v1/` access), no migration in the repo creates it, no app code references it. Purpose unconfirmed — likely a service-role-only landing table for a seed/import script.
+- `get_advisors` (security) flags: 8 functions with mutable `search_path` (`is_verified_provider`, `is_admin`, `my_provider_id`, `bump_conversation_on_message`, `update_updated_at`, `fn_update_resource_confidence`, `compute_confidence_score`, `conversation_messages_broadcast_trigger`); several `SECURITY DEFINER` functions callable by `anon`/`authenticated` (`booking_update_preserves_request_fields`, `resource_update_preserves_admin_fields`, `rls_auto_enable` deserve a specific look — the three RLS-helper functions being callable this way is expected); leaked-password protection disabled in Auth. None confirmed exploitable, none fixed this session — see `CLAUDE.md` Known Open Items.
+- `supabase_migrations.schema_migrations` drift is worse than previously documented: migrations 008, 022, 024, 028, 029, 032, 036, 037 have **no entry at all** (not just "032–035" as the file previously said), several rows are recorded with no number prefix, and there are two different migrations both recorded as `012`. Do not use that table to answer "has migration N been applied."
+- Migration 031 (blog-images storage bucket) confirmed **applied** — bucket exists, `public=true`. Previously undocumented either way.
+- Public map resource count re-verified: **165** (documented count after migration 036 was 166 — small net drift, not investigated further, not a red flag by itself).
+- `resources_resource_type_check` and other constraints not re-verified this session; only spot-checked what's below.
+
+**Repo/doc drift found and fixed this session:**
+- `CLAUDE.md`'s "Mission & Domain Split" described `streetrise.org` as a separate Wix site outside this repo. Per the maintainer, that's obsolete: Wix was dropped, its content migrated into `src/pages/marketing/`, and `streetrise.org` now redirects to `app.streetrise.org`. Rewritten; `LAUNCH_REVIEW.md` got a dated addendum since its own domain-split table is now historical.
+- `/community-voices` (`CommunityVoicesPage`) is routed in `App.tsx` but was missing from `CLAUDE.md`'s Route Map/Repository Structure tables and from `public/sitemap.xml`. Documented; **not** added to the sitemap (whether it should be indexed is a content call, not a docs fix).
+- `robots.txt` gained explicit `Allow:` rules for AI search/assistant crawlers (GPTBot, ClaudeBot, etc.) — separate small task, same session.
+- Migration count references throughout `CLAUDE.md`/`README.md` said "001–037" — corrected to "001–039" everywhere found.
+
+**Still open after this pass** (not fixed, just documented — see `CLAUDE.md` for full detail on each):
+- `VITE_BLOG_WORKER_URL` in Cloudflare Pages — unconfirmed whether it's set / the Pages deployment retried since the Worker started deploying successfully.
+- The four Supabase advisory findings above.
+- `resource_import_staging`'s actual purpose.
+- Whether `/community-voices` belongs in the sitemap.
+- The `streetrise.org` → app-serves-directly domain migration the maintainer wants (Cloudflare custom-domain change, not scoped).
+- Everything already tracked below from the 2026-07-29 session that this pass didn't specifically re-verify (blog markdown rendering, internal-tag leak, `conversations` RLS column-agnostic issue, `booking_status` enum reconciliation) — spot-checked where called out above, otherwise assumed still accurate; re-verify before relying on anything not touched by this session's findings.
+
+---
+
 # Open Items — session of 2026-07-29
 
 ## Nothing in this session is deployed

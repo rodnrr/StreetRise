@@ -1,21 +1,24 @@
 # StreetRise
 
-Real-time resource discovery for people in need — shelter, food, medical care, work exchange, and community support across Tampa Bay and Central Florida.
+Real-time resource discovery for people in need — shelter, food, medical care, work exchange, and community support across Tampa Bay, Orlando, and Miami, FL.
 
-Live app: **app.streetrise.org** (this repo). The marketing/org site at **streetrise.org** is separate and not in this repo.
+Live app: **app.streetrise.org** (this repo). **streetrise.org** now redirects to `app.streetrise.org` — it is not a separate site or codebase anymore (that split existed until the Wix marketing site was dropped; its content was migrated into `src/pages/marketing/` here). The maintainer's goal is to eventually serve the app from `streetrise.org` directly instead of the `app.` subdomain, but that Cloudflare custom-domain migration hasn't been scoped or started — see `CLAUDE.md` → Mission & Domain Split.
+
+For anything beyond this quick-start — data model, RLS, migrations drift, known bugs, deploy internals — see **`CLAUDE.md`**, which is kept current in far more detail than this file.
 
 ## Stack
 
-| Layer      | Tech                                   |
-|------------|----------------------------------------|
-| Frontend   | React 18 + TypeScript + Vite (PWA)     |
-| Styling    | Tailwind CSS v3                        |
-| State      | Zustand + TanStack Query               |
-| Maps       | Leaflet + OpenStreetMap tiles          |
-| Database   | Supabase (Postgres + Realtime + Auth)  |
-| Hosting    | Cloudflare Pages → app.streetrise.org  |
-| Payments   | Stripe (donations)                     |
-| CI         | GitHub Actions (typecheck + build)     |
+| Layer      | Tech                                              |
+|------------|----------------------------------------------------|
+| Frontend   | React 18 + TypeScript + Vite (PWA)                 |
+| Styling    | Tailwind CSS v3                                    |
+| State      | Zustand (map, auth, toasts, EN/ES language) + TanStack Query |
+| i18n       | Hand-written EN/ES dictionary (`src/lib/i18n.ts`) for UI chrome — resource/blog/FAQ content stays English-only |
+| Maps       | Leaflet + OpenStreetMap tiles                      |
+| Database   | Supabase (Postgres + Realtime + Auth)              |
+| Hosting    | Cloudflare Pages → app.streetrise.org              |
+| Payments   | Stripe (donations)                                 |
+| CI         | GitHub Actions — `deploy.yml` (typecheck + build), `deploy-blog-worker.yml` (separate Worker deploy) |
 
 ## Quick start
 
@@ -35,13 +38,13 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Other commands: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run preview`, `npm run deploy`, `npm run import:seed`.
+Other commands: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run preview`, `npm run deploy`, `npm run import:seed`, `npm run agent:work`, `npm run worker:blog:dev` / `worker:blog:deploy`. `npm run lint`, `npm run typecheck`, and `npm run build` are all clean as of this writing (2026-09-01) — re-verify before assuming, since this drifts.
 
 ## Supabase setup
 
-Migrations live in `supabase/migrations/`, numbered **001–030 with gaps — 012, 013, and 021 intentionally do not exist** (renumbering resolved earlier collisions; see the headers of 023 and 027).
+Migrations live in `supabase/migrations/`, numbered **001–039 with gaps — 012, 013, and 021 intentionally do not exist** (renumbering resolved earlier collisions; see the headers of 023 and 027). 038 and 039 are 2026-08-24 repo-completeness re-adds of backfills that already ran against live months earlier — nothing to apply there.
 
-**Migrations are applied to the live project by hand in the Supabase SQL editor**, in numeric order — not by the deploy pipeline. The filenames have no timestamp prefixes, so the repo list and the live migration history drift; treat live as its own source of truth and check actual columns before assuming a migration has run. Hand-apply runbooks for the newest migrations are in `docs/apply-migration-029.md` and `docs/apply-migration-030.md`.
+**Migrations are applied to the live project by hand in the Supabase SQL editor**, in numeric order — not by the deploy pipeline. The filenames have no timestamp prefixes, so the repo list and the live migration history drift; treat live as its own source of truth and check actual columns before assuming a migration has run. **`supabase_migrations.schema_migrations` (what `supabase db migrations list` reads) is itself unreliable** — as of 2026-09-01 it's missing entries for several applied migrations, has two different migrations both recorded under the number `012`, and records some rows with no number at all. Don't use it to answer "has migration N run" — verify the actual columns/objects that migration creates. Hand-apply runbooks for the newer migrations are in `docs/apply-migration-029.md` through `docs/apply-migration-037.md`, plus `docs/apply-migrations-023-027.md` and `docs/claim-flow.md` (033/034).
 
 > ⚠️ Do **not** regenerate `src/lib/database.types.ts` (`npx supabase gen types ...`) unless live has every migration the code depends on. Parts of that file (the `blog_posts` block and the conversation read columns) are hand-written to match intended state — a regen against a lagging DB deletes them.
 
@@ -57,7 +60,7 @@ StreetRise keeps the controlled resource vocabulary in version control so catego
 | `docs/data-dictionary.md` | Human-readable explanation of how to use the controlled values. |
 | `docs/import-seed-candidates.md` | How to run the seed import (`npm run import:seed`, needs `SUPABASE_SERVICE_ROLE_KEY`). |
 
-Later seed batches were applied as SQL migrations rather than CSVs: 017 (batch 4 — Hernando/Pasco/Manatee), 020 + 028 (work exchanges), 022 (Central Florida map listings).
+Later seed batches were applied as SQL migrations rather than CSVs: 017 (batch 4 — Hernando/Pasco/Manatee), 020 + 028 (work exchanges), 022 (Central Florida map listings), 032 (South Florida — Miami-Dade + South Broward/Hollywood), 036 (student clothing + the `students` population-focus tag).
 
 > Current app compatibility note: the frontend/database still uses `outdoor_space` for the parks/outdoors filter. A future move to `day_use_space` needs a dedicated schema migration before any filter-slug change.
 
@@ -76,6 +79,8 @@ npm run deploy
 
 The GitHub Actions workflow (`.github/workflows/deploy.yml`, named "CI") runs typecheck + build on every push/PR to `main`. **Treat merging to `main` as a production deploy** — never merge with red CI.
 
+**The blog publisher Worker (`workers/blog-publisher/`) deploys separately**, via `.github/workflows/deploy-blog-worker.yml` — it runs on pushes touching `workers/blog-publisher/**`, the workflow file, or `package.json`/`package-lock.json`, or on manual `workflow_dispatch`. It first deployed successfully 2026-08-26 after Cloudflare's native "Workers Builds" Git integration proved unreliable (its Root Directory setting kept reverting to the repo root). See `CLAUDE.md` → Deployment and `docs/deploy-blog-worker.md` for the full story and current confirmation status.
+
 ### Required GitHub Secrets
 
 | Secret                        | Where to get it                          |
@@ -83,6 +88,8 @@ The GitHub Actions workflow (`.github/workflows/deploy.yml`, named "CI") runs ty
 | `VITE_SUPABASE_URL`           | supabase.com → Project Settings → API    |
 | `VITE_SUPABASE_ANON_KEY`      | supabase.com → Project Settings → API    |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | stripe.com → Developers → API Keys       |
+| `CLOUDFLARE_API_TOKEN`        | For `deploy-blog-worker.yml` (Workers Scripts: Edit scope) |
+| `CLOUDFLARE_ACCOUNT_ID`       | For `deploy-blog-worker.yml`             |
 
 ## Project structure
 
@@ -92,18 +99,20 @@ src/
 │   ├── map/          # ResourceMarker, ResourceCard, FilterDrawer
 │   ├── provider/     # ProviderLayout, BedCountUpdater
 │   ├── admin/        # AdminLayout (badges, mobile nav)
-│   └── shared/       # RootLayout, Footer, ToastContainer
+│   └── shared/       # RootLayout, Footer, ToastContainer, LangToggle (EN/ES)
 ├── pages/
-│   ├── marketing/    # About, Contact, Partners, Privacy, Terms, Accessibility
+│   ├── marketing/    # About, Contact, Partners, Privacy, Terms, Accessibility, CommunityVoices
 │   ├── blog/         # Blog index + post pages
 │   ├── categories/   # CategoryPage (one component, config-driven)
 │   ├── provider/     # Portal pages (dashboard, listings, bookings, chat, work)
 │   └── admin/        # Admin pages (moderation, chat, FAQ, blog)
 ├── lib/
 │   ├── supabase.ts   # Client + db.*() helpers + realtime
-│   ├── store.ts      # Zustand stores (map, auth, toasts)
+│   ├── store.ts      # Zustand stores (map, auth, toasts, language)
 │   ├── mapFilters.ts # Map filter logic + category labels
 │   ├── categories.ts # Public category-page → map-filter config
+│   ├── i18n.ts        # EN/ES dictionary + useI18n()
+│   ├── resourceFaq.ts # Deterministic instant-answer FAQ engine ("Ask a Question")
 │   ├── conversations.ts, blog.ts, adminCounts.ts
 │   ├── seo/          # SeoHead + structured data
 │   └── database.types.ts
@@ -113,10 +122,11 @@ src/
     └── globals.css   # Tailwind + component layer
 
 data/                 # Controlled vocab + seed CSVs
-docs/                 # Data dictionary, import guide, migration runbooks, open items
-scripts/              # deploy-pages.sh, import-seed-candidates.ts
-supabase/migrations/  # 001–030 (no 012/013/021) — applied to live BY HAND
-.github/workflows/    # deploy.yml — typecheck + build CI on main
+docs/                 # Data dictionary, import guide, migration runbooks, open items, auth setup
+scripts/              # deploy-pages.sh, import-seed-candidates.ts, work-exchange-agent.ts
+workers/blog-publisher/  # Cloudflare Worker: AI blog draft + cover image generator, deployed separately
+supabase/migrations/  # 001–039 (no 012/013/021) — applied to live BY HAND
+.github/workflows/    # deploy.yml (CI: typecheck + build), deploy-blog-worker.yml
 ```
 
 ## Status
@@ -124,27 +134,32 @@ supabase/migrations/  # 001–030 (no 012/013/021) — applied to live BY HAND
 Shipped and live:
 
 - [x] Repo scaffold, configs, types, Supabase client, stores
-- [x] Map page — real-time resource discovery with quick filters and taxonomy
-- [x] Supabase schema + RLS (migrations 001–011)
+- [x] Map page — real-time resource discovery with unified "needs" chip filters and client-side faceting (revamped 2026-08-17)
+- [x] Supabase schema + RLS (migrations 001–011, extended through 039)
 - [x] Provider portal — listings, bed counts, bookings, work exchange, messages
-- [x] Bookings flow — anonymous-allowed request form + provider/admin triage
-- [x] Admin panel — provider/resource verification, bookings, chat, FAQ, blog CRUD
-- [x] Donations — Stripe checkout via Supabase Edge Function
-- [x] FAQ (DB-backed)
-- [x] SEO — sitemap, robots.txt, SeoHead/structured data, public category pages
-- [x] Marketing pages (about, contact, partners, privacy, terms, accessibility) + footer
-- [x] Admin↔provider messaging (migrations 014/015/018)
-- [x] Provider claim flow for seeded orgs (migrations 023–027)
-- [x] Seed data: Tampa Bay + Central Florida providers, resources, work exchanges
+- [x] Bookings flow — anonymous-allowed request form + provider/admin triage, plus a deterministic instant-answer FAQ panel on "Ask a Question" (`resourceFaq.ts`)
+- [x] Admin panel — provider/resource verification, bookings, chat, FAQ, blog CRUD, work-exchange review queue
+- [x] Donations — Stripe checkout via Supabase Edge Function (revamped 2026-08-24 with live-impact copy)
+- [x] FAQ (DB-backed) + the resource-level instant-answer engine above
+- [x] SEO — sitemap, robots.txt (explicit AI-crawler allow rules added), SeoHead/structured data, public category pages
+- [x] Marketing pages (about — now with founder story, contact, partners, privacy, terms, accessibility, community voices) + footer
+- [x] EN/ES language toggle for public UI chrome (`i18n.ts`, `LangToggle`)
+- [x] Admin↔provider messaging (migrations 014/015/018/030)
+- [x] Provider claim flow for seeded orgs (migrations 023–027, 033/034)
+- [x] Seed data: Tampa Bay, Central Florida, and South Florida (Miami-Dade + South Broward) providers, resources, and work exchanges; student clothing resources (migration 036)
+- [x] Blog publisher Worker — generates unpublished AI drafts + cover images, deployed via its own GitHub Actions workflow (first successful deploy 2026-08-26)
 
 ## To do
 
-Tracked in detail in `docs/OPEN_ITEMS.md`; the short list:
+Tracked in detail in `docs/OPEN_ITEMS.md` and `CLAUDE.md`'s Known Open Items; the short list as of 2026-09-01:
 
-- [ ] **Finish chat unread tracking** — migration 030 is applied to live (verified 2026-08-18, `docs/apply-migration-030.md`; do **not** re-run it). Opening a thread marks it read, but sending into the open thread re-marks it unread for the sender — neither chat page marks read on send success.
+- [ ] **Confirm `VITE_BLOG_WORKER_URL` is set in Cloudflare Pages** and the Pages deployment retried — the Worker itself deploys successfully now, but the AI Draft panel on `/admin/blog` stays hidden until that env var is set and picked up.
+- [ ] **Finish chat unread tracking** — migration 030 is applied to live. Opening a thread marks it read, but sending into the open thread re-marks it unread for the sender — neither chat page marks read on send success.
 - [ ] **Render blog markdown** — `BlogPostPage` currently shows raw `body_markdown`.
 - [ ] **Filter internal tags from public pages** — `subcategory:`/`service_area:`/`import:`/`access_src:` tags render as public badges on `ResourceDetailPage`.
-- [ ] **Fix the one known lint error** — `supabase.from('bookings') as any` at `src/lib/supabase.ts:29`.
 - [ ] **Tighten `conversations` UPDATE RLS** — currently column-agnostic (low severity).
 - [ ] **Reconcile `booking_status`** — live enum has values (`declined`, `needs_info`, `contacted`, `no_response`, `closed`) that no repo migration adds.
-- [ ] **Branch cleanup** — run the runbook in `BRANCH_FRESHNESS_AUDIT.md` to retire stale AI session branches.
+- [ ] **Decide on migration 037's backfill** (confidence-trigger parity) — its DDL is a no-op on live, but the backfill re-scores 66 stale rows; read `docs/apply-migration-037.md` first.
+- [ ] **Supabase hardening**: `resource_import_staging` has RLS enabled with no policies (verify it's meant to be API-inert), several functions have mutable `search_path`, and leaked-password protection is off in Auth — see `CLAUDE.md`'s Known Open Items for the full list.
+- [ ] **Domain migration** — move the app from `app.streetrise.org` to `streetrise.org` directly (Cloudflare custom-domain change + a sweep of hardcoded `app.streetrise.org` references). Not scoped yet.
+- [ ] **Branch cleanup** — not currently needed (only 5 branches exist as of 2026-09-01); re-run the `BRANCH_FRESHNESS_AUDIT.md` runbook once a stale-branch backlog builds up again.

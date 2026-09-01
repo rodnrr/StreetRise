@@ -65,7 +65,7 @@ export default function AboutPage() {
               <Button to="/map" size="lg">
                 Find Help Near You
               </Button>
-              <Button to="/partners" variant="secondary" size="lg">
+              <Button to="/partner-with-us" variant="secondary" size="lg">
                 Partner with StreetRise
               </Button>
             </div>
