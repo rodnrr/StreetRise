@@ -1,6 +1,8 @@
 # StreetRise Pre-Debut Launch Review
 *app.streetrise.org — April 2026*
 
+> **2026-09-01 note:** this document's "streetrise.org vs app.streetrise.org" split (separate Wix marketing site vs. this app) no longer reflects reality. `streetrise.org` now redirects to `app.streetrise.org` and the marketing content it describes as living on streetrise.org has been migrated into this repo (`src/pages/marketing/`). See `CLAUDE.md` → Mission & Domain Split for current state. Kept here unedited otherwise, as a historical record of what shipped and why.
+
 ---
 
 ## How Close Is StreetRise to Debut?

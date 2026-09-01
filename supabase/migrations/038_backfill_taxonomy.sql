@@ -8,11 +8,28 @@
 -- below is reproduced verbatim from the statement recorded in the
 -- live migration history, so the repo can rebuild the same state.
 --
--- Safe to run anywhere: every UPDATE is idempotent and guarded, so
--- re-running against live (where it is already applied) is a no-op.
--- Numbered 038 (next free) rather than the original 012 because 012
--- is a renumber-gap on this repo; late execution does not change the
--- result since each statement only fills unset rows.
+-- Steps 1-6 are idempotent and guarded — each only fills unset rows,
+-- so re-running them changes nothing. Numbered 038 (next free) rather
+-- than the original 012 because 012 is a renumber-gap on this repo.
+--
+-- Step 7 is NOT a no-op on an already-populated database. It is
+-- `UPDATE resources SET stale_after_days = stale_after_days` with no
+-- WHERE clause — a blanket touch of every row, present in the original
+-- live statement to re-fire the confidence trigger for rows steps 1-6
+-- changed. It fires `resources_updated_at` (migration 001) on EVERY
+-- row, unconditionally stamping `updated_at = now()` table-wide.
+-- `getTrustInfo()` reads `updated_at` for "Updated Xd ago" and stale
+-- warnings, so re-running this file against live or any already-seeded
+-- database manufactures false freshness across the whole table.
+-- Migration 037 hits the identical hazard with the identical
+-- statement and wraps it in `ALTER TABLE ... DISABLE/ENABLE TRIGGER
+-- resources_updated_at` for exactly this reason — this file has no
+-- such guard. Found by Codex review on PR #92, 2026-09-01.
+--
+-- Do not re-run this file against a database that already has this
+-- backfill's effects (i.e. live, or anything restored from it) without
+-- first wrapping step 7 the way 037 does. It is safe to run once
+-- against a freshly-migrated, unseeded database.
 -- ================================================================
 
 -- ── 1. serves_meals ───────────────────────────────────────────────

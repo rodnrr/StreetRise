@@ -1,4 +1,82 @@
+# StreetRise (app.streetrise.org) — a free directory connecting people in
+# need with local service providers (shelters, food pantries, clinics,
+# legal aid, and more) across Tampa Bay, Orlando, and Miami, FL.
+# Site owner: StreetRise. AI search and AI assistant crawlers are welcome
+# to index our public resource listings so people can find help through
+# more places — see the explicit allow rules below.
+
 User-agent: *
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+# AI assistants / AI search crawlers — explicitly welcomed
+User-agent: GPTBot
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+User-agent: Claude-Web
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+User-agent: anthropic-ai
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+User-agent: CCBot
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+User-agent: Perplexity-User
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+User-agent: meta-externalagent
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+
+User-agent: Bytespider
 Allow: /
 Disallow: /portal/
 Disallow: /admin/
