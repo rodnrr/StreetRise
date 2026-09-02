@@ -741,9 +741,20 @@ const SPANISH_SEARCH_GROUPS: { terms: string[]; match: (r: Resource) => boolean 
   { terms: ['joven', 'jovenes', 'jóvenes', 'juventud'], match: NEED_DEFS.youth.match },
 ]
 
+/**
+ * True when `q` is a prefix of `term` or of one of its words (space-separated,
+ * for multi-word terms like "violencia domestica"). Anchoring to word starts —
+ * rather than a bare substring test — is what stops a short, generic query
+ * like "men" from matching inside an unrelated word such as "ali[men]to".
+ */
+function isWordPrefixMatch(term: string, q: string): boolean {
+  if (!q) return false
+  return term === q || term.startsWith(q) || term.includes(` ${q}`)
+}
+
 function matchesSpanishSynonym(r: Resource, q: string): boolean {
   return SPANISH_SEARCH_GROUPS.some(
-    (group) => group.match(r) && group.terms.some((term) => term.includes(q)),
+    (group) => group.match(r) && group.terms.some((term) => isWordPrefixMatch(term, q)),
   )
 }
 
