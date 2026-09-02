@@ -34,8 +34,8 @@ export default function CategoryPage({ slug }: Props) {
   return (
     <div className="bg-white dark:bg-slate-900">
       <SeoHead
-        title={`${config.displayName} — StreetRise`}
-        description={config.description}
+        title={`${t(config.displayNameKey)} — StreetRise`}
+        description={t(config.descriptionKey)}
         path={`/${config.slug}`}
       >
         <script type="application/ld+json">

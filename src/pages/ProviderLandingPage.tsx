@@ -131,11 +131,13 @@ export default function ProviderLandingPage() {
         </div>
         <p className="text-xs text-gray-500 leading-relaxed">
           {t('providerLanding.reviewedBody')} <span className="inline-flex items-center gap-0.5 font-medium text-primary-700">
-            <CheckCircle size={11} /> {t('providerLanding.staffVerifiedBadge')}
+            <CheckCircle size={11} /> {t('badge.staffVerified')}
           </span> {t('providerLanding.reviewedBodyEnd')}
         </p>
         <p className="text-xs text-gray-500 leading-relaxed">
-          {t('providerLanding.communityListedNote')}
+          {t('providerLanding.communityListedBefore')}{' '}
+          <span className="font-medium text-gray-700">{t('badge.communityListed')}</span>{' '}
+          {t('providerLanding.communityListedAfter')}
         </p>
         <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">
           <Clock size={13} className="shrink-0" />

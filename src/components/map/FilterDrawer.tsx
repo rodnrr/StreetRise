@@ -4,7 +4,9 @@ import clsx from 'clsx'
 import { useMapStore } from '@/lib/store'
 import {
   GENDER_POLICY_LABEL,
+  GENDER_POLICY_LABEL_KEY,
   POPULATION_FOCUS_LABEL,
+  POPULATION_FOCUS_LABEL_KEY,
   TOGGLE_DEFS,
   DISTANCE_OPTIONS_MI,
   isUsefulOption,
@@ -267,7 +269,7 @@ export default function FilterDrawer({ open, onClose, counts, hasOrigin }: Props
                 {genderOptions.map((gp) => (
                   <Pill
                     key={gp}
-                    label={GENDER_POLICY_LABEL[gp]}
+                    label={t(GENDER_POLICY_LABEL_KEY[gp])}
                     count={counts.genderPolicy[gp] ?? 0}
                     active={!!filters.genderPolicy?.includes(gp)}
                     onClick={() => toggleGender(gp)}
@@ -279,7 +281,7 @@ export default function FilterDrawer({ open, onClose, counts, hasOrigin }: Props
                   {populationOptions.map((tag) => (
                     <Pill
                       key={tag}
-                      label={POPULATION_FOCUS_LABEL[tag] ?? tag}
+                      label={POPULATION_FOCUS_LABEL_KEY[tag] ? t(POPULATION_FOCUS_LABEL_KEY[tag]) : tag}
                       count={counts.populationFocus[tag] ?? 0}
                       active={!!filters.populationFocus?.includes(tag)}
                       onClick={() => togglePopulation(tag)}

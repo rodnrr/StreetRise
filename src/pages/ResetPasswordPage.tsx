@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { CheckCircle, AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/lib/i18n'
+import { friendlyAuthErrorKey } from '@/lib/authErrors'
 
 type Phase = 'checking' | 'ready' | 'invalid' | 'done'
 
@@ -53,7 +54,7 @@ export default function ResetPasswordPage() {
     setSaving(true)
     const { error: err } = await supabase.auth.updateUser({ password })
     setSaving(false)
-    if (err) { setError(err.message); return }
+    if (err) { setError(t(friendlyAuthErrorKey(err.message))); return }
     setPhase('done')
   }
 

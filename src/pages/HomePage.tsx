@@ -134,8 +134,8 @@ export default function HomePage() {
   return (
     <div className="bg-white dark:bg-slate-900">
       <SeoHead
-        title="StreetRise — Find Shelter, Food & Support Near You"
-        description="A free app connecting people in Tampa Bay, Orlando, and Miami to verified shelter, food, medical, and support resources — updated in real time by the organizations that provide them."
+        title={t('home.seo.title')}
+        description={t('home.seo.description')}
         path="/"
       >
         <script type="application/ld+json">{JSON.stringify(organizationSchema())}</script>

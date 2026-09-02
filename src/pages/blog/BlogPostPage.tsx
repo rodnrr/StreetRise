@@ -65,7 +65,7 @@ export default function BlogPostPage() {
           {post.author_name}
           {post.published_at && ` · ${new Date(post.published_at).toLocaleDateString(lang === 'es' ? 'es' : 'en-US')}`}
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{post.title}</h1>
+        <h1 lang="en" className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{post.title}</h1>
         {post.cover_image_url && (
           <img
             src={post.cover_image_url}
@@ -73,7 +73,7 @@ export default function BlogPostPage() {
             className="mt-6 w-full rounded-2xl object-cover"
           />
         )}
-        <div className="prose-sm mt-6 whitespace-pre-wrap text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+        <div lang="en" className="prose-sm mt-6 whitespace-pre-wrap text-sm leading-relaxed text-slate-600 dark:text-slate-300">
           {post.body_markdown}
         </div>
       </Section>

@@ -155,7 +155,10 @@ export default function BookingPage() {
       if (error) throw error
     },
     onSuccess: () => setDone(true),
-    onError:   (e: Error) => toast.error(t('booking.err.requestFailed'), e.message),
+    // The raw Supabase/Postgres error is never shown — it's always English
+    // and can hint at schema/implementation details unrelated to what the
+    // user can act on.
+    onError:   () => toast.error(t('booking.err.requestFailed'), t('authError.generic')),
   })
 
   if (done) return (

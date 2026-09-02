@@ -7,6 +7,7 @@ import {
   applySessionAndResolveDestination, PROVIDER_LABEL, type OAuthProvider,
 } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+import { friendlyAuthErrorKey } from '@/lib/authErrors'
 
 /** Enough to catch a typo and enable the button; the server does the real check. */
 const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
@@ -74,7 +75,7 @@ export default function LoginPage() {
         navigate(dest, { replace: true })
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t('login.err.authFailed'))
+      setError(err instanceof Error ? t(friendlyAuthErrorKey(err.message)) : t('login.err.authFailed'))
     } finally {
       setLoading(false)
     }
@@ -84,7 +85,7 @@ export default function LoginPage() {
     setOauthBusy(provider); setError('')
     const { error: err } = await signInWithProvider(provider, explicitNext ?? undefined)
     // Reached only if the redirect never started — otherwise the page is gone.
-    if (err) { setError(err.message); setOauthBusy(null) }
+    if (err) { setError(t(friendlyAuthErrorKey(err.message))); setOauthBusy(null) }
   }
 
   async function handleMagicLink() {

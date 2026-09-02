@@ -25,8 +25,8 @@ import { distanceKm, formatDistance, type LatLng } from '@/lib/geo'
 import { translate, type Lang } from '@/lib/i18n'
 import {
   DAY_KEYS,
-  GENDER_POLICY_LABEL,
-  POPULATION_FOCUS_LABEL,
+  GENDER_POLICY_LABEL_KEY,
+  POPULATION_FOCUS_LABEL_KEY,
   coversMinute,
   hasKnownHours,
   windowFor,
@@ -285,10 +285,13 @@ function eligibilityAnswer(r: Resource, ctx: FaqContext): string | null {
   const { lang } = ctx
   const bits: string[] = []
   if (r.gender_policy && r.gender_policy !== 'unknown') {
-    bits.push(GENDER_POLICY_LABEL[r.gender_policy] ?? r.gender_policy)
+    const key = GENDER_POLICY_LABEL_KEY[r.gender_policy]
+    bits.push(key ? translate(lang, key) : r.gender_policy)
   }
   if (r.population_focus?.length) {
-    const tags = r.population_focus.map((tag) => POPULATION_FOCUS_LABEL[tag] ?? tag).join(', ')
+    const tags = r.population_focus
+      .map((tag) => (POPULATION_FOCUS_LABEL_KEY[tag] ? translate(lang, POPULATION_FOCUS_LABEL_KEY[tag]) : tag))
+      .join(', ')
     bits.push(t(lang, 'faq.eligibility.serves', { tags }))
   }
   if (r.age_min != null) {

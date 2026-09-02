@@ -8,8 +8,8 @@ import clsx from 'clsx'
 import {
   CATEGORY_EMOJI,
   RESOURCE_TYPE_LABEL_KEY,
-  GENDER_POLICY_LABEL,
-  POPULATION_FOCUS_LABEL,
+  GENDER_POLICY_LABEL_KEY,
+  POPULATION_FOCUS_LABEL_KEY,
   getTrustInfo,
   TRUST_LEVEL_CLASSES,
 } from '@/lib/mapFilters'
@@ -220,14 +220,14 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
           )}
 
           {hours && (
-            <p className="text-sm text-gray-700 flex items-center gap-2">
+            <p lang="en" className="text-sm text-gray-700 flex items-center gap-2">
               <Clock size={14} className="text-gray-400 shrink-0" />
               {hours}
             </p>
           )}
 
           {r.description && (
-            <p className="text-sm text-gray-600 leading-relaxed">{r.description}</p>
+            <p lang="en" className="text-sm text-gray-600 leading-relaxed">{r.description}</p>
           )}
 
           {(r.resource_type || r.population_focus?.length) && (
@@ -239,7 +239,7 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
               )}
               {r.population_focus?.map((tag) => (
                 <span key={tag} className="badge bg-purple-50 text-purple-700">
-                  {POPULATION_FOCUS_LABEL[tag] ?? tag}
+                  {POPULATION_FOCUS_LABEL_KEY[tag] ? t(POPULATION_FOCUS_LABEL_KEY[tag]) : tag}
                 </span>
               ))}
             </div>
@@ -263,7 +263,7 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
             {r.phone_required_before_arrival && <span className="badge bg-amber-50 text-amber-700">{t('status.callFirst')}</span>}
             {r.gender_policy && r.gender_policy !== 'unknown' && r.gender_policy !== 'gender_inclusive' && (
               <span className="badge bg-gray-100 text-gray-700">
-                {GENDER_POLICY_LABEL[r.gender_policy] ?? r.gender_policy}
+                {GENDER_POLICY_LABEL_KEY[r.gender_policy] ? t(GENDER_POLICY_LABEL_KEY[r.gender_policy]) : r.gender_policy}
               </span>
             )}
           </div>

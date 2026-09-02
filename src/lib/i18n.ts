@@ -474,6 +474,27 @@ const en: Dict = {
   'home.readBlog': 'Read the Blog',
   'home.donateCtaTitle': 'Help Us Reach More People',
   'home.donateCtaSubtitle': 'Every dollar helps StreetRise verify more resources and expand to more Florida cities.',
+  'home.seo.title': 'StreetRise — Find Shelter, Food & Support Near You',
+  'home.seo.description': 'A free app connecting people in Tampa Bay, Orlando, and Miami to verified shelter, food, medical, and support resources — updated in real time by the organizations that provide them.',
+
+  // Shared UI states used across the whole app
+  'common.loading': 'Loading…',
+  'common.dismiss': 'Dismiss',
+  'errorBoundary.title': 'Something went wrong',
+  'errorBoundary.body': "This page didn't load properly. Reloading usually fixes it — the app may have updated while you had it open.",
+  'errorBoundary.reload': 'Reload the page',
+  'errorBoundary.backToHome': 'Back to home',
+  'errorBoundary.reportNotice': 'If it keeps happening, send this to info@streetrise.org:',
+
+  // Safe, localized fallbacks for raw auth/backend error messages (never show
+  // the raw message — it's usually English and can hint at implementation details)
+  'authError.rateLimited': 'Too many attempts. Please wait a moment and try again.',
+  'authError.invalidCredentials': 'Incorrect email or password.',
+  'authError.emailNotConfirmed': 'Please confirm your email address before signing in.',
+  'authError.alreadyRegistered': 'An account with this email already exists. Try signing in instead.',
+  'authError.weakPassword': 'Please choose a longer password.',
+  'authError.network': "Couldn't connect. Check your internet connection and try again.",
+  'authError.generic': 'Something went wrong. Please try again.',
 
   // Status labels (ResourceCard.statusLabel, reused by ResourceSheet/ResourceDetailPage)
   'status.bedsAvailable': 'Beds available',
@@ -734,9 +755,9 @@ const en: Dict = {
   'providerLanding.step.goLive.body': 'Once approved, you get full portal access — add listings, update availability, and start receiving requests immediately.',
   'providerLanding.reviewedTitle': 'Manually reviewed — no automated approvals',
   'providerLanding.reviewedBody': "A real person on our team reviews every application to confirm you represent the organization you're listing. Approved providers receive a",
-  'providerLanding.staffVerifiedBadge': 'Staff Verified',
   'providerLanding.reviewedBodyEnd': 'badge on all their listings — a visible signal that a real person on our team has confirmed the listing.',
-  'providerLanding.communityListedNote': 'Community members can also list resources for free — those appear with a "Community Listed" badge so users can see the difference.',
+  'providerLanding.communityListedBefore': 'Community members can also list resources for free — those appear with a',
+  'providerLanding.communityListedAfter': 'badge so users can see the difference.',
   'providerLanding.reviewTimeNote': "Review typically takes 1–2 business days. You'll get an email when approved.",
   'providerLanding.readyToBeFindable': 'Ready to make your services findable?',
   'providerLanding.alreadyHaveAccount': 'Already have an account?',
@@ -849,7 +870,8 @@ const en: Dict = {
   'marketing.legal.privacyTitle': 'Privacy Policy',
   'marketing.legal.termsTitle': 'Terms of Use',
   'marketing.legal.lastUpdated': 'Last updated: {date}',
-  'marketing.legal.englishOnlyNotice': 'This document is available in English only. If you need it explained in Spanish, contact us and we will help.',
+  'marketing.legal.englishOnlyNotice': 'This document is available in English only. The English text is the official version.',
+  'marketing.legal.contactUs': 'Questions about this document? Contact us.',
 
   // marketing/CommunityVoicesPage
   'marketing.communityVoices.eyebrow': 'Community Voices',
@@ -937,6 +959,33 @@ const en: Dict = {
   'claim.detail.authorizedNotice': "By claiming you confirm you're authorized to represent this organization.",
   'claim.detail.toastNotSubmittedTitle': 'Claim not submitted',
   'claim.detail.genericError': 'Something went wrong. Please try again.',
+  'claim.detail.err.signedOut': 'Your session has expired. Sign in again and your claim will go straight through.',
+  'claim.detail.err.alreadyOwnsOrg': 'This account already manages an organization on StreetRise. Each organization needs its own account — sign out and create one with your work email.',
+  'claim.detail.err.taken': 'You have already submitted a claim for this organization. It is waiting on review.',
+  'claim.detail.err.invalidEmail': "That contact email doesn't look right. Check it and try again.",
+
+  // Safety-critical eligibility labels (gender_policy / population_focus) —
+  // these affect whether someone should travel to a listing, so unlike some
+  // other DB-adjacent enum labels, they must not stay English-only.
+  'genderPolicy.gender_inclusive.label': 'All genders welcome',
+  'genderPolicy.men_only.label': 'Men only',
+  'genderPolicy.women_only.label': 'Women only',
+  'genderPolicy.family_only.label': 'Families only',
+  'genderPolicy.couples_only.label': 'Couples',
+  'genderPolicy.youth_only.label': 'Youth only',
+  'genderPolicy.unknown.label': 'Eligibility unclear',
+  'populationFocus.veterans.label': 'Veterans',
+  'populationFocus.lgbtq.label': 'LGBTQ+',
+  'populationFocus.domestic_violence.label': 'Domestic Violence',
+  'populationFocus.families.label': 'Families',
+  'populationFocus.students.label': 'Students',
+  'populationFocus.seniors.label': 'Seniors',
+  'populationFocus.young_adults.label': 'Young Adults',
+  'populationFocus.pregnant_women.label': 'Pregnant Women',
+  'populationFocus.substance_recovery.label': 'Recovery',
+  'populationFocus.mental_health.label': 'Mental Health',
+  'populationFocus.reentry.label': 'Reentry',
+  'populationFocus.hiv_aids.label': 'HIV/AIDS',
 }
 
 const es: Dict = {
@@ -1386,6 +1435,26 @@ const es: Dict = {
   'home.readBlog': 'Leer el Blog',
   'home.donateCtaTitle': 'Ayúdanos a Llegar a Más Personas',
   'home.donateCtaSubtitle': 'Cada dólar ayuda a StreetRise a verificar más recursos y expandirse a más ciudades de Florida.',
+  'home.seo.title': 'StreetRise — Encuentra Refugio, Comida y Apoyo Cerca de Ti',
+  'home.seo.description': 'Una aplicación gratuita que conecta a personas en Tampa Bay, Orlando y Miami con recursos verificados de refugio, comida, salud y apoyo — actualizados en tiempo real por las organizaciones que los ofrecen.',
+
+  // Shared UI states used across the whole app
+  'common.loading': 'Cargando…',
+  'common.dismiss': 'Cerrar',
+  'errorBoundary.title': 'Algo salió mal',
+  'errorBoundary.body': 'Esta página no cargó correctamente. Recargar suele solucionarlo — la aplicación puede haberse actualizado mientras la tenías abierta.',
+  'errorBoundary.reload': 'Recargar la página',
+  'errorBoundary.backToHome': 'Volver al inicio',
+  'errorBoundary.reportNotice': 'Si esto sigue ocurriendo, envía esto a info@streetrise.org:',
+
+  // Mensajes seguros y traducidos para errores de autenticación/backend sin procesar
+  'authError.rateLimited': 'Demasiados intentos. Espera un momento e inténtalo de nuevo.',
+  'authError.invalidCredentials': 'Correo o contraseña incorrectos.',
+  'authError.emailNotConfirmed': 'Confirma tu dirección de correo antes de iniciar sesión.',
+  'authError.alreadyRegistered': 'Ya existe una cuenta con este correo. Intenta iniciar sesión.',
+  'authError.weakPassword': 'Elige una contraseña más larga.',
+  'authError.network': 'No pudimos conectar. Revisa tu conexión a internet e inténtalo de nuevo.',
+  'authError.generic': 'Algo salió mal. Inténtalo de nuevo.',
 
   // Status labels
   'status.bedsAvailable': 'Camas disponibles',
@@ -1630,7 +1699,7 @@ const es: Dict = {
   'providerLanding.whatYouCanDo': 'Qué puedes hacer',
   'providerLanding.feature.availability.title': 'Actualizaciones de disponibilidad en tiempo real',
   'providerLanding.feature.availability.body': 'Actualiza el número de camas, el estado de la despensa de alimentos y los horarios de servicio en tiempo real para que las personas siempre vean información precisa antes de llegar.',
-  'providerLanding.feature.bookings.title': 'Gestiona solicitudes de reserva',
+  'providerLanding.feature.bookings.title': 'Gestiona solicitudes de ayuda',
   'providerLanding.feature.bookings.body': 'Recibe, confirma, pon en lista de espera o rechaza solicitudes de recursos desde un panel sencillo — sin ida y vuelta de llamadas.',
   'providerLanding.feature.workExchange.title': 'Publica oportunidades de intercambio de trabajo',
   'providerLanding.feature.workExchange.body': 'Publica vacantes de voluntariado, puestos remunerados, pasantías y oportunidades de intercambio de habilidades para conectar con personas listas para contribuir.',
@@ -1645,9 +1714,9 @@ const es: Dict = {
   'providerLanding.step.goLive.body': 'Una vez aprobado, obtienes acceso completo al portal — agrega listados, actualiza la disponibilidad y comienza a recibir solicitudes de inmediato.',
   'providerLanding.reviewedTitle': 'Revisado manualmente — sin aprobaciones automáticas',
   'providerLanding.reviewedBody': 'Una persona real de nuestro equipo revisa cada solicitud para confirmar que representas a la organización que estás listando. Los proveedores aprobados reciben una insignia de',
-  'providerLanding.staffVerifiedBadge': 'Staff Verified',
   'providerLanding.reviewedBodyEnd': 'en todos sus listados — una señal visible de que una persona real de nuestro equipo ha confirmado el listado.',
-  'providerLanding.communityListedNote': 'Los miembros de la comunidad también pueden listar recursos gratis — esos aparecen con una insignia "Community Listed" para que los usuarios vean la diferencia.',
+  'providerLanding.communityListedBefore': 'Los miembros de la comunidad también pueden listar recursos gratis — esos aparecen con una insignia',
+  'providerLanding.communityListedAfter': 'para que los usuarios vean la diferencia.',
   'providerLanding.reviewTimeNote': 'La revisión suele tardar de 1 a 2 días hábiles. Recibirás un correo cuando seas aprobado.',
   'providerLanding.readyToBeFindable': '¿Listo para que te encuentren?',
   'providerLanding.alreadyHaveAccount': '¿Ya tienes una cuenta?',
@@ -1728,13 +1797,13 @@ const es: Dict = {
   'marketing.accessibility.measuresItem6': 'Acceso en formato de texto o lista a la información de recursos que se presenta visualmente en un mapa.',
   'marketing.accessibility.measuresItem7': 'Una combinación de revisión automatizada, pruebas de teclado y pruebas con tecnología de asistencia a medida que la Plataforma evoluciona.',
   'marketing.accessibility.limitationsHeading': 'Limitaciones conocidas',
-  'marketing.accessibility.limitationsIntro': 'Algunas partes de StreetRise puede que aún no ofrezcan una experiencia igualmente efectiva para todos los usuarios. En particular:',
+  'marketing.accessibility.limitationsIntro': 'Es posible que algunas partes de StreetRise aún no ofrezcan una experiencia igualmente efectiva para todos los usuarios. En particular:',
   'marketing.accessibility.limitationsItem1': 'Los mapas interactivos pueden ser difíciles de operar o interpretar con algunas tecnologías de asistencia. La información de recursos también se ofrece en formato de lista.',
   'marketing.accessibility.limitationsItem2': 'Algunos procesos para proveedores y administradores todavía están siendo revisados en cuanto a navegación por teclado, manejo del enfoque, retroalimentación de formularios y compatibilidad con lectores de pantalla.',
-  'marketing.accessibility.limitationsItem3': 'El contenido o los sitios web operados por organizaciones independientes puede que no cumplan las mismas metas de accesibilidad que StreetRise.',
+  'marketing.accessibility.limitationsItem3': 'Es posible que el contenido o los sitios web operados por organizaciones independientes no cumplan las mismas metas de accesibilidad que StreetRise.',
   'marketing.accessibility.limitationsOutro': 'Estamos trabajando para identificar y resolver barreras, priorizando los problemas que impiden a las personas encontrar o solicitar servicios esenciales.',
   'marketing.accessibility.altAccessHeading': 'Acceso alternativo y asistencia',
-  'marketing.accessibility.altAccessP1': 'Si una barrera de accesibilidad te impide encontrar información o completar una acción compatible, contáctanos. Haremos un esfuerzo razonable por ofrecerte la información o asistencia a través de un método alternativo disponible.',
+  'marketing.accessibility.altAccessP1': 'Si una barrera de accesibilidad te impide encontrar información o completar una acción en el sitio, contáctanos. Haremos un esfuerzo razonable por ofrecerte la información o asistencia a través de un método alternativo disponible.',
   'marketing.accessibility.contactCallPrefix': 'Llama al',
   'marketing.accessibility.contactEmailPrefix': 'o escribe a',
   'marketing.accessibility.notEmergencyLine': 'Esta información de contacto es para asistencia de accesibilidad y soporte general. No es una línea de emergencia y puede que no esté monitoreada de forma continua.',
@@ -1759,7 +1828,8 @@ const es: Dict = {
   'marketing.legal.privacyTitle': 'Política de Privacidad',
   'marketing.legal.termsTitle': 'Términos de Uso',
   'marketing.legal.lastUpdated': 'Última actualización: {date}',
-  'marketing.legal.englishOnlyNotice': 'Este documento está disponible solo en inglés. Si necesitas que te lo expliquemos en español, contáctanos y te ayudaremos.',
+  'marketing.legal.englishOnlyNotice': 'Este documento está disponible solo en inglés. El texto en inglés es la versión oficial.',
+  'marketing.legal.contactUs': '¿Preguntas sobre este documento? Contáctanos.',
 
   // marketing/CommunityVoicesPage
   'marketing.communityVoices.eyebrow': 'Voces de la Comunidad',
@@ -1847,6 +1917,31 @@ const es: Dict = {
   'claim.detail.authorizedNotice': 'Al reclamar confirmas que estás autorizado para representar a esta organización.',
   'claim.detail.toastNotSubmittedTitle': 'Reclamo no enviado',
   'claim.detail.genericError': 'Algo salió mal. Inténtalo de nuevo.',
+  'claim.detail.err.signedOut': 'Tu sesión ha expirado. Inicia sesión de nuevo y tu reclamo se enviará sin problema.',
+  'claim.detail.err.alreadyOwnsOrg': 'Esta cuenta ya gestiona una organización en StreetRise. Cada organización necesita su propia cuenta — cierra sesión y crea una con tu correo de trabajo.',
+  'claim.detail.err.taken': 'Ya has enviado un reclamo para esta organización. Está en espera de revisión.',
+  'claim.detail.err.invalidEmail': 'Ese correo de contacto no parece válido. Revísalo e inténtalo de nuevo.',
+
+  // Safety-critical eligibility labels
+  'genderPolicy.gender_inclusive.label': 'Todos los géneros son bienvenidos',
+  'genderPolicy.men_only.label': 'Solo hombres',
+  'genderPolicy.women_only.label': 'Solo mujeres',
+  'genderPolicy.family_only.label': 'Solo familias',
+  'genderPolicy.couples_only.label': 'Parejas',
+  'genderPolicy.youth_only.label': 'Solo jóvenes',
+  'genderPolicy.unknown.label': 'Elegibilidad no especificada',
+  'populationFocus.veterans.label': 'Veteranos',
+  'populationFocus.lgbtq.label': 'LGBTQ+',
+  'populationFocus.domestic_violence.label': 'Violencia Doméstica',
+  'populationFocus.families.label': 'Familias',
+  'populationFocus.students.label': 'Estudiantes',
+  'populationFocus.seniors.label': 'Personas Mayores',
+  'populationFocus.young_adults.label': 'Adultos Jóvenes',
+  'populationFocus.pregnant_women.label': 'Mujeres Embarazadas',
+  'populationFocus.substance_recovery.label': 'Recuperación',
+  'populationFocus.mental_health.label': 'Salud Mental',
+  'populationFocus.reentry.label': 'Reinserción',
+  'populationFocus.hiv_aids.label': 'VIH/SIDA',
 }
 
 export const translations: Record<Lang, Dict> = { en, es }

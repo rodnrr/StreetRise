@@ -1,9 +1,10 @@
+import { Link } from 'react-router-dom'
 import Section from '@/components/ui/Section'
 import SectionHeading from '@/components/ui/SectionHeading'
 import SeoHead from '@/lib/seo/SeoHead'
 import { useI18n } from '@/lib/i18n'
 
-const LAST_UPDATED = 'August 26, 2026'
+const LAST_UPDATED_DATE = new Date(2026, 7, 26) // August 26, 2026
 
 // The body below is intentionally NOT translated: it is formal, legally
 // consequential text (data handling, retention, disclosure) that has not been
@@ -12,9 +13,14 @@ const LAST_UPDATED = 'August 26, 2026'
 // legal prose without review risks a translation that doesn't match the
 // English original's actual legal meaning, which is worse than leaving it
 // untranslated with a clear notice. Only the page chrome (heading, date,
-// notice) is localized.
+// notice) is localized. The body is explicitly marked lang="en" so a screen
+// reader in Spanish mode still pronounces it with English rules (WCAG 2.2
+// Language of Parts) instead of misreading it as Spanish.
 export default function PrivacyPage() {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
+  const lastUpdated = LAST_UPDATED_DATE.toLocaleDateString(lang === 'es' ? 'es' : 'en-US', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  })
   return (
     <div className="bg-white dark:bg-slate-900">
       <SeoHead
@@ -31,14 +37,20 @@ export default function PrivacyPage() {
             align="left"
           />
 
-          <p className="mb-2 text-xs text-slate-400">
-            {t('marketing.legal.lastUpdated').replace('{date}', LAST_UPDATED)}
-          </p>
-          <p className="mb-6 text-xs italic text-slate-400">
-            {t('marketing.legal.englishOnlyNotice')}
+          <p className="mb-4 text-xs text-slate-400">
+            {t('marketing.legal.lastUpdated').replace('{date}', lastUpdated)}
           </p>
 
-          <div className="prose-sm space-y-5 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+            <p className="font-medium">{t('marketing.legal.englishOnlyNotice')}</p>
+            <p className="mt-1">
+              <Link to="/contact" className="font-medium underline hover:no-underline">
+                {t('marketing.legal.contactUs')}
+              </Link>
+            </p>
+          </div>
+
+          <div lang="en" className="prose-sm space-y-5 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
             <p>
               StreetRise (“StreetRise,” “we,” “us,” or “our”) helps people
               find and contact organizations that provide shelter, food,

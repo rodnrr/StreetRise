@@ -10,7 +10,7 @@ import { useAuthStore, useToast } from '@/lib/store'
 import {
   useClaimableProvider, useMyProviderOrg, submitClaim, currentIdentity, isEmailShaped,
   ClaimError, CLAIMABLE_KEY, MY_CLAIMS_KEY, MY_ORG_KEY,
-  type ClaimIdentity,
+  type ClaimIdentity, type ClaimErrorKind,
 } from '@/lib/claims'
 import { notifyClaim } from '@/lib/notifications'
 import { useI18n, translate } from '@/lib/i18n'
@@ -103,7 +103,17 @@ export default function ClaimDetailPage() {
       qc.invalidateQueries({ queryKey: MY_ORG_KEY })
       setDone(true)
     } catch (err) {
-      const msg = err instanceof ClaimError ? err.message : t('claim.detail.genericError')
+      // ClaimError carries a stable `kind` even though its own `message` is
+      // always English (it's constructed once in @/lib/claims, not per-locale)
+      // — map by kind here instead of showing that raw message.
+      const CLAIM_ERROR_KEY: Record<ClaimErrorKind, string> = {
+        signed_out: 'claim.detail.err.signedOut',
+        already_owns_org: 'claim.detail.err.alreadyOwnsOrg',
+        taken: 'claim.detail.err.taken',
+        invalid_email: 'claim.detail.err.invalidEmail',
+        unknown: 'claim.detail.genericError',
+      }
+      const msg = err instanceof ClaimError ? t(CLAIM_ERROR_KEY[err.kind]) : t('claim.detail.genericError')
       toast.error(t('claim.detail.toastNotSubmittedTitle'), msg)
       if (err instanceof ClaimError && err.kind === 'taken') {
         qc.invalidateQueries({ queryKey: CLAIMABLE_KEY })

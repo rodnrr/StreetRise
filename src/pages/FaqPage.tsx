@@ -87,7 +87,7 @@ export default function FaqPage() {
               onClick={() => setExpanded(expanded === item.id ? null : item.id)}
               aria-expanded={expanded === item.id}
             >
-              <div className="flex-1">
+              <div className="flex-1" lang="en">
                 <p className="font-semibold text-gray-900 text-sm leading-snug">{item.question}</p>
                 {expanded !== item.id && (
                   <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{item.answer}</p>
@@ -100,7 +100,7 @@ export default function FaqPage() {
             </button>
 
             {expanded === item.id && (
-              <div className="mt-3 pt-3 border-t border-gray-100 animate-fade-in">
+              <div className="mt-3 pt-3 border-t border-gray-100 animate-fade-in" lang="en">
                 <p className="text-sm text-gray-700 leading-relaxed">{item.answer}</p>
               </div>
             )}

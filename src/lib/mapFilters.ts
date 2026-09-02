@@ -166,6 +166,22 @@ export const GENDER_POLICY_LABEL: Record<string, string> = {
   unknown:          'Eligibility unclear',
 }
 
+/**
+ * i18n.ts key for each gender_policy's translated label — use via
+ * `t(GENDER_POLICY_LABEL_KEY[policy])`. These are safety-critical: someone
+ * decides whether to travel to a shelter based on this label, so — unlike
+ * some other DB-adjacent enum labels — they must not stay English-only.
+ */
+export const GENDER_POLICY_LABEL_KEY: Record<string, string> = {
+  gender_inclusive: 'genderPolicy.gender_inclusive.label',
+  men_only:         'genderPolicy.men_only.label',
+  women_only:       'genderPolicy.women_only.label',
+  family_only:      'genderPolicy.family_only.label',
+  couples_only:     'genderPolicy.couples_only.label',
+  youth_only:       'genderPolicy.youth_only.label',
+  unknown:          'genderPolicy.unknown.label',
+}
+
 export const POPULATION_FOCUS_LABEL: Record<string, string> = {
   veterans:          'Veterans',
   lgbtq:             'LGBTQ+',
@@ -179,6 +195,22 @@ export const POPULATION_FOCUS_LABEL: Record<string, string> = {
   mental_health:     'Mental Health',
   reentry:           'Reentry',
   hiv_aids:          'HIV/AIDS',
+}
+
+/** i18n.ts key for each population_focus tag's translated label — same safety rationale as GENDER_POLICY_LABEL_KEY. */
+export const POPULATION_FOCUS_LABEL_KEY: Record<string, string> = {
+  veterans:           'populationFocus.veterans.label',
+  lgbtq:              'populationFocus.lgbtq.label',
+  domestic_violence:  'populationFocus.domestic_violence.label',
+  families:           'populationFocus.families.label',
+  students:           'populationFocus.students.label',
+  seniors:            'populationFocus.seniors.label',
+  young_adults:       'populationFocus.young_adults.label',
+  pregnant_women:     'populationFocus.pregnant_women.label',
+  substance_recovery: 'populationFocus.substance_recovery.label',
+  mental_health:      'populationFocus.mental_health.label',
+  reentry:            'populationFocus.reentry.label',
+  hiv_aids:           'populationFocus.hiv_aids.label',
 }
 
 export const QUICK_FILTER_DEFS: Record<QuickFilterKey, { label: string; labelKey: string; icon: string }> = {
@@ -726,6 +758,7 @@ const SPANISH_SEARCH_GROUPS: { terms: string[]; match: (r: Resource) => boolean 
   { terms: ['refugio', 'refugios', 'albergue', 'albergues'], match: NEED_DEFS.shelter.match },
   { terms: ['comida', 'comidas', 'alimento', 'alimentos', 'alimentacion', 'alimentación', 'despensa', 'despensas'], match: NEED_DEFS.food.match },
   { terms: ['ducha', 'duchas', 'regadera', 'regaderas', 'bano', 'baño', 'banos', 'baños', 'lavanderia', 'lavandería', 'higiene'], match: NEED_DEFS.hygiene.match },
+  { terms: ['espacio diurno', 'durante el dia', 'durante el día', 'diurno', 'centro diurno'], match: NEED_DEFS.daytime.match },
   { terms: ['medico', 'médico', 'medica', 'médica', 'clinica', 'clínica', 'salud', 'doctor'], match: NEED_DEFS.medical.match },
   { terms: ['salud mental', 'consejeria', 'consejería', 'crisis'], match: NEED_DEFS.mental_health.match },
   { terms: ['recuperacion', 'recuperación', 'adiccion', 'adicción', 'adicciones'], match: NEED_DEFS.recovery.match },
@@ -734,21 +767,38 @@ const SPANISH_SEARCH_GROUPS: { terms: string[]; match: (r: Resource) => boolean 
   { terms: ['ropa', 'vestimenta', 'ropero'], match: NEED_DEFS.clothing.match },
   { terms: ['transporte', 'autobus', 'autobús'], match: NEED_DEFS.transportation.match },
   { terms: ['cuidado de ninos', 'cuidado de niños', 'cuidado infantil', 'guarderia', 'guardería'], match: NEED_DEFS.childcare.match },
+  { terms: ['alcance comunitario', 'trabajo de calle', 'equipo de calle'], match: NEED_DEFS.outreach.match },
   { terms: ['familia', 'familias'], match: NEED_DEFS.families.match },
   { terms: ['estudiante', 'estudiantes', 'escuela', 'uniformes'], match: NEED_DEFS.students.match },
   { terms: ['veterano', 'veteranos', 'veterana', 'veteranas'], match: NEED_DEFS.veterans.match },
   { terms: ['violencia domestica', 'violencia doméstica'], match: NEED_DEFS.dv.match },
   { terms: ['joven', 'jovenes', 'jóvenes', 'juventud'], match: NEED_DEFS.youth.match },
+  { terms: ['lgbtq', 'lgbt', 'diversidad sexual'], match: NEED_DEFS.lgbtq.match },
 ]
+
+// A query shorter than this, or one that is itself a common Spanish function
+// word, is too generic to trust as a synonym trigger — "a", "de", and "la"
+// are all valid word-start prefixes of real terms (e.g. "cuidado de ninos",
+// "lavandería") under a naive prefix test, so without this guard nearly
+// every resource would match nearly every one-letter or two-letter query.
+const MIN_SYNONYM_QUERY_LENGTH = 3
+const SPANISH_STOPWORDS = new Set([
+  'de', 'la', 'el', 'los', 'las', 'un', 'una', 'unos', 'unas',
+  'y', 'o', 'a', 'en', 'con', 'sin', 'por', 'para', 'del', 'al',
+  'que', 'su', 'sus', 'mas', 'más', 'muy', 'este', 'esta', 'eso',
+])
 
 /**
  * True when `q` is a prefix of `term` or of one of its words (space-separated,
  * for multi-word terms like "violencia domestica"). Anchoring to word starts —
  * rather than a bare substring test — is what stops a short, generic query
  * like "men" from matching inside an unrelated word such as "ali[men]to".
+ * The length/stopword guard on top of that stops equally generic short
+ * queries ("a", "de", "la") from matching a huge fraction of terms just
+ * because they happen to start a word somewhere.
  */
 function isWordPrefixMatch(term: string, q: string): boolean {
-  if (!q) return false
+  if (q.length < MIN_SYNONYM_QUERY_LENGTH || SPANISH_STOPWORDS.has(q)) return false
   return term === q || term.startsWith(q) || term.includes(` ${q}`)
 }
 
@@ -1127,8 +1177,8 @@ export function activeFilterLabels(filters: MapFilters, t: (key: string) => stri
   for (const def of TOGGLE_DEFS) {
     if (filters[def.key]) out.push(t(def.labelKey))
   }
-  for (const gp of filters.genderPolicy ?? []) out.push(GENDER_POLICY_LABEL[gp] ?? gp)
-  for (const tag of filters.populationFocus ?? []) out.push(POPULATION_FOCUS_LABEL[tag] ?? tag)
+  for (const gp of filters.genderPolicy ?? []) out.push(t(GENDER_POLICY_LABEL_KEY[gp] ?? gp))
+  for (const tag of filters.populationFocus ?? []) out.push(t(POPULATION_FOCUS_LABEL_KEY[tag] ?? tag))
   if (filters.availabilityStatus) out.push(filters.availabilityStatus)
 
   return out
@@ -1153,14 +1203,14 @@ export function clearedFilter(
   for (const def of TOGGLE_DEFS) {
     if (t(def.labelKey) === label && filters[def.key]) patch[def.key] = undefined
   }
-  for (const [gp, gpLabel] of Object.entries(GENDER_POLICY_LABEL)) {
-    if (gpLabel === label) {
+  for (const gp of Object.keys(GENDER_POLICY_LABEL)) {
+    if (t(GENDER_POLICY_LABEL_KEY[gp]) === label) {
       patch.genderPolicy = (filters.genderPolicy ?? []).filter((v) => v !== gp)
       if (!patch.genderPolicy.length) patch.genderPolicy = undefined
     }
   }
-  for (const [tag, tagLabel] of Object.entries(POPULATION_FOCUS_LABEL)) {
-    if (tagLabel === label) {
+  for (const tag of Object.keys(POPULATION_FOCUS_LABEL)) {
+    if (t(POPULATION_FOCUS_LABEL_KEY[tag]) === label) {
       patch.populationFocus = (filters.populationFocus ?? []).filter((v) => v !== tag)
       if (!patch.populationFocus.length) patch.populationFocus = undefined
     }

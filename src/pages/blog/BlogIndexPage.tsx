@@ -57,7 +57,7 @@ export default function BlogIndexPage() {
                       className="h-20 w-20 flex-shrink-0 rounded-xl object-cover"
                     />
                   )}
-                  <div className="min-w-0">
+                  <div className="min-w-0" lang="en">
                     <p className="font-bold text-slate-900 dark:text-white">{post.title}</p>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{post.excerpt}</p>
                     {post.published_at && (

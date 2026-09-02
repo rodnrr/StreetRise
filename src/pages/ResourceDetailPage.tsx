@@ -5,8 +5,8 @@ import { db } from '@/lib/supabase'
 import {
   CATEGORY_EMOJI,
   RESOURCE_TYPE_LABEL_KEY,
-  GENDER_POLICY_LABEL,
-  POPULATION_FOCUS_LABEL,
+  GENDER_POLICY_LABEL_KEY,
+  POPULATION_FOCUS_LABEL_KEY,
   getTrustInfo,
   TRUST_LEVEL_CLASSES,
 } from '@/lib/mapFilters'
@@ -180,7 +180,7 @@ export default function ResourceDetailPage() {
             )}
             {resource.population_focus?.map((tag) => (
               <span key={tag} className="badge bg-purple-50 text-purple-700">
-                {POPULATION_FOCUS_LABEL[tag] ?? tag}
+                {POPULATION_FOCUS_LABEL_KEY[tag] ? t(POPULATION_FOCUS_LABEL_KEY[tag]) : tag}
               </span>
             ))}
           </div>
@@ -189,11 +189,11 @@ export default function ResourceDetailPage() {
         {/* Gender policy */}
         {resource.gender_policy && resource.gender_policy !== 'unknown' && (
           <p className="text-sm text-gray-600 mb-3">
-            👤 {GENDER_POLICY_LABEL[resource.gender_policy] ?? resource.gender_policy}
+            👤 {GENDER_POLICY_LABEL_KEY[resource.gender_policy] ? t(GENDER_POLICY_LABEL_KEY[resource.gender_policy]) : resource.gender_policy}
           </p>
         )}
 
-        <p className="text-gray-700 text-sm leading-relaxed">{resource.description}</p>
+        <p lang="en" className="text-gray-700 text-sm leading-relaxed">{resource.description}</p>
 
         {/* Bed count */}
         {showBeds && (

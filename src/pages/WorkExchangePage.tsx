@@ -129,7 +129,7 @@ export default function WorkExchangePage() {
             <div className="flex items-start gap-3 mb-2">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <h3 className="font-semibold text-gray-900">{wx.title}</h3>
+                  <h3 lang="en" className="font-semibold text-gray-900">{wx.title}</h3>
                   <span className={TYPE_STYLE[wx.exchange_type] ?? 'badge'}>{t(TYPE_LABEL_KEY[wx.exchange_type])}</span>
                 </div>
                 <p className="text-sm text-gray-500 flex items-center gap-1">
@@ -138,19 +138,19 @@ export default function WorkExchangePage() {
               </div>
             </div>
 
-            <p className="text-sm text-gray-700 line-clamp-2 mb-3">{wx.description}</p>
+            <p lang="en" className="text-sm text-gray-700 line-clamp-2 mb-3">{wx.description}</p>
 
             <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
               {wx.hours_per_week && (
                 <span className="flex items-center gap-1"><Clock size={12} /> {wx.hours_per_week} {t('work.hrsPerWeek')}</span>
               )}
               {wx.compensation && (
-                <span className="font-medium text-primary-600">{wx.compensation}</span>
+                <span lang="en" className="font-medium text-primary-600">{wx.compensation}</span>
               )}
             </div>
 
             {wx.skills_required?.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-3">
+              <div lang="en" className="flex flex-wrap gap-1.5 mt-3">
                 {wx.skills_required.map(s => (
                   <span key={s} className="badge bg-gray-100 text-gray-600 text-xs">{s}</span>
                 ))}
