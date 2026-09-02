@@ -4,7 +4,7 @@ import { Phone, Globe, MapPin, Clock, BedDouble, ChevronLeft, CheckCircle, XCirc
 import { db } from '@/lib/supabase'
 import {
   CATEGORY_EMOJI,
-  RESOURCE_TYPE_LABEL,
+  RESOURCE_TYPE_LABEL_KEY,
   GENDER_POLICY_LABEL,
   POPULATION_FOCUS_LABEL,
   getTrustInfo,
@@ -34,8 +34,9 @@ function VerificationBadge({ status }: { status: string }) {
 
 function TrustAlert({ resource }: { resource: Resource }) {
   const { t } = useI18n()
-  const { label, level } = getTrustInfo(resource)
+  const { labelKey, labelParams, level } = getTrustInfo(resource)
   if (level === 'fresh' || level === 'recent') return null
+  const label = labelParams ? t(labelKey).replace('{days}', labelParams.days) : t(labelKey)
   return (
     <div className={`flex items-start gap-2.5 rounded-xl p-3 mb-4 ${TRUST_LEVEL_CLASSES[level]}`}>
       <AlertTriangle size={16} className="shrink-0 mt-0.5" />
@@ -174,7 +175,7 @@ export default function ResourceDetailPage() {
           <div className="flex flex-wrap gap-1.5 mb-3">
             {resource.resource_type && (
               <span className="badge bg-blue-50 text-blue-700">
-                {RESOURCE_TYPE_LABEL[resource.resource_type] ?? resource.resource_type}
+                {RESOURCE_TYPE_LABEL_KEY[resource.resource_type] ? t(RESOURCE_TYPE_LABEL_KEY[resource.resource_type]) : resource.resource_type}
               </span>
             )}
             {resource.population_focus?.map((tag) => (

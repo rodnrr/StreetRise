@@ -117,6 +117,7 @@ const en: Dict = {
   'booking.err.adult': 'At least 1 adult',
   'booking.err.contactRequired': 'Phone or email required',
   'booking.err.questionRequired': 'Type your question so the provider can answer it',
+  'booking.err.requestFailed': 'Request failed',
 
   // Instant-answer FAQ panel (Ask a Question)
   'booking.faq.title': 'Ask about this listing',
@@ -842,6 +843,14 @@ const en: Dict = {
   'marketing.accessibility.contactSendPrefix': 'Accessibility questions and requests may be sent to',
   'marketing.accessibility.contactOr': 'or',
 
+  // marketing/PrivacyPage, marketing/TermsPage — chrome only; the full legal
+  // text is intentionally left English-only (see file header comments).
+  'marketing.legal.eyebrow': 'Legal',
+  'marketing.legal.privacyTitle': 'Privacy Policy',
+  'marketing.legal.termsTitle': 'Terms of Use',
+  'marketing.legal.lastUpdated': 'Last updated: {date}',
+  'marketing.legal.englishOnlyNotice': 'This document is available in English only. If you need it explained in Spanish, contact us and we will help.',
+
   // marketing/CommunityVoicesPage
   'marketing.communityVoices.eyebrow': 'Community Voices',
   'marketing.communityVoices.title': 'Stories from Our Community',
@@ -1023,6 +1032,7 @@ const es: Dict = {
   'booking.err.adult': 'Al menos 1 adulto',
   'booking.err.contactRequired': 'Se requiere teléfono o correo',
   'booking.err.questionRequired': 'Escribe tu pregunta para que el proveedor pueda responderla',
+  'booking.err.requestFailed': 'Error en la solicitud',
 
   // Panel de respuestas instantáneas (Hacer una Pregunta)
   'booking.faq.title': 'Pregunta sobre este lugar',
@@ -1743,6 +1753,13 @@ const es: Dict = {
   'marketing.accessibility.contactHeading': 'Contacto',
   'marketing.accessibility.contactSendPrefix': 'Las preguntas y solicitudes de accesibilidad pueden enviarse a',
   'marketing.accessibility.contactOr': 'o al',
+
+  // marketing/PrivacyPage, marketing/TermsPage — chrome only
+  'marketing.legal.eyebrow': 'Legal',
+  'marketing.legal.privacyTitle': 'Política de Privacidad',
+  'marketing.legal.termsTitle': 'Términos de Uso',
+  'marketing.legal.lastUpdated': 'Última actualización: {date}',
+  'marketing.legal.englishOnlyNotice': 'Este documento está disponible solo en inglés. Si necesitas que te lo expliquemos en español, contáctanos y te ayudaremos.',
 
   // marketing/CommunityVoicesPage
   'marketing.communityVoices.eyebrow': 'Voces de la Comunidad',

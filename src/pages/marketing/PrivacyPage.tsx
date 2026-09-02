@@ -1,10 +1,20 @@
 import Section from '@/components/ui/Section'
 import SectionHeading from '@/components/ui/SectionHeading'
 import SeoHead from '@/lib/seo/SeoHead'
+import { useI18n } from '@/lib/i18n'
 
 const LAST_UPDATED = 'August 26, 2026'
 
+// The body below is intentionally NOT translated: it is formal, legally
+// consequential text (data handling, retention, disclosure) that has not been
+// confirmed as attorney-reviewed even in its English original (see
+// CLAUDE.md's Known Open Items). Machine-translating liability-sensitive
+// legal prose without review risks a translation that doesn't match the
+// English original's actual legal meaning, which is worse than leaving it
+// untranslated with a clear notice. Only the page chrome (heading, date,
+// notice) is localized.
 export default function PrivacyPage() {
+  const { t } = useI18n()
   return (
     <div className="bg-white dark:bg-slate-900">
       <SeoHead
@@ -16,13 +26,16 @@ export default function PrivacyPage() {
       <Section containerSize="prose">
         <article>
           <SectionHeading
-            eyebrow="Legal"
-            title="Privacy Policy"
+            eyebrow={t('marketing.legal.eyebrow')}
+            title={t('marketing.legal.privacyTitle')}
             align="left"
           />
 
-          <p className="mb-6 text-xs text-slate-400">
-            Last updated: {LAST_UPDATED}
+          <p className="mb-2 text-xs text-slate-400">
+            {t('marketing.legal.lastUpdated').replace('{date}', LAST_UPDATED)}
+          </p>
+          <p className="mb-6 text-xs italic text-slate-400">
+            {t('marketing.legal.englishOnlyNotice')}
           </p>
 
           <div className="prose-sm space-y-5 text-sm leading-relaxed text-slate-600 dark:text-slate-300">

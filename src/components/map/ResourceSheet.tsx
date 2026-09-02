@@ -7,7 +7,7 @@ import {
 import clsx from 'clsx'
 import {
   CATEGORY_EMOJI,
-  RESOURCE_TYPE_LABEL,
+  RESOURCE_TYPE_LABEL_KEY,
   GENDER_POLICY_LABEL,
   POPULATION_FOCUS_LABEL,
   getTrustInfo,
@@ -234,7 +234,7 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
             <div className="flex flex-wrap gap-1.5">
               {r.resource_type && (
                 <span className="badge bg-blue-50 text-blue-700">
-                  {RESOURCE_TYPE_LABEL[r.resource_type] ?? r.resource_type}
+                  {RESOURCE_TYPE_LABEL_KEY[r.resource_type] ? t(RESOURCE_TYPE_LABEL_KEY[r.resource_type]) : r.resource_type}
                 </span>
               )}
               {r.population_focus?.map((tag) => (
@@ -269,7 +269,7 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
           </div>
 
           <span className={clsx('inline-flex items-center text-xs rounded-full px-2 py-0.5', TRUST_LEVEL_CLASSES[trust.level])}>
-            {trust.label}
+            {trust.labelParams ? t(trust.labelKey).replace('{days}', trust.labelParams.days) : t(trust.labelKey)}
           </span>
         </div>
 

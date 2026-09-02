@@ -2,7 +2,7 @@ import { ChevronRight, MapPin, Phone } from 'lucide-react'
 import clsx from 'clsx'
 import {
   CATEGORY_EMOJI,
-  RESOURCE_TYPE_LABEL,
+  RESOURCE_TYPE_LABEL_KEY,
   getTrustInfo,
 } from '@/lib/mapFilters'
 import { formatDistance } from '@/lib/geo'
@@ -78,7 +78,7 @@ export default function ResourceCard({ resource: r, distanceKm, isSelected, onCl
         <p className="font-semibold text-gray-900 text-sm leading-snug">{r.name}</p>
 
         <p className="text-xs text-gray-500 truncate mt-0.5">
-          {r.resource_type ? `${RESOURCE_TYPE_LABEL[r.resource_type] ?? r.resource_type} · ` : ''}
+          {r.resource_type ? `${RESOURCE_TYPE_LABEL_KEY[r.resource_type] ? t(RESOURCE_TYPE_LABEL_KEY[r.resource_type]) : r.resource_type} · ` : ''}
           {r.address?.city}
           {distanceKm != null && ` · ${formatDistance(distanceKm)}`}
         </p>

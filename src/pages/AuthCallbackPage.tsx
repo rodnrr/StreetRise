@@ -48,7 +48,10 @@ export default function AuthCallbackPage() {
     })()
 
     return () => { cancelled = true }
-  }, [navigate, params])
+    // `t` is intentionally omitted: it's a fresh function reference every render,
+    // and this effect performs a one-time OAuth exchange + redirect — including
+    // it would risk re-running that exchange on an unrelated re-render.
+  }, [navigate, params]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (failed) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
