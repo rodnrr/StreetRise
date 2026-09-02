@@ -5,29 +5,29 @@ import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Container from '@/components/ui/Container'
 import SeoHead from '@/lib/seo/SeoHead'
-
-const VALUES = [
-  {
-    icon: MapPin,
-    title: 'Practical information',
-    description:
-      'A searchable map of real services, combining provider updates, public information, and StreetRise review.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Built for dignity',
-    description:
-      'Confidential-address handling for domestic violence resources, honest availability, and fewer barriers between a person and help.',
-  },
-  {
-    icon: Heart,
-    title: 'Free to search',
-    description:
-      'No account or payment is required to find help. StreetRise is designed to remain free for the people who rely on it.',
-  },
-]
+import { useI18n } from '@/lib/i18n'
 
 export default function AboutPage() {
+  const { t } = useI18n()
+
+  const VALUES = [
+    {
+      icon: MapPin,
+      title: t('marketing.about.value1Title'),
+      description: t('marketing.about.value1Desc'),
+    },
+    {
+      icon: ShieldCheck,
+      title: t('marketing.about.value2Title'),
+      description: t('marketing.about.value2Desc'),
+    },
+    {
+      icon: Heart,
+      title: t('marketing.about.value3Title'),
+      description: t('marketing.about.value3Desc'),
+    },
+  ]
+
   return (
     <div className="bg-white dark:bg-slate-900">
       <SeoHead
@@ -45,28 +45,25 @@ export default function AboutPage() {
         <Container className="relative grid items-center gap-12 py-14 md:py-20 lg:grid-cols-[1.1fr_0.8fr] lg:gap-16 lg:py-24">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-cyan-300">
-              About StreetRise
+              {t('marketing.about.eyebrow')}
             </p>
             <h1 className="mt-4 max-w-2xl text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl">
-              Help should be easier to find.
+              {t('marketing.about.h1')}
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-300 sm:text-xl">
-              StreetRise brings shelter, food, healthcare, legal aid, and
-              other essential services into one clear, searchable place—so a
-              person looking for help can spend less time navigating systems
-              and more time taking the next step.
+              {t('marketing.about.heroBody')}
             </p>
 
             <p className="mt-6 text-sm font-semibold text-cyan-200">
-              Founded by Rodner Salgado
+              {t('marketing.about.foundedBy')}
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button to="/map" size="lg">
-                Find Help Near You
+                {t('marketing.about.ctaFindHelp')}
               </Button>
               <Button to="/partner-with-us" variant="secondary" size="lg">
-                Partner with StreetRise
+                {t('marketing.about.ctaPartner')}
               </Button>
             </div>
           </div>
@@ -76,7 +73,7 @@ export default function AboutPage() {
             <div className="relative aspect-[3/4] overflow-hidden rounded-[2rem] border border-white/15 bg-slate-800 shadow-2xl shadow-black/40">
               <img
                 src="/images/blog/meet-the-founder-cover.jpg"
-                alt="Rodner Salgado, founder of StreetRise"
+                alt={t('marketing.about.founderImgAlt')}
                 className="h-full w-full object-cover object-right"
               />
               <div
@@ -85,7 +82,7 @@ export default function AboutPage() {
               />
             </div>
             <figcaption className="mt-4 text-center text-sm text-slate-300">
-              Rodner Salgado · Founder, StreetRise
+              {t('marketing.about.founderCaption')}
             </figcaption>
           </figure>
         </Container>
@@ -95,30 +92,22 @@ export default function AboutPage() {
         <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start lg:gap-16">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary-600 dark:text-primary-400">
-              Meet the founder
+              {t('marketing.about.meetFounderEyebrow')}
             </p>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
-              Building a clearer path from need to help
+              {t('marketing.about.meetFounderTitle')}
             </h2>
           </div>
 
           <div className="space-y-5 text-base leading-relaxed text-slate-600 dark:text-slate-300">
             <p>
-              Rodner Salgado is building StreetRise around a practical
-              question: how can someone find the right help without navigating
-              outdated lists, disconnected systems, and uncertainty about
-              what is actually available?
+              {t('marketing.about.founderP1')}
             </p>
             <p>
-              StreetRise turns that question into useful public
-              infrastructure. People can search without creating an account,
-              while service organizations can claim their listings and keep
-              important details current. StreetRise also reviews information
-              gathered from community and public sources.
+              {t('marketing.about.founderP2')}
             </p>
             <p className="border-l-4 border-cyan-400 pl-5 text-lg font-semibold text-slate-900 dark:text-white">
-              The goal is simple: give every person a more direct, dignified
-              way to find their next step.
+              {t('marketing.about.founderQuote')}
             </p>
           </div>
         </div>
@@ -126,9 +115,9 @@ export default function AboutPage() {
 
       <Section tone="gray" containerSize="wide">
         <SectionHeading
-          eyebrow="What guides us"
-          title="Designed around the person searching"
-          subtitle="StreetRise is more than a list of organizations. It is built to make essential service information clearer, safer, and easier to act on."
+          eyebrow={t('marketing.about.valuesEyebrow')}
+          title={t('marketing.about.valuesTitle')}
+          subtitle={t('marketing.about.valuesSubtitle')}
         />
 
         <div className="mt-10 grid gap-4 md:grid-cols-3">
@@ -153,14 +142,14 @@ export default function AboutPage() {
 
       <Section containerSize="prose" className="text-center">
         <SectionHeading
-          eyebrow="Growing across Florida"
-          title="Where StreetRise Is Today"
-          subtitle="StreetRise is live in Tampa Bay, Orlando, and Miami/Hollywood, with Jacksonville planned next. Providers can claim listings and keep service details current as the network grows."
+          eyebrow={t('marketing.about.whereEyebrow')}
+          title={t('marketing.about.whereTitle')}
+          subtitle={t('marketing.about.whereSubtitle')}
         />
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
-          <Button to="/map">See the Map</Button>
+          <Button to="/map">{t('marketing.about.seeMap')}</Button>
           <Button to="/contact" variant="secondary">
-            Contact StreetRise
+            {t('marketing.about.contactCta')}
           </Button>
         </div>
       </Section>

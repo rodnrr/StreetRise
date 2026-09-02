@@ -76,6 +76,29 @@ export const CATEGORY_LABEL: Record<string, string> = {
   other:              'Other',
 }
 
+/** i18n.ts key for each category's translated label — use via `t(CATEGORY_LABEL_KEY[category])`. */
+export const CATEGORY_LABEL_KEY: Record<string, string> = {
+  shelter:            'category.shelter.label',
+  food:               'category.food.label',
+  work_exchange:      'category.work_exchange.label',
+  employment:         'category.employment.label',
+  mental_health:      'category.mental_health.label',
+  substance_recovery: 'category.substance_recovery.label',
+  medical:            'category.medical.label',
+  healthcare:         'category.healthcare.label',
+  legal:              'category.legal.label',
+  legal_aid:          'category.legal_aid.label',
+  hygiene:            'category.hygiene.label',
+  clothing:           'category.clothing.label',
+  childcare:          'category.childcare.label',
+  transportation:     'category.transportation.label',
+  outdoor_space:      'category.outdoor_space.label',
+  day_space:          'category.day_space.label',
+  outreach:           'category.outreach.label',
+  hotline:            'category.hotline.label',
+  other:              'category.other.label',
+}
+
 export const RESOURCE_TYPE_LABEL: Record<string, string> = {
   emergency_shelter:          'Emergency Shelter',
   transitional_housing:       'Transitional Housing',
@@ -104,6 +127,35 @@ export const RESOURCE_TYPE_LABEL: Record<string, string> = {
   other:                      'Other',
 }
 
+/** i18n.ts key for each resource_type's translated label — use via `t(RESOURCE_TYPE_LABEL_KEY[type])`. */
+export const RESOURCE_TYPE_LABEL_KEY: Record<string, string> = {
+  emergency_shelter:          'resourceType.emergency_shelter.label',
+  transitional_housing:       'resourceType.transitional_housing.label',
+  food_pantry:                'resourceType.food_pantry.label',
+  hot_meal:                   'resourceType.hot_meal.label',
+  shower_facility:            'resourceType.shower_facility.label',
+  restroom_access:            'resourceType.restroom_access.label',
+  day_use_park:               'resourceType.day_use_park.label',
+  warming_cooling_center:     'resourceType.warming_cooling_center.label',
+  domestic_violence_shelter:  'resourceType.domestic_violence_shelter.label',
+  veteran_housing:            'resourceType.veteran_housing.label',
+  youth_shelter:              'resourceType.youth_shelter.label',
+  work_exchange:              'resourceType.work_exchange.label',
+  crisis_hotline:             'resourceType.crisis_hotline.label',
+  job_training:               'resourceType.job_training.label',
+  legal_services:             'resourceType.legal_services.label',
+  medical_clinic:             'resourceType.medical_clinic.label',
+  mental_health_clinic:       'resourceType.mental_health_clinic.label',
+  substance_recovery_program: 'resourceType.substance_recovery_program.label',
+  clothing_closet:            'resourceType.clothing_closet.label',
+  hygiene_supplies:           'resourceType.hygiene_supplies.label',
+  laundry_facility:           'resourceType.laundry_facility.label',
+  childcare_services:         'resourceType.childcare_services.label',
+  transportation_assistance:  'resourceType.transportation_assistance.label',
+  outreach_program:           'resourceType.outreach_program.label',
+  other:                      'resourceType.other.label',
+}
+
 export const GENDER_POLICY_LABEL: Record<string, string> = {
   gender_inclusive: 'All genders welcome',
   men_only:         'Men only',
@@ -112,6 +164,22 @@ export const GENDER_POLICY_LABEL: Record<string, string> = {
   couples_only:     'Couples',
   youth_only:       'Youth only',
   unknown:          'Eligibility unclear',
+}
+
+/**
+ * i18n.ts key for each gender_policy's translated label — use via
+ * `t(GENDER_POLICY_LABEL_KEY[policy])`. These are safety-critical: someone
+ * decides whether to travel to a shelter based on this label, so — unlike
+ * some other DB-adjacent enum labels — they must not stay English-only.
+ */
+export const GENDER_POLICY_LABEL_KEY: Record<string, string> = {
+  gender_inclusive: 'genderPolicy.gender_inclusive.label',
+  men_only:         'genderPolicy.men_only.label',
+  women_only:       'genderPolicy.women_only.label',
+  family_only:      'genderPolicy.family_only.label',
+  couples_only:     'genderPolicy.couples_only.label',
+  youth_only:       'genderPolicy.youth_only.label',
+  unknown:          'genderPolicy.unknown.label',
 }
 
 export const POPULATION_FOCUS_LABEL: Record<string, string> = {
@@ -129,18 +197,34 @@ export const POPULATION_FOCUS_LABEL: Record<string, string> = {
   hiv_aids:          'HIV/AIDS',
 }
 
-export const QUICK_FILTER_DEFS: Record<QuickFilterKey, { label: string; icon: string }> = {
-  shelter_tonight: { label: 'Shelter tonight',   icon: '🏠'  },
-  food_today:      { label: 'Food today',         icon: '🍽️' },
-  shower_restroom: { label: 'Shower / restroom',  icon: '🚿'  },
-  safe_daytime:    { label: 'Safe daytime place', icon: '🌤️' },
-  family_help:     { label: 'Family help',        icon: '👨‍👩‍👧' },
-  mens_help:       { label: "Men's help",         icon: '🧔'  },
-  womens_help:     { label: "Women's help",       icon: '👩'  },
-  veteran_support: { label: 'Veterans',           icon: '🎖️' },
-  lgbtq_support:   { label: 'LGBTQ+',             icon: '🏳️‍🌈' },
-  youth_support:   { label: 'Youth',              icon: '🧑'  },
-  dv_support:      { label: 'DV support',         icon: '🛡️' },
+/** i18n.ts key for each population_focus tag's translated label — same safety rationale as GENDER_POLICY_LABEL_KEY. */
+export const POPULATION_FOCUS_LABEL_KEY: Record<string, string> = {
+  veterans:           'populationFocus.veterans.label',
+  lgbtq:              'populationFocus.lgbtq.label',
+  domestic_violence:  'populationFocus.domestic_violence.label',
+  families:           'populationFocus.families.label',
+  students:           'populationFocus.students.label',
+  seniors:            'populationFocus.seniors.label',
+  young_adults:       'populationFocus.young_adults.label',
+  pregnant_women:     'populationFocus.pregnant_women.label',
+  substance_recovery: 'populationFocus.substance_recovery.label',
+  mental_health:      'populationFocus.mental_health.label',
+  reentry:            'populationFocus.reentry.label',
+  hiv_aids:           'populationFocus.hiv_aids.label',
+}
+
+export const QUICK_FILTER_DEFS: Record<QuickFilterKey, { label: string; labelKey: string; icon: string }> = {
+  shelter_tonight: { label: 'Shelter tonight',   labelKey: 'quickFilter.shelter_tonight.label', icon: '🏠'  },
+  food_today:      { label: 'Food today',         labelKey: 'quickFilter.food_today.label',      icon: '🍽️' },
+  shower_restroom: { label: 'Shower / restroom',  labelKey: 'quickFilter.shower_restroom.label', icon: '🚿'  },
+  safe_daytime:    { label: 'Safe daytime place', labelKey: 'quickFilter.safe_daytime.label',     icon: '🌤️' },
+  family_help:     { label: 'Family help',        labelKey: 'quickFilter.family_help.label',      icon: '👨‍👩‍👧' },
+  mens_help:       { label: "Men's help",         labelKey: 'quickFilter.mens_help.label',        icon: '🧔'  },
+  womens_help:     { label: "Women's help",       labelKey: 'quickFilter.womens_help.label',      icon: '👩'  },
+  veteran_support: { label: 'Veterans',           labelKey: 'quickFilter.veteran_support.label',  icon: '🎖️' },
+  lgbtq_support:   { label: 'LGBTQ+',             labelKey: 'quickFilter.lgbtq_support.label',    icon: '🏳️‍🌈' },
+  youth_support:   { label: 'Youth',              labelKey: 'quickFilter.youth_support.label',    icon: '🧑'  },
+  dv_support:      { label: 'DV support',         labelKey: 'quickFilter.dv_support.label',       icon: '🛡️' },
 }
 
 // Ordered list for the chip row (most frequent needs first)
@@ -194,9 +278,11 @@ export const CATEGORY_SLUG_MAP: Record<string, ResourceCategory> = {
 
 export interface NeedDef {
   label: string
+  labelKey: string
   icon: string
   /** Short line shown under the label in the filter drawer. */
   hint: string
+  hintKey: string
   match: (r: Resource) => boolean
 }
 
@@ -206,8 +292,10 @@ const hasPopulation = (r: Resource, tag: string) => r.population_focus?.includes
 export const NEED_DEFS: Record<NeedKey, NeedDef> = {
   shelter: {
     label: 'Shelter tonight',
+    labelKey: 'need.shelter.label',
     icon: '🏠',
     hint: 'Places to sleep',
+    hintKey: 'need.shelter.hint',
     // `overnight_allowed` is unrecorded (null) on many shelter rows. Treating
     // "unknown" as a no would hide real beds from someone who needs one
     // tonight, so only an explicit `false` drops out.
@@ -215,86 +303,114 @@ export const NEED_DEFS: Record<NeedKey, NeedDef> = {
   },
   food: {
     label: 'Food',
+    labelKey: 'need.food.label',
     icon: '🍽️',
     hint: 'Pantries and hot meals',
+    hintKey: 'need.food.hint',
     match: (r) => r.category === 'food' || r.serves_meals,
   },
   hygiene: {
     label: 'Shower / restroom',
+    labelKey: 'need.hygiene.label',
     icon: '🚿',
     hint: 'Showers, restrooms, laundry',
+    hintKey: 'need.hygiene.hint',
     match: (r) => r.category === 'hygiene' || r.has_showers || r.has_restrooms || r.has_laundry,
   },
   daytime: {
     label: 'Daytime space',
+    labelKey: 'need.daytime.label',
     icon: '🌤️',
     hint: 'Somewhere to be during the day',
+    hintKey: 'need.daytime.hint',
     match: (r) => inCategory(r, ['day_space', 'outdoor_space']),
   },
   medical: {
     label: 'Medical',
+    labelKey: 'need.medical.label',
     icon: '⚕️',
     hint: 'Clinics and health care',
+    hintKey: 'need.medical.hint',
     match: (r) => inCategory(r, ['medical', 'healthcare']),
   },
   mental_health: {
     label: 'Mental health',
+    labelKey: 'need.mental_health.label',
     icon: '💙',
     hint: 'Counselling and crisis support',
+    hintKey: 'need.mental_health.hint',
     match: (r) => inCategory(r, ['mental_health', 'hotline']),
   },
   recovery: {
     label: 'Recovery',
+    labelKey: 'need.recovery.label',
     icon: '🌱',
     hint: 'Substance recovery programs',
+    hintKey: 'need.recovery.hint',
     match: (r) => r.category === 'substance_recovery' || hasPopulation(r, 'substance_recovery'),
   },
   legal: {
     label: 'Legal aid',
+    labelKey: 'need.legal.label',
     icon: '⚖️',
     hint: 'Free and low-cost legal help',
+    hintKey: 'need.legal.hint',
     match: (r) => inCategory(r, ['legal', 'legal_aid']),
   },
   work: {
     label: 'Work & jobs',
+    labelKey: 'need.work.label',
     icon: '💼',
     hint: 'Employment and work exchange',
+    hintKey: 'need.work.hint',
     match: (r) => inCategory(r, ['employment', 'work_exchange']),
   },
   clothing: {
     label: 'Clothing',
+    labelKey: 'need.clothing.label',
     icon: '👕',
     hint: 'Clothing closets',
+    hintKey: 'need.clothing.hint',
     match: (r) => r.category === 'clothing',
   },
   transportation: {
     label: 'Transportation',
+    labelKey: 'need.transportation.label',
     icon: '🚌',
     hint: 'Bus passes and rides',
+    hintKey: 'need.transportation.hint',
     match: (r) => r.category === 'transportation',
   },
   childcare: {
     label: 'Childcare',
+    labelKey: 'need.childcare.label',
     icon: '👶',
     hint: 'Childcare services',
+    hintKey: 'need.childcare.hint',
     match: (r) => r.category === 'childcare',
   },
   outreach: {
     label: 'Outreach',
+    labelKey: 'need.outreach.label',
     icon: '🤲',
     hint: 'Teams that come to you',
+    hintKey: 'need.outreach.hint',
     match: (r) => r.category === 'outreach',
   },
   families: {
     label: 'Families',
+    labelKey: 'need.families.label',
     icon: '👨‍👩‍👧',
     hint: 'Serves families with children',
+    hintKey: 'need.families.hint',
     match: (r) => hasPopulation(r, 'families') || r.gender_policy === 'family_only',
   },
   students: {
     label: 'Students',
+    labelKey: 'need.students.label',
     icon: '🎒',
     hint: 'School clothing, uniforms and student support',
+    hintKey: 'need.students.hint',
     // Tag-driven only, exactly like `veterans`. A clothing closet that serves
     // adults on the street is not a student resource, so this deliberately does
     // NOT widen to `category === 'clothing'`. As student-facing resources land
@@ -304,26 +420,34 @@ export const NEED_DEFS: Record<NeedKey, NeedDef> = {
   },
   veterans: {
     label: 'Veterans',
+    labelKey: 'need.veterans.label',
     icon: '🎖️',
     hint: 'Serves veterans',
+    hintKey: 'need.veterans.hint',
     match: (r) => hasPopulation(r, 'veterans'),
   },
   dv: {
     label: 'DV support',
+    labelKey: 'need.dv.label',
     icon: '🛡️',
     hint: 'Domestic violence support',
+    hintKey: 'need.dv.hint',
     match: (r) => hasPopulation(r, 'domestic_violence'),
   },
   youth: {
     label: 'Youth',
+    labelKey: 'need.youth.label',
     icon: '🧑',
     hint: 'Serves youth and young adults',
+    hintKey: 'need.youth.hint',
     match: (r) => hasPopulation(r, 'young_adults') || r.gender_policy === 'youth_only',
   },
   lgbtq: {
     label: 'LGBTQ+',
+    labelKey: 'need.lgbtq.label',
     icon: '🏳️‍🌈',
     hint: 'Serves LGBTQ+ people',
+    hintKey: 'need.lgbtq.hint',
     match: (r) => hasPopulation(r, 'lgbtq'),
   },
 }
@@ -444,27 +568,30 @@ export type ToggleKey =
 export interface ToggleDef {
   key: ToggleKey
   label: string
+  labelKey: string
+  /** Leading emoji shown before the translated label, kept separate so the word itself can translate cleanly. */
+  icon?: string
   group: 'access' | 'facility' | 'trust'
   /** `now` is supplied so time-dependent filters stay live; most ignore it. */
   test: (r: Resource, now: Date) => boolean
 }
 
 export const TOGGLE_DEFS: ToggleDef[] = [
-  { key: 'openNow',             group: 'access',   label: 'Open right now',            test: (r, now) => isOpenNow(r, now) },
-  { key: 'overnightAllowed',    group: 'access',   label: 'Open overnight',            test: (r) => r.overnight_allowed === true },
-  { key: 'walkInsOnly',         group: 'access',   label: 'Walk-ins accepted',         test: (r) => r.walk_ins_accepted },
-  { key: 'noCallRequired',      group: 'access',   label: 'No call needed first',      test: (r) => r.phone_required_before_arrival === false },
-  { key: 'noReferralRequired',  group: 'access',   label: 'No referral needed',        test: (r) => r.requires_referral === false },
-  { key: 'noIdRequired',        group: 'access',   label: 'No ID needed',              test: (r) => r.requires_id === false },
-  { key: 'hasShowers',          group: 'facility', label: '🚿 Showers',                test: (r) => r.has_showers },
-  { key: 'hasRestrooms',        group: 'facility', label: '🚻 Restrooms',              test: (r) => r.has_restrooms },
-  { key: 'servesMeals',         group: 'facility', label: '🍽️ Meals served',          test: (r) => r.serves_meals },
-  { key: 'hasLaundry',          group: 'facility', label: '🫧 Laundry',                test: (r) => r.has_laundry },
-  { key: 'petFriendly',         group: 'facility', label: '🐾 Pets allowed',           test: (r) => r.pet_friendly },
-  { key: 'wheelchairAccessible',group: 'facility', label: '♿ Wheelchair accessible',  test: (r) => r.wheelchair_accessible },
-  { key: 'nearTransit',         group: 'facility', label: '🚌 Near public transit',    test: (r) => r.public_transit_accessible },
-  { key: 'verifiedOnly',        group: 'trust',    label: 'Staff-verified only',       test: (r) => r.verification_status === 'verified' },
-  { key: 'hideStale',           group: 'trust',    label: 'Hide possibly outdated',    test: (r) => getTrustInfo(r).level !== 'stale' },
+  { key: 'openNow',             group: 'access',   label: 'Open right now',            labelKey: 'toggle.openNow.label',             test: (r, now) => isOpenNow(r, now) },
+  { key: 'overnightAllowed',    group: 'access',   label: 'Open overnight',            labelKey: 'toggle.overnightAllowed.label',    test: (r) => r.overnight_allowed === true },
+  { key: 'walkInsOnly',         group: 'access',   label: 'Walk-ins accepted',         labelKey: 'toggle.walkInsOnly.label',         test: (r) => r.walk_ins_accepted },
+  { key: 'noCallRequired',      group: 'access',   label: 'No call needed first',      labelKey: 'toggle.noCallRequired.label',      test: (r) => r.phone_required_before_arrival === false },
+  { key: 'noReferralRequired',  group: 'access',   label: 'No referral needed',        labelKey: 'toggle.noReferralRequired.label',  test: (r) => r.requires_referral === false },
+  { key: 'noIdRequired',        group: 'access',   label: 'No ID needed',              labelKey: 'toggle.noIdRequired.label',        test: (r) => r.requires_id === false },
+  { key: 'hasShowers',          group: 'facility', label: '🚿 Showers',                labelKey: 'toggle.hasShowers.label',          icon: '🚿', test: (r) => r.has_showers },
+  { key: 'hasRestrooms',        group: 'facility', label: '🚻 Restrooms',              labelKey: 'toggle.hasRestrooms.label',        icon: '🚻', test: (r) => r.has_restrooms },
+  { key: 'servesMeals',         group: 'facility', label: '🍽️ Meals served',          labelKey: 'toggle.servesMeals.label',         icon: '🍽️', test: (r) => r.serves_meals },
+  { key: 'hasLaundry',          group: 'facility', label: '🫧 Laundry',                labelKey: 'toggle.hasLaundry.label',          icon: '🫧', test: (r) => r.has_laundry },
+  { key: 'petFriendly',         group: 'facility', label: '🐾 Pets allowed',           labelKey: 'toggle.petFriendly.label',         icon: '🐾', test: (r) => r.pet_friendly },
+  { key: 'wheelchairAccessible',group: 'facility', label: '♿ Wheelchair accessible',  labelKey: 'toggle.wheelchairAccessible.label',icon: '♿', test: (r) => r.wheelchair_accessible },
+  { key: 'nearTransit',         group: 'facility', label: '🚌 Near public transit',    labelKey: 'toggle.nearTransit.label',         icon: '🚌', test: (r) => r.public_transit_accessible },
+  { key: 'verifiedOnly',        group: 'trust',    label: 'Staff-verified only',       labelKey: 'toggle.verifiedOnly.label',        test: (r) => r.verification_status === 'verified' },
+  { key: 'hideStale',           group: 'trust',    label: 'Hide possibly outdated',    labelKey: 'toggle.hideStale.label',           test: (r) => getTrustInfo(r).level !== 'stale' },
 ]
 
 const TOGGLE_BY_KEY = new Map(TOGGLE_DEFS.map((t) => [t.key, t]))
@@ -616,6 +743,71 @@ interface Predicate {
   test: (r: Resource) => boolean
 }
 
+// ── Spanish search synonyms ──────────────────────────────────────
+//
+// `name`/`category`/`resource_type`/`description` are English DB content (see
+// i18n.ts's scope note), so a plain substring match against them never finds
+// anything for a Spanish query like "refugio" or "comida" — there is no
+// Spanish text in those fields to match. Each group below names a real-world
+// need in Spanish and reuses the same predicate the matching NEED_DEFS entry
+// already uses, so a Spanish search returns the same set that need's chip
+// would. This is independent of `resourceFaq.ts`'s bilingual FAQ matching —
+// that engine answers a already-selected resource's booking-flow question;
+// this one decides which resources the map search box surfaces at all.
+const SPANISH_SEARCH_GROUPS: { terms: string[]; match: (r: Resource) => boolean }[] = [
+  { terms: ['refugio', 'refugios', 'albergue', 'albergues'], match: NEED_DEFS.shelter.match },
+  { terms: ['comida', 'comidas', 'alimento', 'alimentos', 'alimentacion', 'alimentación', 'despensa', 'despensas'], match: NEED_DEFS.food.match },
+  { terms: ['ducha', 'duchas', 'regadera', 'regaderas', 'bano', 'baño', 'banos', 'baños', 'lavanderia', 'lavandería', 'higiene'], match: NEED_DEFS.hygiene.match },
+  { terms: ['espacio diurno', 'durante el dia', 'durante el día', 'diurno', 'centro diurno'], match: NEED_DEFS.daytime.match },
+  { terms: ['medico', 'médico', 'medica', 'médica', 'clinica', 'clínica', 'salud', 'doctor'], match: NEED_DEFS.medical.match },
+  { terms: ['salud mental', 'consejeria', 'consejería', 'crisis'], match: NEED_DEFS.mental_health.match },
+  { terms: ['recuperacion', 'recuperación', 'adiccion', 'adicción', 'adicciones'], match: NEED_DEFS.recovery.match },
+  { terms: ['legal', 'abogado', 'abogados', 'ayuda legal'], match: NEED_DEFS.legal.match },
+  { terms: ['trabajo', 'empleo', 'empleos'], match: NEED_DEFS.work.match },
+  { terms: ['ropa', 'vestimenta', 'ropero'], match: NEED_DEFS.clothing.match },
+  { terms: ['transporte', 'autobus', 'autobús'], match: NEED_DEFS.transportation.match },
+  { terms: ['cuidado de ninos', 'cuidado de niños', 'cuidado infantil', 'guarderia', 'guardería'], match: NEED_DEFS.childcare.match },
+  { terms: ['alcance comunitario', 'trabajo de calle', 'equipo de calle'], match: NEED_DEFS.outreach.match },
+  { terms: ['familia', 'familias'], match: NEED_DEFS.families.match },
+  { terms: ['estudiante', 'estudiantes', 'escuela', 'uniformes'], match: NEED_DEFS.students.match },
+  { terms: ['veterano', 'veteranos', 'veterana', 'veteranas'], match: NEED_DEFS.veterans.match },
+  { terms: ['violencia domestica', 'violencia doméstica'], match: NEED_DEFS.dv.match },
+  { terms: ['joven', 'jovenes', 'jóvenes', 'juventud'], match: NEED_DEFS.youth.match },
+  { terms: ['lgbtq', 'lgbt', 'diversidad sexual'], match: NEED_DEFS.lgbtq.match },
+]
+
+// A query shorter than this, or one that is itself a common Spanish function
+// word, is too generic to trust as a synonym trigger — "a", "de", and "la"
+// are all valid word-start prefixes of real terms (e.g. "cuidado de ninos",
+// "lavandería") under a naive prefix test, so without this guard nearly
+// every resource would match nearly every one-letter or two-letter query.
+const MIN_SYNONYM_QUERY_LENGTH = 3
+const SPANISH_STOPWORDS = new Set([
+  'de', 'la', 'el', 'los', 'las', 'un', 'una', 'unos', 'unas',
+  'y', 'o', 'a', 'en', 'con', 'sin', 'por', 'para', 'del', 'al',
+  'que', 'su', 'sus', 'mas', 'más', 'muy', 'este', 'esta', 'eso',
+])
+
+/**
+ * True when `q` is a prefix of `term` or of one of its words (space-separated,
+ * for multi-word terms like "violencia domestica"). Anchoring to word starts —
+ * rather than a bare substring test — is what stops a short, generic query
+ * like "men" from matching inside an unrelated word such as "ali[men]to".
+ * The length/stopword guard on top of that stops equally generic short
+ * queries ("a", "de", "la") from matching a huge fraction of terms just
+ * because they happen to start a word somewhere.
+ */
+function isWordPrefixMatch(term: string, q: string): boolean {
+  if (q.length < MIN_SYNONYM_QUERY_LENGTH || SPANISH_STOPWORDS.has(q)) return false
+  return term === q || term.startsWith(q) || term.includes(` ${q}`)
+}
+
+function matchesSpanishSynonym(r: Resource, q: string): boolean {
+  return SPANISH_SEARCH_GROUPS.some(
+    (group) => group.match(r) && group.terms.some((term) => isWordPrefixMatch(term, q)),
+  )
+}
+
 function matchesText(r: Resource, q: string): boolean {
   return (
     r.name.toLowerCase().includes(q) ||
@@ -623,7 +815,8 @@ function matchesText(r: Resource, q: string): boolean {
     (r.resource_type?.toLowerCase() ?? '').includes(q) ||
     (r.address?.city?.toLowerCase() ?? '').includes(q) ||
     (r.address?.zip?.toLowerCase() ?? '').includes(q) ||
-    (r.description?.toLowerCase() ?? '').includes(q)
+    (r.description?.toLowerCase() ?? '').includes(q) ||
+    matchesSpanishSynonym(r, q)
   )
 }
 
@@ -856,7 +1049,15 @@ export function isUsefulOption(count: number, baseTotal: number): boolean {
 export type TrustLevel = 'fresh' | 'recent' | 'aging' | 'stale'
 
 export interface TrustInfo {
+  /** English fallback — kept for any caller that hasn't switched to labelKey yet. */
   label: string
+  /**
+   * i18n.ts key for the translated label. `labelParams` (when present) has the
+   * values to substitute for `{days}` — the base `t()` doesn't interpolate, so
+   * callers do e.g. `t(labelKey).replace('{days}', labelParams.days)`.
+   */
+  labelKey: string
+  labelParams?: Record<string, string>
   level: TrustLevel
 }
 
@@ -871,30 +1072,38 @@ export function getTrustInfo(resource: Resource): TrustInfo {
   const isVerified = resource.verification_status === 'verified'
 
   if (!refDate) {
-    return { label: 'May be outdated — call first', level: 'stale' }
+    return { label: 'May be outdated — call first', labelKey: 'trust.mayBeOutdated', level: 'stale' }
   }
 
   const daysSince = Math.floor((Date.now() - refDate.getTime()) / 86_400_000)
 
   if (daysSince === 0) {
-    return {
-      label: isVerified ? 'Verified · Updated today' : 'Updated today',
-      level: 'fresh',
-    }
+    return isVerified
+      ? { label: 'Verified · Updated today', labelKey: 'trust.verifiedUpdatedToday', level: 'fresh' }
+      : { label: 'Updated today', labelKey: 'trust.updatedToday', level: 'fresh' }
   }
   if (daysSince <= 7) {
-    return {
-      label: isVerified ? 'Verified recently' : `Updated ${daysSince}d ago`,
-      level: 'fresh',
-    }
+    return isVerified
+      ? { label: 'Verified recently', labelKey: 'trust.verifiedRecently', level: 'fresh' }
+      : {
+          label: `Updated ${daysSince}d ago`,
+          labelKey: 'trust.updatedDaysAgo',
+          labelParams: { days: String(daysSince) },
+          level: 'fresh',
+        }
   }
   if (daysSince <= staleAfter) {
-    return { label: `Updated ${daysSince}d ago`, level: 'recent' }
+    return {
+      label: `Updated ${daysSince}d ago`,
+      labelKey: 'trust.updatedDaysAgo',
+      labelParams: { days: String(daysSince) },
+      level: 'recent',
+    }
   }
   if (daysSince <= staleAfter * 2) {
-    return { label: 'May be outdated — call first', level: 'aging' }
+    return { label: 'May be outdated — call first', labelKey: 'trust.mayBeOutdated', level: 'aging' }
   }
-  return { label: 'May be outdated — call first', level: 'stale' }
+  return { label: 'May be outdated — call first', labelKey: 'trust.mayBeOutdated', level: 'stale' }
 }
 
 export const TRUST_LEVEL_CLASSES: Record<TrustLevel, string> = {
@@ -953,43 +1162,55 @@ export function countActiveFilters(filters: MapFilters): number {
   return need + countActiveRefinements(filters)
 }
 
-/** Human list of everything currently narrowing the results. */
-export function activeFilterLabels(filters: MapFilters): string[] {
+/**
+ * Human list of everything currently narrowing the results, translated via `t`.
+ * Pass the `t()` from `useI18n()` so removable filter chips show in the active
+ * language; omit it to get the raw English labels (e.g. for non-UI callers).
+ */
+export function activeFilterLabels(filters: MapFilters, t: (key: string) => string = (k) => k): string[] {
   const out: string[] = []
 
-  if (filters.need) out.push(NEED_DEFS[filters.need].label)
-  else if (filters.quickFilter) out.push(QUICK_FILTER_DEFS[filters.quickFilter].label)
-  else if (filters.category) out.push(CATEGORY_LABEL[filters.category] ?? filters.category)
+  if (filters.need) out.push(t(NEED_DEFS[filters.need].labelKey))
+  else if (filters.quickFilter) out.push(t(QUICK_FILTER_DEFS[filters.quickFilter].labelKey))
+  else if (filters.category) out.push(t(CATEGORY_LABEL_KEY[filters.category] ?? filters.category))
 
   for (const def of TOGGLE_DEFS) {
-    if (filters[def.key]) out.push(def.label)
+    if (filters[def.key]) out.push(t(def.labelKey))
   }
-  for (const gp of filters.genderPolicy ?? []) out.push(GENDER_POLICY_LABEL[gp] ?? gp)
-  for (const tag of filters.populationFocus ?? []) out.push(POPULATION_FOCUS_LABEL[tag] ?? tag)
+  for (const gp of filters.genderPolicy ?? []) out.push(t(GENDER_POLICY_LABEL_KEY[gp] ?? gp))
+  for (const tag of filters.populationFocus ?? []) out.push(t(POPULATION_FOCUS_LABEL_KEY[tag] ?? tag))
   if (filters.availabilityStatus) out.push(filters.availabilityStatus)
 
   return out
 }
 
-export function activeFilterSummary(filters: MapFilters): string {
-  return activeFilterLabels(filters)[0] ?? ''
+export function activeFilterSummary(filters: MapFilters, t?: (key: string) => string): string {
+  return activeFilterLabels(filters, t)[0] ?? ''
 }
 
-/** Remove one refinement by name — powers the removable chips above the list. */
-export function clearedFilter(filters: MapFilters, label: string): Partial<MapFilters> {
+/**
+ * Remove one refinement by its displayed label — powers the removable chips
+ * above the list. Pass the same `t()` used to build that label (see
+ * `activeFilterLabels`) so a translated chip matches back to its toggle.
+ */
+export function clearedFilter(
+  filters: MapFilters,
+  label: string,
+  t: (key: string) => string = (k) => k,
+): Partial<MapFilters> {
   const patch: Partial<MapFilters> = {}
 
   for (const def of TOGGLE_DEFS) {
-    if (def.label === label && filters[def.key]) patch[def.key] = undefined
+    if (t(def.labelKey) === label && filters[def.key]) patch[def.key] = undefined
   }
-  for (const [gp, gpLabel] of Object.entries(GENDER_POLICY_LABEL)) {
-    if (gpLabel === label) {
+  for (const gp of Object.keys(GENDER_POLICY_LABEL)) {
+    if (t(GENDER_POLICY_LABEL_KEY[gp]) === label) {
       patch.genderPolicy = (filters.genderPolicy ?? []).filter((v) => v !== gp)
       if (!patch.genderPolicy.length) patch.genderPolicy = undefined
     }
   }
-  for (const [tag, tagLabel] of Object.entries(POPULATION_FOCUS_LABEL)) {
-    if (tagLabel === label) {
+  for (const tag of Object.keys(POPULATION_FOCUS_LABEL)) {
+    if (t(POPULATION_FOCUS_LABEL_KEY[tag]) === label) {
       patch.populationFocus = (filters.populationFocus ?? []).filter((v) => v !== tag)
       if (!patch.populationFocus.length) patch.populationFocus = undefined
     }

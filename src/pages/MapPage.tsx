@@ -89,14 +89,15 @@ function MapController({
 
 /** One need chip. Shows how many places it would return. */
 function NeedChip({
-  needKey, count, active, onClick,
+  needKey, count, active, onClick, t,
 }: {
   needKey: NeedKey
   count: number
   active: boolean
   onClick: () => void
+  t: (key: string) => string
 }) {
-  const { label, icon } = NEED_DEFS[needKey]
+  const { labelKey, icon } = NEED_DEFS[needKey]
   return (
     <button
       onClick={onClick}
@@ -110,7 +111,7 @@ function NeedChip({
       )}
     >
       <span className="text-base leading-none" aria-hidden>{icon}</span>
-      {label}
+      {t(labelKey)}
       <span className={active ? 'text-white/70' : 'text-gray-400'}>{count}</span>
     </button>
   )
@@ -240,7 +241,7 @@ export default function MapPage() {
 
   const selected = ranked.find((r) => r.resource.id === selectedId)
   const activeRefinements = countActiveRefinements(filters)
-  const refinementLabels = activeFilterLabels(filters).slice(filters.need ? 1 : 0)
+  const refinementLabels = activeFilterLabels(filters, t).slice(filters.need ? 1 : 0)
 
   // ── Fit the map to what the list is showing ──
   // Re-fits when the *set* changes (a need chip, a search), not when the user
@@ -278,7 +279,7 @@ export default function MapPage() {
 
   const locateUser = useCallback(() => {
     if (!navigator.geolocation) {
-      toast.error('Location unavailable', 'This browser cannot share your location.')
+      toast.error(t('map.toast.locationUnavailableTitle'), t('map.toast.locationNoSupport'))
       return
     }
     setLocating(true)
@@ -291,12 +292,12 @@ export default function MapPage() {
         setLocating(false)
       },
       () => {
-        toast.error('Location unavailable', 'Enable location access, or search a city or ZIP instead.')
+        toast.error(t('map.toast.locationUnavailableTitle'), t('map.toast.locationDenied'))
         setLocating(false)
       },
       { timeout: 10_000 },
     )
-  }, [setUserLocation, toast])
+  }, [setUserLocation, toast, t])
 
   const pickNeed = useCallback((key: NeedKey) => {
     setSelectedId(null)
@@ -398,7 +399,7 @@ export default function MapPage() {
                   )}
                 >
                   <Clock size={14} />
-                  Open now
+                  {t('map.openNow')}
                   <span className={filters.openNow ? 'text-white/70' : 'text-emerald-500'}>
                     {openNowCount}
                   </span>
@@ -413,6 +414,7 @@ export default function MapPage() {
                 count={counts.needs[key] ?? 0}
                 active={filters.need === key}
                 onClick={() => pickNeed(key)}
+                t={t}
               />
             ))}
           </div>
@@ -423,7 +425,7 @@ export default function MapPage() {
               {refinementLabels.map((label) => (
                 <button
                   key={label}
-                  onClick={() => setFilters(clearedFilter(filters, label))}
+                  onClick={() => setFilters(clearedFilter(filters, label, t))}
                   className="shrink-0 inline-flex items-center gap-1 rounded-full bg-primary-50
                              text-primary-700 text-xs font-medium px-2.5 py-1 hover:bg-primary-100"
                 >
@@ -435,7 +437,7 @@ export default function MapPage() {
                 onClick={clearRefinements}
                 className="shrink-0 text-xs text-gray-500 px-2 py-1 hover:text-gray-700"
               >
-                Clear
+                {t('map.clear')}
               </button>
             </div>
           )}
@@ -510,21 +512,24 @@ export default function MapPage() {
         <div className="flex-1 min-h-0 rounded-2xl bg-white shadow-card flex flex-col overflow-hidden">
           <div className="shrink-0 flex items-baseline justify-between px-4 py-2.5 border-b border-gray-100">
             <h2 className="font-semibold text-gray-900 text-sm">
-              {isLoading ? 'Loading…' : `${ranked.length} ${ranked.length === 1 ? 'place' : 'places'}`}
+              {isLoading
+                ? t('map.loading')
+                : `${ranked.length} ${ranked.length === 1 ? t('filterDrawer.place') : t('filterDrawer.places')}`}
               {filters.need && (
-                <span className="text-gray-400 font-normal"> · {NEED_DEFS[filters.need].label}</span>
+                <span className="text-gray-400 font-normal"> · {t(NEED_DEFS[filters.need].labelKey)}</span>
               )}
             </h2>
             <span className="text-xs text-gray-400">
-              {userLocation ? 'Nearest first' : 'Nearest to map centre'}
+              {userLocation ? t('map.nearestFirst') : t('map.nearestToCenter')}
             </span>
           </div>
 
           {filters.openNow && hiddenForUnknownHours > 0 && (
             <p className="shrink-0 px-4 py-2 text-xs text-amber-700 bg-amber-50 border-b border-amber-100">
-              {hiddenForUnknownHours} more {hiddenForUnknownHours === 1 ? 'place doesn' : 'places don'}’t
-              publish hours, so {hiddenForUnknownHours === 1 ? 'it is' : 'they are'} not shown here.
-              Turn off <span className="font-medium">Open now</span> to see {hiddenForUnknownHours === 1 ? 'it' : 'them'}.
+              {(hiddenForUnknownHours === 1 ? t('map.hiddenHoursOneBefore') : t('map.hiddenHoursOtherBefore'))
+                .replace('{count}', String(hiddenForUnknownHours))}
+              <span className="font-medium">{t('toggle.openNow.label')}</span>
+              {hiddenForUnknownHours === 1 ? t('map.hiddenHoursOneAfter') : t('map.hiddenHoursOtherAfter')}
             </p>
           )}
 
@@ -557,14 +562,14 @@ export default function MapPage() {
             {!isLoading && !isError && ranked.length === 0 && (
               <div className="text-center py-10 px-6">
                 <p className="text-sm text-gray-700 mb-1">
-                  {filters.openNow ? 'Nothing is open right now.' : 'Nothing matches all of that.'}
+                  {filters.openNow ? t('map.emptyOpenNow') : t('map.emptyNoMatch')}
                 </p>
                 <p className="text-xs text-gray-400 mb-5">
                   {filters.openNow
-                    ? 'Hours are checked against the current time in Florida.'
+                    ? t('map.emptyOpenNowHint')
                     : activeRefinements > 0
-                    ? 'Your filters are narrower than the listings we have here.'
-                    : 'Try a different need, or search a nearby city.'}
+                    ? t('map.emptyRefinementsHint')
+                    : t('map.emptyDefaultHint')}
                 </p>
                 <div className="flex flex-col gap-2 items-center">
                   {filters.openNow && (
@@ -572,16 +577,16 @@ export default function MapPage() {
                       onClick={() => setFilters({ openNow: undefined })}
                       className="btn-secondary btn-sm"
                     >
-                      Show places whatever the time
+                      {t('map.showAnytime')}
                     </button>
                   )}
                   {activeRefinements > 0 && (
                     <button onClick={clearRefinements} className="btn-secondary btn-sm">
-                      Remove filters, keep {filters.need ? NEED_DEFS[filters.need].label.toLowerCase() : 'search'}
+                      {t('map.removeFiltersKeep')} {filters.need ? t(NEED_DEFS[filters.need].labelKey).toLowerCase() : t('map.searchFallback')}
                     </button>
                   )}
                   <button onClick={resetAll} className="text-sm text-primary-600 font-medium">
-                    Start over
+                    {t('map.startOver')}
                   </button>
                 </div>
               </div>

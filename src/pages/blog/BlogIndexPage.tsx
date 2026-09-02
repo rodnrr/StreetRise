@@ -7,8 +7,10 @@ import SectionHeading from '@/components/ui/SectionHeading'
 import Card from '@/components/ui/Card'
 import EmptyState from '@/components/ui/EmptyState'
 import SeoHead from '@/lib/seo/SeoHead'
+import { useI18n } from '@/lib/i18n'
 
 export default function BlogIndexPage() {
+  const { t, lang } = useI18n()
   const { data: posts, isLoading } = useQuery({
     queryKey: ['blog-posts'],
     queryFn: fetchPublishedPosts,
@@ -18,13 +20,13 @@ export default function BlogIndexPage() {
   return (
     <div className="bg-white dark:bg-slate-900">
       <SeoHead
-        title="Blog"
-        description="News, partner spotlights, and impact stories from StreetRise."
+        title={t('blog.index.seoTitle')}
+        description={t('blog.index.seoDescription')}
         path="/blog"
       />
 
       <Section containerSize="prose" className="text-center">
-        <SectionHeading eyebrow="Blog" title="News & Stories from StreetRise" />
+        <SectionHeading eyebrow={t('blog.index.eyebrow')} title={t('blog.index.heading')} />
       </Section>
 
       <Section containerSize="prose" className="pt-0">
@@ -37,8 +39,8 @@ export default function BlogIndexPage() {
         {!isLoading && (!posts || posts.length === 0) && (
           <EmptyState
             icon={Newspaper}
-            title="No posts yet"
-            description="We're just getting started on the blog. Check back for updates on new cities, partners, and impact stories."
+            title={t('blog.index.emptyTitle')}
+            description={t('blog.index.emptyDescription')}
           />
         )}
 
@@ -56,11 +58,13 @@ export default function BlogIndexPage() {
                     />
                   )}
                   <div className="min-w-0">
-                    <p className="font-bold text-slate-900 dark:text-white">{post.title}</p>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{post.excerpt}</p>
+                    <div lang="en">
+                      <p className="font-bold text-slate-900 dark:text-white">{post.title}</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{post.excerpt}</p>
+                    </div>
                     {post.published_at && (
                       <p className="mt-2 text-xs text-slate-400">
-                        {new Date(post.published_at).toLocaleDateString()}
+                        {new Date(post.published_at).toLocaleDateString(lang === 'es' ? 'es' : 'en-US')}
                       </p>
                     )}
                   </div>

@@ -1,6 +1,7 @@
 import { CheckCircle, AlertTriangle, XCircle, Info, X } from 'lucide-react'
 import clsx from 'clsx'
 import { useToastStore } from '@/lib/store'
+import { useI18n } from '@/lib/i18n'
 import type { ToastMessage } from '@/types'
 
 const ICONS = {
@@ -18,6 +19,7 @@ const BG = {
 }
 
 function Toast({ toast, onRemove }: { toast: ToastMessage; onRemove: () => void }) {
+  const { t } = useI18n()
   return (
     <div
       className={clsx(
@@ -34,7 +36,7 @@ function Toast({ toast, onRemove }: { toast: ToastMessage; onRemove: () => void 
       <button
         onClick={onRemove}
         className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
-        aria-label="Dismiss"
+        aria-label={t('common.dismiss')}
       >
         <X size={16} />
       </button>

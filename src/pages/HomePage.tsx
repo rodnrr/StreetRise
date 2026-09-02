@@ -19,16 +19,16 @@ import type { Resource } from '@/types'
 // "Browse by need" — categories with a dedicated marketing page link into it
 // (better SEO + real content); the rest fall back to a pre-filtered /map link.
 const CATEGORIES = [
-  { label: 'Shelter',         emoji: '🏠', to: '/shelters' },
-  { label: 'Food',            emoji: '🍽️', to: '/food-pantries' },
-  { label: 'Hygiene',         emoji: '🚿', to: '/hygiene' },
-  { label: 'Medical',         emoji: '⚕️', to: '/medical' },
-  { label: 'Employment',      emoji: '💼', to: '/employment' },
-  { label: 'Students',        emoji: '🎒', to: '/students' },
-  { label: 'Mental Health',   emoji: '💙', to: '/map?category=mental_health' },
-  { label: 'Legal Help',      emoji: '⚖️', to: '/legal' },
-  { label: 'Parks & Day Use', emoji: '🌳', to: '/map?category=outdoor_space' },
-  { label: 'All Resources',   emoji: '📍', to: '/map' },
+  { labelKey: 'home.category.shelter',      emoji: '🏠', to: '/shelters' },
+  { labelKey: 'home.category.food',         emoji: '🍽️', to: '/food-pantries' },
+  { labelKey: 'home.category.hygiene',      emoji: '🚿', to: '/hygiene' },
+  { labelKey: 'home.category.medical',      emoji: '⚕️', to: '/medical' },
+  { labelKey: 'home.category.employment',   emoji: '💼', to: '/employment' },
+  { labelKey: 'home.category.students',     emoji: '🎒', to: '/students' },
+  { labelKey: 'home.category.mentalHealth', emoji: '💙', to: '/map?category=mental_health' },
+  { labelKey: 'home.category.legalHelp',    emoji: '⚖️', to: '/legal' },
+  { labelKey: 'home.category.parksDayUse',  emoji: '🌳', to: '/map?category=outdoor_space' },
+  { labelKey: 'home.category.allResources', emoji: '📍', to: '/map' },
 ]
 
 // Metros StreetRise serves. Set `live: true` ONLY when a metro has real,
@@ -44,21 +44,21 @@ const CITIES = [
 const HOW_IT_WORKS = [
   {
     step: '01',
-    title: 'Find',
+    titleKey: 'home.howItWorks.find.title',
     icon: Search,
-    description: 'Search by what you need or your location. The map shows every verified resource in your city.',
+    descriptionKey: 'home.howItWorks.find.description',
   },
   {
     step: '02',
-    title: 'Check',
+    titleKey: 'home.howItWorks.check.title',
     icon: ClipboardCheck,
-    description: 'See real-time availability, hours, phone numbers, and directions. Always call ahead — availability changes fast.',
+    descriptionKey: 'home.howItWorks.check.description',
   },
   {
     step: '03',
-    title: 'Get Help',
+    titleKey: 'home.howItWorks.getHelp.title',
     icon: HeartHandshake,
-    description: 'Call, walk in, or submit a request through the app. Shelters and services respond to requests and confirm spots.',
+    descriptionKey: 'home.howItWorks.getHelp.description',
   },
 ]
 
@@ -125,7 +125,7 @@ function useLatestPosts() {
 }
 
 export default function HomePage() {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const { data: count } = useResourceCount()
   const { data: featured } = useFeaturedResources()
   const { data: posts } = useLatestPosts()
@@ -134,8 +134,8 @@ export default function HomePage() {
   return (
     <div className="bg-white dark:bg-slate-900">
       <SeoHead
-        title="StreetRise — Find Shelter, Food & Support Near You"
-        description="A free app connecting people in Tampa Bay, Orlando, and Miami to verified shelter, food, medical, and support resources — updated in real time by the organizations that provide them."
+        title={t('home.seo.title')}
+        description={t('home.seo.description')}
         path="/"
       >
         <script type="application/ld+json">{JSON.stringify(organizationSchema())}</script>
@@ -188,12 +188,12 @@ export default function HomePage() {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
                 </span>
-                Live right now
+                {t('home.liveRightNow')}
               </div>
               <p className="mt-2 text-4xl font-bold text-slate-900 dark:text-white">
                 {count != null ? count : '—'}
               </p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">verified listings on the map</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{t('home.verifiedListingsOnMap')}</p>
               <div className="mt-5 grid grid-cols-2 gap-2">
                 {CITIES.map(({ name, live }) => (
                   <div
@@ -205,7 +205,7 @@ export default function HomePage() {
                       {name}
                     </span>
                     <span className={clsx('badge text-[10px]', live ? 'badge-available' : 'badge-unknown')}>
-                      {live ? 'Live' : 'Soon'}
+                      {live ? t('home.live') : t('home.soon')}
                     </span>
                   </div>
                 ))}
@@ -218,7 +218,7 @@ export default function HomePage() {
       {/* ── Featured resources ── */}
       {featured && featured.length > 0 && (
         <Section tone="gray" containerSize="wide">
-          <SectionHeading eyebrow="Verified today" title="Real Resources in Your City" align="left" />
+          <SectionHeading eyebrow={t('home.verifiedTodayEyebrow')} title={t('home.realResourcesTitle')} align="left" />
           <div className="grid gap-4 md:grid-cols-3">
             {featured.map((r) => (
               <Card<typeof Link> key={r.id} hoverable as={Link} to={`/resources/${r.id}`} className="block">
@@ -233,23 +233,23 @@ export default function HomePage() {
             ))}
           </div>
           <div className="mt-6 text-center">
-            <Button to="/map" variant="secondary">See All Resources</Button>
+            <Button to="/map" variant="secondary">{t('home.seeAllResources')}</Button>
           </div>
         </Section>
       )}
 
       {/* ── How It Works ── */}
       <Section containerSize="wide">
-        <SectionHeading title="How It Works" align="left" />
+        <SectionHeading title={t('home.howItWorksTitle')} align="left" />
         <div className="grid gap-8 md:grid-cols-3">
-          {HOW_IT_WORKS.map(({ step, title, description, icon: Icon }) => (
+          {HOW_IT_WORKS.map(({ step, titleKey, descriptionKey, icon: Icon }) => (
             <div key={step}>
               <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400">
                 <Icon size={22} />
               </div>
               <p className="text-sm font-bold text-primary-600 dark:text-primary-400">{step}</p>
-              <p className="font-bold text-slate-900 dark:text-white">{title}</p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</p>
+              <p className="font-bold text-slate-900 dark:text-white">{t(titleKey)}</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t(descriptionKey)}</p>
             </div>
           ))}
         </div>
@@ -257,20 +257,15 @@ export default function HomePage() {
 
       {/* ── Mission ── */}
       <Section tone="gray" containerSize="prose">
-        <SectionHeading title="Real Help for Real People" align="left" />
+        <SectionHeading title={t('home.missionTitle')} align="left" />
         <p className="leading-relaxed text-slate-600 dark:text-slate-300 md:text-lg">
-          StreetRise was built for people experiencing homelessness, veterans,
-          families in crisis, domestic violence survivors, people with
-          disabilities, and anyone connecting them to care. This is not a
-          directory of non-profits. This is a map of actual services — shelter
-          beds, meals, showers, medical care, legal aid, and more — updated by
-          the providers who deliver them.
+          {t('home.missionBody')}
         </p>
       </Section>
 
       {/* ── Where we're available ── */}
       <Section containerSize="wide">
-        <SectionHeading title="Where StreetRise is Available" align="left" />
+        <SectionHeading title={t('home.whereAvailableTitle')} align="left" />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {CITIES.map(({ name, live }) => (
             <div
@@ -282,31 +277,31 @@ export default function HomePage() {
                 {name}, FL
               </span>
               <span className={clsx('badge', live ? 'badge-available' : 'badge-unknown')}>
-                {live ? 'Live' : 'Coming soon'}
+                {live ? t('home.live') : t('home.comingSoon')}
               </span>
             </div>
           ))}
         </div>
         <p className="mt-4 text-center text-sm text-slate-400">
-          Want StreetRise in your city?{' '}
+          {t('home.wantInCity')}{' '}
           <Link to="/partner-with-us" className="font-medium text-primary-600 hover:underline dark:text-primary-400">
-            Partner with us
+            {t('home.partnerWithUs')}
           </Link>
         </p>
       </Section>
 
       {/* ── Browse by need ── */}
       <Section tone="gray" containerSize="wide">
-        <SectionHeading title="Browse by Need" align="left" />
+        <SectionHeading title={t('home.browseByNeed')} align="left" />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {CATEGORIES.map(({ label, emoji, to }) => (
+          {CATEGORIES.map(({ labelKey, emoji, to }) => (
             <Link
-              key={label}
+              key={labelKey}
               to={to}
               className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors hover:border-primary-300 dark:border-slate-700 dark:bg-slate-800"
             >
               <span className="text-2xl">{emoji}</span>
-              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{label}</span>
+              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t(labelKey)}</span>
               <ArrowRight size={14} className="ml-auto text-slate-300" />
             </Link>
           ))}
@@ -315,12 +310,12 @@ export default function HomePage() {
 
       {/* ── From the blog (honest empty state until posts are published) ── */}
       <Section containerSize="prose">
-        <SectionHeading title="From the Blog" align="left" />
+        <SectionHeading title={t('home.fromBlog')} align="left" />
         {latestPosts.length === 0 ? (
           <EmptyState
             icon={Newspaper}
-            title="No posts yet"
-            description="We're just getting started on the blog. Check back for updates on new cities, partners, and impact stories."
+            title={t('home.blogEmptyTitle')}
+            description={t('home.blogEmptyDescription')}
           />
         ) : (
           <>
@@ -331,14 +326,14 @@ export default function HomePage() {
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{post.excerpt}</p>
                   {post.published_at && (
                     <p className="mt-2 text-xs text-slate-400">
-                      {new Date(post.published_at).toLocaleDateString()}
+                      {new Date(post.published_at).toLocaleDateString(lang === 'es' ? 'es' : 'en-US')}
                     </p>
                   )}
                 </Card>
               ))}
             </div>
             <div className="mt-6 text-center">
-              <Button to="/blog" variant="secondary">Read the Blog</Button>
+              <Button to="/blog" variant="secondary">{t('home.readBlog')}</Button>
             </div>
           </>
         )}
@@ -347,12 +342,12 @@ export default function HomePage() {
       {/* ── Donate CTA ── */}
       <Section tone="primary" containerSize="prose" className="text-center">
         <SectionHeading
-          title="Help Us Reach More People"
-          subtitle="Every dollar helps StreetRise verify more resources and expand to more Florida cities."
+          title={t('home.donateCtaTitle')}
+          subtitle={t('home.donateCtaSubtitle')}
         />
         <Button to="/donate" size="lg" className="gap-2">
           <Heart size={18} />
-          Give Hope (Donate)
+          {t('home.donate')}
         </Button>
       </Section>
     </div>

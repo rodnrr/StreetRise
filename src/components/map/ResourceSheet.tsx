@@ -7,13 +7,14 @@ import {
 import clsx from 'clsx'
 import {
   CATEGORY_EMOJI,
-  RESOURCE_TYPE_LABEL,
-  GENDER_POLICY_LABEL,
-  POPULATION_FOCUS_LABEL,
+  RESOURCE_TYPE_LABEL_KEY,
+  GENDER_POLICY_LABEL_KEY,
+  POPULATION_FOCUS_LABEL_KEY,
   getTrustInfo,
   TRUST_LEVEL_CLASSES,
 } from '@/lib/mapFilters'
 import { formatDistance } from '@/lib/geo'
+import { useI18n } from '@/lib/i18n'
 import type { Resource } from '@/types'
 
 const STATUS_BADGE: Record<string, string> = {
@@ -24,21 +25,33 @@ const STATUS_BADGE: Record<string, string> = {
   closed:    'badge-unknown',
 }
 
-function availabilityLabel(r: Resource) {
+function availabilityLabel(r: Resource, t: (key: string) => string) {
   const shelter = r.category === 'shelter'
   const labels: Record<string, string> = shelter
-    ? { available: 'Beds Available', limited: 'Limited Beds', full: 'Shelter Full', unknown: 'Availability Unknown', closed: 'Closed' }
-    : { available: 'Open Now', limited: 'Limited Availability', full: 'Unavailable', unknown: 'Availability Unknown', closed: 'Closed' }
-  return labels[r.availability_status] ?? 'Availability Unknown'
+    ? {
+        available: t('status.bedsAvailableTitle'),
+        limited: t('status.limitedBedsTitle'),
+        full: t('status.shelterFull'),
+        unknown: t('status.availabilityUnknown'),
+        closed: t('status.closed'),
+      }
+    : {
+        available: t('status.openNowTitle'),
+        limited: t('status.limitedAvailability'),
+        full: t('status.unavailable'),
+        unknown: t('status.availabilityUnknown'),
+        closed: t('status.closed'),
+      }
+  return labels[r.availability_status] ?? t('status.availabilityUnknown')
 }
 
 /**
  * Shelters take a spot request; everything else takes a help request.
  * Never "book" or "reserve" — nothing here is a confirmed reservation.
  */
-function requestLabel(r: Resource) {
-  if (r.availability_status === 'full' || r.availability_status === 'closed') return 'Join the Waitlist'
-  return r.category === 'shelter' ? 'Request a Spot' : 'Request Help'
+function requestLabel(r: Resource, t: (key: string) => string) {
+  if (r.availability_status === 'full' || r.availability_status === 'closed') return t('booking.joinWaitlist')
+  return r.category === 'shelter' ? t('booking.requestSpot') : t('booking.requestHelp')
 }
 
 function directionsUrl(r: Resource) {
@@ -49,14 +62,14 @@ function directionsUrl(r: Resource) {
   return dest ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}` : null
 }
 
-const FACILITIES: { key: keyof Resource; icon: string; label: string }[] = [
-  { key: 'has_showers',               icon: '🚿', label: 'Showers' },
-  { key: 'has_restrooms',             icon: '🚻', label: 'Restrooms' },
-  { key: 'serves_meals',              icon: '🍽️', label: 'Meals' },
-  { key: 'has_laundry',               icon: '🫧',  label: 'Laundry' },
-  { key: 'pet_friendly',              icon: '🐾', label: 'Pets OK' },
-  { key: 'wheelchair_accessible',     icon: '♿', label: 'Accessible' },
-  { key: 'public_transit_accessible', icon: '🚌', label: 'Near transit' },
+const FACILITIES: { key: keyof Resource; icon: string; labelKey: string }[] = [
+  { key: 'has_showers',               icon: '🚿', labelKey: 'resourceSheet.facility.showers' },
+  { key: 'has_restrooms',             icon: '🚻', labelKey: 'resourceSheet.facility.restrooms' },
+  { key: 'serves_meals',              icon: '🍽️', labelKey: 'resourceSheet.facility.meals' },
+  { key: 'has_laundry',               icon: '🫧',  labelKey: 'resourceSheet.facility.laundry' },
+  { key: 'pet_friendly',              icon: '🐾', labelKey: 'resourceSheet.facility.petsOk' },
+  { key: 'wheelchair_accessible',     icon: '♿', labelKey: 'resourceSheet.facility.accessible' },
+  { key: 'public_transit_accessible', icon: '🚌', labelKey: 'resourceSheet.facility.nearTransit' },
 ]
 
 /** One action tile in the grid. Renders as a link, an anchor, or nothing. */
@@ -106,6 +119,7 @@ interface Props {
 }
 
 export default function ResourceSheet({ resource: r, distanceKm, onClose }: Props) {
+  const { t } = useI18n()
   // Escape closes the sheet — the backdrop is not the only way out.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -150,15 +164,15 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
         <div className="flex items-start gap-3 px-4 pt-3 pb-3 border-b border-gray-100 shrink-0">
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-              <span className={STATUS_BADGE[r.availability_status]}>{availabilityLabel(r)}</span>
+              <span className={STATUS_BADGE[r.availability_status]}>{availabilityLabel(r, t)}</span>
               {r.verification_status === 'verified' && (
                 <span className="badge bg-emerald-50 text-emerald-700 gap-1">
-                  <CheckCircle size={11} /> Staff Verified
+                  <CheckCircle size={11} /> {t('badge.staffVerified')}
                 </span>
               )}
               {r.verification_status === 'pending' && (
                 <span className="badge bg-amber-50 text-amber-700 gap-1">
-                  <Clock size={11} /> Community Listed
+                  <Clock size={11} /> {t('badge.communityListed')}
                 </span>
               )}
             </div>
@@ -166,14 +180,14 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
               {emoji} {r.name}
             </h2>
             {hideAddress ? (
-              <p className="text-xs text-gray-500 mt-1">📞 Call for location and intake</p>
+              <p className="text-xs text-gray-500 mt-1">📞 {t('resourceSheet.callForLocationAndIntake')}</p>
             ) : (
               <p className="text-xs text-gray-500 flex items-start gap-1 mt-1">
                 <MapPin size={12} className="mt-px shrink-0" />
                 <span>
                   {[r.address?.street, r.address?.city].filter(Boolean).join(', ')}
                   {distanceKm != null && (
-                    <span className="text-gray-400"> · {formatDistance(distanceKm)} away</span>
+                    <span className="text-gray-400"> · {formatDistance(distanceKm)} {t('resourceSheet.away')}</span>
                   )}
                 </span>
               </p>
@@ -182,7 +196,7 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
           <button
             onClick={onClose}
             className="btn-icon shrink-0 text-gray-400 hover:text-gray-700 -mt-1 -mr-1"
-            aria-label="Close"
+            aria-label={t('resourceSheet.closeAria')}
           >
             <X size={20} />
           </button>
@@ -194,8 +208,8 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
             <div className="flex items-center gap-2 bg-gray-50 rounded-xl p-3">
               <Users size={15} className="text-gray-500 shrink-0" />
               <span className="text-sm text-gray-700">
-                <span className="font-bold text-gray-900">{r.beds_available ?? '?'}</span> of{' '}
-                <span className="font-bold">{r.beds_total}</span> beds available
+                <span className="font-bold text-gray-900">{r.beds_available ?? '?'}</span> {t('resourceSheet.of')}{' '}
+                <span className="font-bold">{r.beds_total}</span> {t('resourceSheet.bedsAvailableLabel')}
               </span>
               {r.beds_updated_at && (
                 <span className="text-xs text-gray-400 ml-auto shrink-0">
@@ -206,26 +220,26 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
           )}
 
           {hours && (
-            <p className="text-sm text-gray-700 flex items-center gap-2">
+            <p lang="en" className="text-sm text-gray-700 flex items-center gap-2">
               <Clock size={14} className="text-gray-400 shrink-0" />
               {hours}
             </p>
           )}
 
           {r.description && (
-            <p className="text-sm text-gray-600 leading-relaxed">{r.description}</p>
+            <p lang="en" className="text-sm text-gray-600 leading-relaxed">{r.description}</p>
           )}
 
           {(r.resource_type || r.population_focus?.length) && (
             <div className="flex flex-wrap gap-1.5">
               {r.resource_type && (
                 <span className="badge bg-blue-50 text-blue-700">
-                  {RESOURCE_TYPE_LABEL[r.resource_type] ?? r.resource_type}
+                  {RESOURCE_TYPE_LABEL_KEY[r.resource_type] ? t(RESOURCE_TYPE_LABEL_KEY[r.resource_type]) : r.resource_type}
                 </span>
               )}
               {r.population_focus?.map((tag) => (
                 <span key={tag} className="badge bg-purple-50 text-purple-700">
-                  {POPULATION_FOCUS_LABEL[tag] ?? tag}
+                  {POPULATION_FOCUS_LABEL_KEY[tag] ? t(POPULATION_FOCUS_LABEL_KEY[tag]) : tag}
                 </span>
               ))}
             </div>
@@ -233,9 +247,9 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
 
           {facilities.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {facilities.map(({ icon, label }) => (
-                <span key={label} className="badge bg-gray-50 text-gray-600 gap-1">
-                  {icon} {label}
+              {facilities.map(({ icon, labelKey }) => (
+                <span key={labelKey} className="badge bg-gray-50 text-gray-600 gap-1">
+                  {icon} {t(labelKey)}
                 </span>
               ))}
             </div>
@@ -243,19 +257,19 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
 
           {/* Access conditions worth knowing before you travel */}
           <div className="flex flex-wrap gap-1.5">
-            {r.walk_ins_accepted && <span className="badge bg-green-50 text-green-700">Walk-ins OK</span>}
-            {!r.requires_id && <span className="badge bg-blue-50 text-blue-700">No ID needed</span>}
-            {r.requires_referral && <span className="badge bg-amber-50 text-amber-700">Referral needed</span>}
-            {r.phone_required_before_arrival && <span className="badge bg-amber-50 text-amber-700">Call first</span>}
+            {r.walk_ins_accepted && <span className="badge bg-green-50 text-green-700">{t('status.walkInsOk')}</span>}
+            {!r.requires_id && <span className="badge bg-blue-50 text-blue-700">{t('resourceSheet.noIdNeeded')}</span>}
+            {r.requires_referral && <span className="badge bg-amber-50 text-amber-700">{t('status.referralNeeded')}</span>}
+            {r.phone_required_before_arrival && <span className="badge bg-amber-50 text-amber-700">{t('status.callFirst')}</span>}
             {r.gender_policy && r.gender_policy !== 'unknown' && r.gender_policy !== 'gender_inclusive' && (
               <span className="badge bg-gray-100 text-gray-700">
-                {GENDER_POLICY_LABEL[r.gender_policy] ?? r.gender_policy}
+                {GENDER_POLICY_LABEL_KEY[r.gender_policy] ? t(GENDER_POLICY_LABEL_KEY[r.gender_policy]) : r.gender_policy}
               </span>
             )}
           </div>
 
           <span className={clsx('inline-flex items-center text-xs rounded-full px-2 py-0.5', TRUST_LEVEL_CLASSES[trust.level])}>
-            {trust.label}
+            {trust.labelParams ? t(trust.labelKey).replace('{days}', trust.labelParams.days) : t(trust.labelKey)}
           </span>
         </div>
 
@@ -268,37 +282,37 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
             <Action
               href={`tel:${r.phone}`}
               icon={<Phone size={16} />}
-              label="Call"
+              label={t('resourceSheet.call')}
               tone="call"
             />
           )}
           <Action
             to={`/book/${r.id}`}
             icon={<CalendarCheck size={16} />}
-            label={requestLabel(r)}
+            label={requestLabel(r, t)}
             tone="primary"
           />
           <Action
             to={`/book/${r.id}?intent=question`}
             icon={<MessageSquare size={16} />}
-            label="Ask a Question"
+            label={t('booking.askQuestion')}
           />
           {r.website && (
-            <Action href={r.website} external icon={<Globe size={16} />} label="Website" />
+            <Action href={r.website} external icon={<Globe size={16} />} label={t('resourceSheet.website')} />
           )}
           {/* Gated on isConfidential, not hideAddress: a confidential-address or
               phone-intake listing must never get a directions link, whether or
               not it is also tagged domestic violence. The list row already tells
               people to call for the location. */}
           {directions && !isConfidential && (
-            <Action href={directions} external icon={<Navigation size={16} />} label="Directions" />
+            <Action href={directions} external icon={<Navigation size={16} />} label={t('resourceSheet.directions')} />
           )}
           <Link
             to={`/resources/${r.id}`}
             className="col-span-2 flex items-center justify-center gap-1.5 py-2 text-sm
                        font-medium text-primary-600 hover:text-primary-700"
           >
-            Full details <ArrowRight size={15} />
+            {t('resourceSheet.fullDetails')} <ArrowRight size={15} />
           </Link>
         </div>
       </div>

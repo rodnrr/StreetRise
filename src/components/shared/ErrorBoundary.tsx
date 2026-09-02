@@ -1,4 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { useLangStore } from '@/lib/store'
+import { translate } from '@/lib/i18n'
 
 /**
  * Last line of defence against a blank page.
@@ -33,22 +35,28 @@ export default class ErrorBoundary extends Component<Props, State> {
     const { error } = this.state
     if (!error) return this.props.children
 
+    // A class component can't call the useI18n() hook, and this fallback has
+    // to render correctly even if the render that crashed was itself
+    // language-related — reading the persisted store directly keeps this
+    // boundary simple and independent of whatever broke above it.
+    const lang = useLangStore.getState().lang
+    const t = (key: string) => translate(lang, key)
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center text-center p-8 bg-white">
         <p className="text-5xl mb-4">😞</p>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('errorBoundary.title')}</h1>
         <p className="text-gray-500 mb-6 max-w-sm">
-          This page didn’t load properly. Reloading usually fixes it — the app may
-          have updated while you had it open.
+          {t('errorBoundary.body')}
         </p>
         <div className="flex flex-col sm:flex-row gap-2">
           <button onClick={() => window.location.reload()} className="btn-primary">
-            Reload the page
+            {t('errorBoundary.reload')}
           </button>
-          <a href="/" className="btn-secondary">Back to home</a>
+          <a href="/" className="btn-secondary">{t('errorBoundary.backToHome')}</a>
         </div>
         <p className="text-xs text-gray-400 mt-8 max-w-sm break-words">
-          If it keeps happening, send this to info@streetrise.org:
+          {t('errorBoundary.reportNotice')}
           <br />
           <code className="text-gray-500">{error.message || String(error)}</code>
         </p>

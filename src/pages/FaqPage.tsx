@@ -3,9 +3,11 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, HelpCircle, Search } from 'lucide-react'
 import clsx from 'clsx'
 import { db } from '@/lib/supabase'
+import { useI18n } from '@/lib/i18n'
 import type { FaqItem } from '@/types'
 
 export default function FaqPage() {
+  const { t } = useI18n()
   const [search, setSearch]       = useState('')
   const [expanded, setExpanded]   = useState<string | null>(null)
   const [category, setCategory]   = useState<string>('all')
@@ -20,6 +22,7 @@ export default function FaqPage() {
   })
 
   const categories = ['all', ...Array.from(new Set(items.map(i => i.category)))]
+  const categoryLabel = (c: string) => c === 'all' ? t('faqPage.allCategories') : c.replace(/_/g, ' ')
 
   const filtered = items.filter(item => {
     const matchCat    = category === 'all' || item.category === category
@@ -35,8 +38,8 @@ export default function FaqPage() {
         <div className="w-12 h-12 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
           <HelpCircle size={24} className="text-primary-600" />
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Frequently Asked Questions</h1>
-        <p className="text-gray-500 mt-1 text-sm">Everything you need to know about StreetRise</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('faqPage.title')}</h1>
+        <p className="text-gray-500 mt-1 text-sm">{t('faqPage.subtitle')}</p>
       </div>
 
       {/* Search */}
@@ -44,7 +47,7 @@ export default function FaqPage() {
         <Search size={16} className="text-gray-400" />
         <input
           value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search questions…"
+          placeholder={t('faqPage.searchPlaceholder')}
           className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"
         />
       </div>
@@ -60,7 +63,7 @@ export default function FaqPage() {
               'bg-gray-100 text-gray-600 hover:bg-gray-200': category !== c,
             })}
           >
-            {c.replace(/_/g, ' ')}
+            {categoryLabel(c)}
           </button>
         ))}
       </div>
@@ -71,7 +74,7 @@ export default function FaqPage() {
 
       {!isLoading && filtered.length === 0 && (
         <div className="text-center py-16">
-          <p className="text-gray-400">No questions match your search.</p>
+          <p className="text-gray-400">{t('faqPage.noResults')}</p>
         </div>
       )}
 
@@ -84,7 +87,7 @@ export default function FaqPage() {
               onClick={() => setExpanded(expanded === item.id ? null : item.id)}
               aria-expanded={expanded === item.id}
             >
-              <div className="flex-1">
+              <div className="flex-1" lang="en">
                 <p className="font-semibold text-gray-900 text-sm leading-snug">{item.question}</p>
                 {expanded !== item.id && (
                   <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{item.answer}</p>
@@ -97,7 +100,7 @@ export default function FaqPage() {
             </button>
 
             {expanded === item.id && (
-              <div className="mt-3 pt-3 border-t border-gray-100 animate-fade-in">
+              <div className="mt-3 pt-3 border-t border-gray-100 animate-fade-in" lang="en">
                 <p className="text-sm text-gray-700 leading-relaxed">{item.answer}</p>
               </div>
             )}
@@ -107,8 +110,10 @@ export default function FaqPage() {
 
       {/* Crisis banner */}
       <div className="mt-8 p-4 bg-danger-50 border border-danger-500/20 rounded-2xl">
-        <p className="font-semibold text-danger-600 text-sm mb-1">🚨 In immediate danger?</p>
-        <p className="text-sm text-danger-600">Call <strong>911</strong>. Mental health crisis: <strong>988</strong>. Domestic violence: <strong>1-800-799-7233</strong></p>
+        <p className="font-semibold text-danger-600 text-sm mb-1">🚨 {t('faqPage.crisisTitle')}</p>
+        <p className="text-sm text-danger-600">
+          {t('faqPage.crisisCall')} <strong>911</strong>. {t('faqPage.crisisMentalHealth')} <strong>988</strong>. {t('faqPage.crisisDomesticViolence')} <strong>1-800-799-7233</strong>
+        </p>
       </div>
     </div>
   )

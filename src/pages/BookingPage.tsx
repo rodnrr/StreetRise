@@ -60,12 +60,12 @@ const STATUS_STYLE: Record<string, string> = {
   closed:    'text-gray-500 bg-gray-100',
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  available: 'Open Now',
-  limited:   'Limited Availability',
-  full:      'Unavailable',
-  unknown:   'Availability Unknown',
-  closed:    'Closed',
+const STATUS_LABEL_KEY: Record<string, string> = {
+  available: 'status.openNowTitle',
+  limited:   'status.limitedAvailability',
+  full:      'status.unavailable',
+  unknown:   'status.availabilityUnknown',
+  closed:    'status.closed',
 }
 
 /** Returns an i18n key for the primary action label. */
@@ -155,7 +155,10 @@ export default function BookingPage() {
       if (error) throw error
     },
     onSuccess: () => setDone(true),
-    onError:   (e: Error) => toast.error('Request failed', e.message),
+    // The raw Supabase/Postgres error is never shown — it's always English
+    // and can hint at schema/implementation details unrelated to what the
+    // user can act on.
+    onError:   () => toast.error(t('booking.err.requestFailed'), t('authError.generic')),
   })
 
   if (done) return (
@@ -195,13 +198,15 @@ export default function BookingPage() {
             <p className="text-sm text-gray-500">{resource.address.city}, {resource.address.state}</p>
           </div>
           <span className={`badge ${STATUS_STYLE[resource.availability_status]}`}>
-            {STATUS_LABEL[resource.availability_status] ?? resource.availability_status}
+            {STATUS_LABEL_KEY[resource.availability_status] ? t(STATUS_LABEL_KEY[resource.availability_status]) : resource.availability_status}
           </span>
         </div>
         {resource.category === 'shelter' && resource.beds_total != null && (
           <div className="flex items-center gap-2 mt-3 text-sm text-gray-600">
             <BedDouble size={15} />
-            <span><strong>{resource.beds_available ?? '?'}</strong> of <strong>{resource.beds_total}</strong> beds available</span>
+            <span>
+              <strong>{resource.beds_available ?? '?'}</strong> {t('resourceSheet.of')} <strong>{resource.beds_total}</strong> {t('resourceSheet.bedsAvailableLabel')}
+            </span>
           </div>
         )}
       </div>
