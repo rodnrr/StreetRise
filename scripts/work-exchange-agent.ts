@@ -389,11 +389,12 @@ function htmlToText(html: string): string {
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#0?39;|&apos;/gi, "'")
+    // Decode ampersands last so a double-encoded entity loses only one layer.
+    .replace(/&amp;/gi, '&')
     .replace(/[ \t ]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
