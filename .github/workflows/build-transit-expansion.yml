@@ -19,7 +19,7 @@ on:
       - package-lock.json
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-gtfs:
@@ -27,6 +27,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - uses: actions/setup-node@v4
         with:
@@ -116,17 +118,21 @@ jobs:
             'https://www.psta.net/latest/google_transit.zip'
           build_feed lynx 051_seed_lynx_transit.sql \
             'http://gtfsrt.golynx.com/gtfsrt/google_transit.zip'
-          build_feed hernando 052_seed_hernando_transit.sql \
+
+          # Hernando's county-hosted GTFS is checked but is currently stale. It
+          # intentionally uses a candidate filename and is never committed by
+          # the step below unless a future county feed becomes current.
+          build_feed hernando candidate_hernando_transit.sql \
             'https://media-002-us.cdn.govstack.com/hernandocounty-us/media/zkqclmfs/current-gtfs-thehernandoexpress-fl-us.zip'
 
           # Broward's producer URL currently responds 403. This is the latest
           # official BCT archive held by Mobility Database (mdb-330), downloaded
           # 2026-06-30 and validated there with 44 routes. Keep this URL pinned
           # to the exact archived snapshot for reproducibility.
-          build_feed bct 053_seed_bct_transit.sql \
+          build_feed bct 052_seed_bct_transit.sql \
             'https://files.mobilitydatabase.org/mdb-330/mdb-330-202606300003/mdb-330-202606300003.zip'
 
-          build_feed citrus 054_seed_citrus_connection_transit.sql \
+          build_feed citrus 053_seed_citrus_connection_transit.sql \
             'https://www.ccbusinfo.com/InfoPoint/gtfs-zip.ashx'
 
           echo '--- build report ---'
@@ -140,3 +146,49 @@ jobs:
           path: generated-transit/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Commit validated feed migrations to expansion branch
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=(
+            050_seed_psta_transit.sql
+            051_seed_lynx_transit.sql
+            052_seed_bct_transit.sql
+            053_seed_citrus_connection_transit.sql
+          )
+
+          for file in "${expected[@]}"; do
+            test -s "generated-transit/$file" || {
+              echo "Refusing to commit: missing validated migration $file" >&2
+              exit 1
+            }
+          done
+
+          # Hernando is intentionally excluded until its published GTFS is
+          # current. A stale candidate must never reach supabase/migrations.
+          if [ -e generated-transit/candidate_hernando_transit.sql ]; then
+            echo 'Refusing to commit: Hernando candidate was not rejected as stale' >&2
+            exit 1
+          fi
+
+          cp generated-transit/050_seed_psta_transit.sql supabase/migrations/
+          cp generated-transit/051_seed_lynx_transit.sql supabase/migrations/
+          cp generated-transit/052_seed_bct_transit.sql supabase/migrations/
+          cp generated-transit/053_seed_citrus_connection_transit.sql supabase/migrations/
+
+          git config user.name 'StreetRise GTFS Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add supabase/migrations/050_seed_psta_transit.sql \
+                  supabase/migrations/051_seed_lynx_transit.sql \
+                  supabase/migrations/052_seed_bct_transit.sql \
+                  supabase/migrations/053_seed_citrus_connection_transit.sql
+
+          if git diff --cached --quiet; then
+            echo 'Validated feed migrations already match the branch.'
+            exit 0
+          fi
+
+          git commit -m 'feat: add verified transit coverage feeds'
+          git push origin HEAD:${{ github.head_ref }}
