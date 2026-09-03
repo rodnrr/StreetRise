@@ -118,14 +118,27 @@ const horizon = addDays(asOf, LOOKAHEAD_DAYS)
 type ServiceDays = { weekday: boolean; saturday: boolean; sunday: boolean }
 const activeService = new Map<string, ServiceDays>()
 
+const WEEKDAY_COLUMNS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+const ALL_DAY_COLUMNS = [...WEEKDAY_COLUMNS, 'saturday', 'sunday']
+
 for (const c of readTable('calendar.txt')) {
-  if (c.start_date <= asOf && asOf <= c.end_date) {
-    activeService.set(c.service_id, {
-      weekday: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].some((d) => c[d] === '1'),
-      saturday: c.saturday === '1',
-      sunday: c.sunday === '1',
-    })
-  }
+  if (c.start_date > asOf || asOf > c.end_date) continue
+  // An all-zero weekly pattern describes NO regular operating day. GTFS uses
+  // that shape for exception-only services whose real dates live in
+  // calendar_dates.txt. Activating it here would be wrong twice over: the
+  // service would carry no day coverage at all, AND — because the additions
+  // loop below skips ids already present — it would never get the dates it
+  // actually runs on, so its trips could be emitted while its only real
+  // service date sits outside the horizon. Treating it as undescribed lets it
+  // fall through to the calendar_dates path, which is where its truth is.
+  // (Caught in review on PR #100; none of the four loaded feeds contains such
+  // a row today, so this changes no current output.)
+  if (!ALL_DAY_COLUMNS.some((d) => c[d] === '1')) continue
+  activeService.set(c.service_id, {
+    weekday: WEEKDAY_COLUMNS.some((d) => c[d] === '1'),
+    saturday: c.saturday === '1',
+    sunday: c.sunday === '1',
+  })
 }
 const fromCalendarCount = activeService.size
 
@@ -259,6 +272,19 @@ for await (const line of rl) {
     a = { routeIds: new Set(), weekday: false, saturday: false, sunday: false, first: null, last: null }
     agg.set(stopId, a)
   }
+  // A call that forbids BOTH boarding and alighting is a timing point, not a
+  // usable stop: nobody can get on or off. Counting its route and day coverage
+  // would advertise service a passenger cannot take — for example claiming
+  // Sunday service at a stop whose only Sunday call is one of these. Measured
+  // across the four loaded feeds, skipping these corrects the route list on 2
+  // of 11,091 stops, both in Miami-Dade: mdt:7836 no longer credits MIAALP and
+  // mdt:9656 no longer credits 301. No stop is dropped and no day coverage or
+  // service window moves, because every affected stop is boardable on some
+  // other call. (Caught in review on PR #100.)
+  const noPickup = cells[idx.pickup_type]?.trim() === '1'
+  const noDropOff = cells[idx.drop_off_type]?.trim() === '1'
+  if (noPickup && noDropOff) continue
+
   a.routeIds.add(meta.routeId)
   a.weekday ||= meta.days.weekday
   a.saturday ||= meta.days.saturday
@@ -266,7 +292,7 @@ for await (const line of rl) {
   // pickup_type '1' means no boarding here — a drop-off-only call cannot be
   // the "first bus" for someone standing at the stop. Trimmed for the same
   // right-alignment reason as the times above.
-  if (meta.days.weekday && cells[idx.pickup_type]?.trim() !== '1') {
+  if (meta.days.weekday && !noPickup) {
     const t = toMinutes(cells[idx.departure_time] || cells[idx.arrival_time])
     if (t != null) {
       a.first = a.first == null ? t : Math.min(a.first, t)

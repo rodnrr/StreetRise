@@ -1,10 +1,18 @@
 # Applying Migration 041 — Transportation Assistance Seed
 
-**Status: NOT APPLIED.** Written 2026-09-03 alongside the transportation
-assistance layer. There is verification work to do *before* it goes in — see
-[Verify the facts first](#verify-the-facts-first). The app code that reads
-these rows is already merged and degrades honestly without them: `/transportation`
-renders its "No transportation programs listed yet" empty state.
+**Status: APPLIED to live 2026-09-03**, together with migration 047, by the
+maintainer. Verified from this session by reading live: all six
+`category = 'transportation'` rows are present, `pending`, and off-map
+(`lat`/`lng` NULL, `is_map_ready = FALSE`) as designed, and 047's corrections
+landed — PSTA Access and Mobility-on-Demand carry `(727) 540-1888`, the TD and
+Direct Connect rows keep `(727) 540-1900`, and every `website` is a programme
+deep link rather than an org root.
+
+This runbook is kept as the record of what was applied and, more importantly,
+of **what is still unverified in the seeded data** — see
+[Verify the facts first](#verify-the-facts-first). Every row is `pending`, so
+nothing here claims to be staff-verified; do not flip one to `verified` without
+a real check.
 
 ## Why it exists
 
@@ -74,6 +82,38 @@ One correction to the brief was applied in the file: HARTPlus reservations are
 documented as **one to three days** in advance, not specifically "the day
 before".
 
+### Migration 047 resolved most of this — and is applied
+
+**After this section was written, the maintainer reached the agencies' own
+pages on 2026-09-03; `047_correct_transportation_seed_accuracy.sql` records
+what they found, and it is applied to live.** It is the answer to most of the
+table below. Anywhere the two disagree, **047 is right and the text below is
+the superseded first pass** — kept because the corrections are more legible
+next to what they corrected.
+
+What 047 settles:
+
+- **Phone numbers were wrong.** PSTA Access and Mobility-on-Demand are
+  `(727) 540-1888`, not the `(727) 540-1900` seeded for all of them — that
+  number is for TD applications and general information. This was the entry in
+  the table below flagged as the one that strands someone.
+- **`website` now deep-links each programme** to its current official page
+  instead of pointing at the org root.
+- **The HARTPlus timing "correction" above was itself wrong.** Reservations are
+  required **the day before** service, as the original brief said — so the
+  maintainer's brief was right and the public sources this session found were
+  not. Worth reading as a caution about the rest of this section.
+- **Eligibility determination** is completed **within 21 days after the
+  application process is complete** — an upper bound, not the "at least 21
+  days" floor seeded here, which was pessimistic in a way that could discourage
+  someone from applying.
+- **The MOD description no longer names a specific taxi vendor**, because
+  PSTA's own pages are not internally consistent about it.
+
+Still unverified after 047, so still check before flipping any row to
+`verified`: the **eight designated transit locations** figure for Direct
+Connect, and both street addresses.
+
 **Check these before flipping any row to `verified`:**
 
 | Claim | Where | Why it matters |
@@ -111,11 +151,21 @@ Direct Connect and Travel Training requires approval *before* a first trip.
 Someone who needs a ride in the next hour will not get it from an enrollment
 programme, and the finder says so rather than listing it as an answer.
 
-## How to apply
+## How it was applied (and how to re-run it)
+
+Done on live 2026-09-03. Recorded here for a rebuild or a second environment:
 
 1. Supabase dashboard → project `mldatfcwnmvrmxumzxyb` → **SQL Editor**.
 2. Paste `supabase/migrations/041_seed_transportation_assistance.sql`.
 3. Run it once.
+4. **Then paste and run `supabase/migrations/047_correct_transportation_seed_accuracy.sql`.**
+   041 seeds the rows; 047 corrects the phone numbers, deep links and timing
+   language in them (see above). **Never run 041 without 047** — 041 alone
+   publishes `(727) 540-1900` on PSTA Access and Mobility-on-Demand, which is
+   the general InfoLine rather than the programme's own number.
+
+Both are safe to re-run: 041's `INSERT`s are `ON CONFLICT (id) DO NOTHING` over
+stable uuid5 ids, and 047's `UPDATE`s are keyed by `external_id`.
 
 Idempotent: both `INSERT`s are `ON CONFLICT (id) DO NOTHING` over stable uuid5
 ids (`uuid5(NAMESPACE_URL, 'https://streetrise.org/seed/041/<external_id>')`),

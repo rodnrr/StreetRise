@@ -284,6 +284,11 @@ export default function TransportationPage() {
     () => rankRideOptions(programs ?? [], answers, {
       destinationCity: destination?.city,
       originText,
+      // Geolocation answers "where are you now" without yielding a city, so
+      // the ranking is told a starting point EXISTS even when it cannot be
+      // placed. That is a different unknown from skipping the question, and
+      // scores differently — see rideOptions' ScoreContext.originProvided.
+      originProvided: !!origin || !!originText.trim(),
       t,
     }),
     // `lang`, not `t`: the translator is a fresh closure every render, so
@@ -294,7 +299,7 @@ export default function TransportationPage() {
     // explanations under freshly re-rendered headings (caught in review on
     // PR #100).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [programs, answers, destination?.city, originText, lang],
+    [programs, answers, destination?.city, originText, origin, lang],
   )
 
   const inArea = ranked.filter((o) => o.fit !== 'other_area')
@@ -314,8 +319,13 @@ export default function TransportationPage() {
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        // Deliberately does NOT clear what they typed. Coordinates are the
+        // better routing target, but only the text can be resolved to a county
+        // for service-area matching — there is no reverse geocoder here — so
+        // clearing it threw away the one input the ranking could actually use
+        // (caught in review on PR #100). Both are kept: coordinates win for the
+        // map link, text drives the matching.
         setOrigin({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-        setOriginText('')
         setLocating(false)
       },
       () => {
@@ -604,7 +614,15 @@ export default function TransportationPage() {
             subtitle={t('transportation.directorySubtitle')}
           />
           {isLoading && <div className="space-y-3">{[0, 1].map((i) => <div key={i} className="skeleton h-24" />)}</div>}
-          {!isLoading && (programs?.length ?? 0) === 0 && (
+          {isError && (
+            <EmptyState icon={SearchX} title={t('map.loadError')} description={t('map.loadErrorHint')} />
+          )}
+          {/* `!isError` matters: on a failed fetch `programs` is undefined and
+              isLoading is false, so without it the directory told visitors no
+              transportation programmes exist when in fact the query failed
+              (caught in review on PR #100). The results view already guarded
+              this; the directory did not. */}
+          {!isLoading && !isError && (programs?.length ?? 0) === 0 && (
             <EmptyState
               icon={SearchX}
               title={t('ride.noProgramsTitle')}
