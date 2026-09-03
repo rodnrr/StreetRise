@@ -1,14 +1,12 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Phone, Globe, MapPin, Clock, BedDouble, ChevronLeft, CheckCircle, XCircle, AlertTriangle, ArrowRight } from 'lucide-react'
+import { Phone, Globe, MapPin, Clock, BedDouble, ChevronLeft, CheckCircle, XCircle, ArrowRight } from 'lucide-react'
 import { db } from '@/lib/supabase'
 import {
   CATEGORY_EMOJI,
   RESOURCE_TYPE_LABEL_KEY,
   GENDER_POLICY_LABEL_KEY,
   POPULATION_FOCUS_LABEL_KEY,
-  getTrustInfo,
-  TRUST_LEVEL_CLASSES,
 } from '@/lib/mapFilters'
 import { useI18n } from '@/lib/i18n'
 import type { Resource } from '@/types'
@@ -30,19 +28,6 @@ function VerificationBadge({ status }: { status: string }) {
     )
   }
   return null
-}
-
-function TrustAlert({ resource }: { resource: Resource }) {
-  const { t } = useI18n()
-  const { labelKey, labelParams, level } = getTrustInfo(resource)
-  if (level === 'fresh' || level === 'recent') return null
-  const label = labelParams ? t(labelKey).replace('{days}', labelParams.days) : t(labelKey)
-  return (
-    <div className={`flex items-start gap-2.5 rounded-xl p-3 mb-4 ${TRUST_LEVEL_CLASSES[level]}`}>
-      <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-      <p className="text-sm font-medium">{label} — {t('resourceDetail.confirmBeforeVisiting')}</p>
-    </div>
-  )
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -145,9 +130,6 @@ export default function ResourceDetailPage() {
       <Link to="/map" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
         <ChevronLeft size={16} /> {t('resourceDetail.backToMap')}
       </Link>
-
-      {/* Trust alert (aging/stale resources) */}
-      <TrustAlert resource={resource} />
 
       {/* Hero */}
       <div className="card">

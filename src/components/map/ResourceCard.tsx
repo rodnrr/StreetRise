@@ -3,7 +3,6 @@ import clsx from 'clsx'
 import {
   CATEGORY_EMOJI,
   RESOURCE_TYPE_LABEL_KEY,
-  getTrustInfo,
 } from '@/lib/mapFilters'
 import { formatDistance } from '@/lib/geo'
 import { useI18n } from '@/lib/i18n'
@@ -59,7 +58,6 @@ interface Props {
  */
 export default function ResourceCard({ resource: r, distanceKm, isSelected, onClick }: Props) {
   const { t } = useI18n()
-  const trust = getTrustInfo(r)
 
   return (
     <button
@@ -113,13 +111,6 @@ export default function ResourceCard({ resource: r, distanceKm, isSelected, onCl
             <span className="text-xs text-gray-400 inline-flex items-center gap-0.5">
               <Phone size={10} /> {t('resourceCard.phone')}
             </span>
-          )}
-          {/* Staleness, not a requirement — worded to match getTrustInfo's own
-              "May be outdated" label. It used to say "Call first" too, which
-              collided with the real requirement above and made one string mean
-              two different things. */}
-          {trust.level === 'stale' && (
-            <span className="text-xs text-red-600">{t('status.mayBeOutdated')}</span>
           )}
           {(r.access_type === 'confidential_address' || r.access_type === 'phone_intake') && (
             <span className="text-xs text-gray-400 inline-flex items-center gap-0.5">
