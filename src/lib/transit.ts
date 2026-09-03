@@ -68,17 +68,17 @@ export interface TransitRoute {
 
 /** Public brand name for an agency slug, as the agency itself writes it. */
 export const AGENCY_LABEL: Record<string, string> = {
-  hart:     'HART',
-  mcat:     'MCAT',
-  mdt:      'Miami-Dade Transit',
-  pasco:    'GoPasco',
-  psta:     'PSTA',
-  lynx:     'LYNX',
-  hernando: 'TheBus',
-  bct:      'Broward County Transit',
-  citrus:   'Citrus Connection',
-  sunrail:  'SunRail',
-  trirail:  'Tri-Rail',
+  hart:              'HART',
+  mcat:              'MCAT',
+  mdt:               'Miami-Dade Transit',
+  pasco:             'GoPasco',
+  psta:              'PSTA',
+  lynx:              'LYNX',
+  hernando:          'TheBus',
+  bct:               'Broward County Transit',
+  citrus_connection: 'Citrus Connection',
+  sunrail:           'SunRail',
+  trirail:           'Tri-Rail',
 }
 
 /**
@@ -107,7 +107,7 @@ export const AGENCIES_BY_COUNTY: Record<string, string[]> = {
   osceola:      ['lynx'],
   seminole:     ['lynx'],
   broward:      ['bct'],
-  polk:         ['citrus'],
+  polk:         ['citrus_connection'],
 }
 
 /** Within this, the stop is a normal walk — the standard quarter-mile rule. */
