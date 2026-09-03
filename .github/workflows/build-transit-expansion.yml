@@ -1,0 +1,113 @@
+name: Build transit expansion migrations
+
+on:
+  push:
+    branches:
+      - feat/transit-coverage-expansion
+    paths:
+      - .github/workflows/build-transit-expansion.yml
+      - scripts/build-transit-sql.ts
+      - package.json
+      - package-lock.json
+
+permissions:
+  contents: read
+
+jobs:
+  build-gtfs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Download and validate official GTFS feeds
+        shell: bash
+        run: |
+          set -u
+          mkdir -p /tmp/streetrise-gtfs generated-transit
+          REPORT=generated-transit/build-report.txt
+          : > "$REPORT"
+
+          build_feed() {
+            slug="$1"
+            migration="$2"
+            url="$3"
+            zip="/tmp/streetrise-gtfs/${slug}.zip"
+            dir="/tmp/streetrise-gtfs/${slug}"
+
+            echo "=== ${slug} ===" | tee -a "$REPORT"
+            echo "source=${url}" | tee -a "$REPORT"
+
+            if ! curl --fail --location --retry 3 --retry-delay 2 \
+              --connect-timeout 20 --max-time 180 \
+              --user-agent 'StreetRise GTFS importer (https://streetrise.org)' \
+              "$url" -o "$zip"; then
+              echo "status=DOWNLOAD_FAILED" | tee -a "$REPORT"
+              echo | tee -a "$REPORT"
+              return 0
+            fi
+
+            sha256sum "$zip" | tee -a "$REPORT"
+            mkdir -p "$dir"
+            if ! unzip -q "$zip" -d "$dir"; then
+              echo "status=UNZIP_FAILED" | tee -a "$REPORT"
+              echo | tee -a "$REPORT"
+              return 0
+            fi
+
+            missing=0
+            for required in agency.txt routes.txt stops.txt trips.txt stop_times.txt; do
+              if [ ! -f "$dir/$required" ]; then
+                echo "missing=${required}" | tee -a "$REPORT"
+                missing=1
+              fi
+            done
+            if [ "$missing" -ne 0 ]; then
+              echo "status=INVALID_GTFS" | tee -a "$REPORT"
+              echo | tee -a "$REPORT"
+              return 0
+            fi
+
+            echo "files=$(find "$dir" -maxdepth 1 -type f -printf '%f ' | sort)" | tee -a "$REPORT"
+            if npm run transit:sql -- "$dir" "$slug" 20260903 \
+              > "generated-transit/${migration}" \
+              2> "generated-transit/${slug}-import.log"; then
+              echo "status=OK" | tee -a "$REPORT"
+              echo "migration=${migration}" | tee -a "$REPORT"
+              echo "bytes=$(wc -c < "generated-transit/${migration}")" | tee -a "$REPORT"
+            else
+              echo "status=IMPORT_FAILED" | tee -a "$REPORT"
+              rm -f "generated-transit/${migration}"
+            fi
+            echo | tee -a "$REPORT"
+          }
+
+          build_feed psta 050_seed_psta_transit.sql \
+            'https://www.psta.net/latest/google_transit.zip'
+          build_feed lynx 051_seed_lynx_transit.sql \
+            'https://gtfsrt.golynx.com/gtfsrt/google_transit.zip'
+          build_feed hernando 052_seed_hernando_transit.sql \
+            'https://media-002-us.cdn.govstack.com/hernandocounty-us/media/zkqclmfs/current-gtfs-thehernandoexpress-fl-us.zip'
+          build_feed bct 053_seed_bct_transit.sql \
+            'https://www.broward.org/bct/documents/google_transit.zip'
+          build_feed citrus 054_seed_citrus_connection_transit.sql \
+            'https://www.ccbusinfo.com/InfoPoint/gtfs-zip.ashx'
+
+          echo '--- build report ---'
+          cat "$REPORT"
+
+      - name: Upload generated migrations and validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: transit-expansion-generated
+          path: generated-transit/
+          if-no-files-found: error
+          retention-days: 7
