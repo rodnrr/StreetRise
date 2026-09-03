@@ -6,14 +6,26 @@ type Block =
   | { type: 'hr' }
 
 const MARKDOWN_BLOCK_RE = /^(#{2,3}\s|[-*]\s|\d+\.\s|>\s|---\s*$)/m
+const LINK_VALIDATION_BASE = new URL('https://streetrise.invalid/blog/post')
 
 function safeHref(value: string): string | null {
   const href = value.trim()
   if (!href) return null
-  if (href.startsWith('/')) return href
+
   try {
-    const url = new URL(href)
-    return ['http:', 'https:', 'mailto:'].includes(url.protocol) ? href : null
+    const resolved = new URL(href, LINK_VALIDATION_BASE)
+    const hasExplicitScheme = /^[a-z][a-z0-9+.-]*:/i.test(href)
+
+    if (hasExplicitScheme) {
+      return ['http:', 'https:', 'mailto:'].includes(resolved.protocol) ? href : null
+    }
+
+    // Document-relative forms such as `resource-name`, `../resources`,
+    // `?page=2`, `#details`, and `/map` are safe only when resolving them
+    // cannot change the origin. This also rejects protocol-relative URLs
+    // (`//example.com`) and backslash variants that URL parsing treats as a
+    // host change.
+    return resolved.origin === LINK_VALIDATION_BASE.origin ? href : null
   } catch {
     return null
   }
