@@ -4,7 +4,7 @@ This record documents the static GTFS inputs evaluated for the StreetRise transi
 
 All feeds were downloaded in GitHub Actions, checked for the required GTFS tables (`agency.txt`, `routes.txt`, `stops.txt`, `trips.txt`, `stop_times.txt`), SHA-256 hashed, and processed with `scripts/build-transit-sql.ts` using an explicit reference date of `20260903`.
 
-Raw GTFS ZIP archives are **not** committed to the repository. Only generated SQL migrations and this provenance record are retained. As of migration 054, future generator runs call the single canonical `refresh_transit_accessibility_flags()` function, so feed refreshes inherit the current-feed / exactly-one-mile accessibility rule rather than carrying a duplicate proximity implementation.
+Raw GTFS ZIP archives are **not** committed to the repository. Only generated SQL migrations and this provenance record are retained. Future generator runs after migration 054 call the single canonical `refresh_transit_accessibility_flags()` function, so feed refreshes inherit the current-feed / exactly-one-mile accessibility rule rather than carrying a duplicate proximity implementation.
 
 ## Accepted feeds
 
