@@ -35,7 +35,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Download and validate official GTFS feeds
+      - name: Download and validate GTFS feeds
         shell: bash
         run: |
           set -u
@@ -49,6 +49,7 @@ jobs:
             url="$3"
             zip="/tmp/streetrise-gtfs/${slug}.zip"
             dir="/tmp/streetrise-gtfs/${slug}"
+            out="generated-transit/${migration}"
 
             echo "=== ${slug} ===" | tee -a "$REPORT"
             echo "source=${url}" | tee -a "$REPORT"
@@ -84,27 +85,47 @@ jobs:
             fi
 
             echo "files=$(find "$dir" -maxdepth 1 -type f -printf '%f ' | sort)" | tee -a "$REPORT"
-            if npm run transit:sql -- "$dir" "$slug" 20260903 \
-              > "generated-transit/${migration}" \
-              2> "generated-transit/${slug}-import.log"; then
-              echo "status=OK" | tee -a "$REPORT"
-              echo "migration=${migration}" | tee -a "$REPORT"
-              echo "bytes=$(wc -c < "generated-transit/${migration}")" | tee -a "$REPORT"
+
+            # Call tsx directly. `npm run` writes its command banner to stdout,
+            # which would make the captured file invalid SQL.
+            if npx tsx scripts/build-transit-sql.ts "$dir" "$slug" 20260903 \
+              > "$out" 2> "generated-transit/${slug}-import.log"; then
+              valid_until=$(sed -n 's/^-- Active service .* feed valid until \([0-9-]*\)\.$/\1/p' "$out" | head -1)
+              echo "feed_valid_until=${valid_until:-unknown}" | tee -a "$REPORT"
+
+              # Never make a commit-ready migration from a GTFS archive whose
+              # own published validity has already ended. Keep the importer log
+              # and report as evidence, but discard the SQL.
+              if [ -n "$valid_until" ] && [[ "$valid_until" < "2026-09-03" ]]; then
+                echo "status=STALE_FEED" | tee -a "$REPORT"
+                rm -f "$out"
+              else
+                echo "status=OK" | tee -a "$REPORT"
+                echo "migration=${migration}" | tee -a "$REPORT"
+                echo "bytes=$(wc -c < "$out")" | tee -a "$REPORT"
+              fi
             else
               echo "status=IMPORT_FAILED" | tee -a "$REPORT"
-              rm -f "generated-transit/${migration}"
+              rm -f "$out"
             fi
             echo | tee -a "$REPORT"
           }
 
+          # Direct agency-published feeds where they are currently fetchable.
           build_feed psta 050_seed_psta_transit.sql \
             'https://www.psta.net/latest/google_transit.zip'
           build_feed lynx 051_seed_lynx_transit.sql \
-            'https://gtfsrt.golynx.com/gtfsrt/google_transit.zip'
+            'http://gtfsrt.golynx.com/gtfsrt/google_transit.zip'
           build_feed hernando 052_seed_hernando_transit.sql \
             'https://media-002-us.cdn.govstack.com/hernandocounty-us/media/zkqclmfs/current-gtfs-thehernandoexpress-fl-us.zip'
+
+          # Broward's producer URL currently responds 403. This is the latest
+          # official BCT archive held by Mobility Database (mdb-330), downloaded
+          # 2026-06-30 and validated there with 44 routes. Keep this URL pinned
+          # to the exact archived snapshot for reproducibility.
           build_feed bct 053_seed_bct_transit.sql \
-            'https://www.broward.org/bct/documents/google_transit.zip'
+            'https://files.mobilitydatabase.org/mdb-330/mdb-330-202606300003/mdb-330-202606300003.zip'
+
           build_feed citrus 054_seed_citrus_connection_transit.sql \
             'https://www.ccbusinfo.com/InfoPoint/gtfs-zip.ashx'
 
