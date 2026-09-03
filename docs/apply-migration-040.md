@@ -1,8 +1,10 @@
 # Applying Migration 040 — Extend Staleness Window to 90 Days
 
-**Status: not yet applied to live.** Hand-apply via the Supabase SQL editor,
-same as every other migration in this repo — see `CLAUDE.md` → Database
-Migrations for why this is by hand and not via `supabase db push`.
+**Status: APPLIED — verified live 2026-09-03.** Before: 217/217 rows at the
+old default (30). After: 0 rows below 90, all 217 at exactly 90,
+`stale_after_days` column default is 90, and `max(updated_at)` across
+`resources` is byte-identical before and after (`2026-09-03 02:45:09.197833+00`)
+— confirming the backfill did not manufacture false freshness.
 
 ## Why it exists
 
