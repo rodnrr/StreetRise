@@ -1,10 +1,18 @@
 # Applying Migration 041 — Transportation Assistance Seed
 
-**Status: NOT APPLIED.** Written 2026-09-03 alongside the transportation
-assistance layer. There is verification work to do *before* it goes in — see
-[Verify the facts first](#verify-the-facts-first). The app code that reads
-these rows is already merged and degrades honestly without them: `/transportation`
-renders its "No transportation programs listed yet" empty state.
+**Status: APPLIED to live 2026-09-03**, together with migration 047, by the
+maintainer. Verified from this session by reading live: all six
+`category = 'transportation'` rows are present, `pending`, and off-map
+(`lat`/`lng` NULL, `is_map_ready = FALSE`) as designed, and 047's corrections
+landed — PSTA Access and Mobility-on-Demand carry `(727) 540-1888`, the TD and
+Direct Connect rows keep `(727) 540-1900`, and every `website` is a programme
+deep link rather than an org root.
+
+This runbook is kept as the record of what was applied and, more importantly,
+of **what is still unverified in the seeded data** — see
+[Verify the facts first](#verify-the-facts-first). Every row is `pending`, so
+nothing here claims to be staff-verified; do not flip one to `verified` without
+a real check.
 
 ## Why it exists
 
@@ -74,12 +82,14 @@ One correction to the brief was applied in the file: HARTPlus reservations are
 documented as **one to three days** in advance, not specifically "the day
 before".
 
-### Migration 047 resolves most of this — apply it too
+### Migration 047 resolved most of this — and is applied
 
-**Since this runbook was written, the maintainer reached the agencies' own
-pages on 2026-09-03 and `047_correct_transportation_seed_accuracy.sql` records
-what they found.** It is the answer to the table below, so **run 047 straight
-after 041**; 041 alone leaves the uncorrected values in place.
+**After this section was written, the maintainer reached the agencies' own
+pages on 2026-09-03; `047_correct_transportation_seed_accuracy.sql` records
+what they found, and it is applied to live.** It is the answer to most of the
+table below. Anywhere the two disagree, **047 is right and the text below is
+the superseded first pass** — kept because the corrections are more legible
+next to what they corrected.
 
 What 047 settles:
 
@@ -141,16 +151,21 @@ Direct Connect and Travel Training requires approval *before* a first trip.
 Someone who needs a ride in the next hour will not get it from an enrollment
 programme, and the finder says so rather than listing it as an answer.
 
-## How to apply
+## How it was applied (and how to re-run it)
+
+Done on live 2026-09-03. Recorded here for a rebuild or a second environment:
 
 1. Supabase dashboard → project `mldatfcwnmvrmxumzxyb` → **SQL Editor**.
 2. Paste `supabase/migrations/041_seed_transportation_assistance.sql`.
 3. Run it once.
 4. **Then paste and run `supabase/migrations/047_correct_transportation_seed_accuracy.sql`.**
    041 seeds the rows; 047 corrects the phone numbers, deep links and timing
-   language in them (see above). Applying 041 without 047 publishes a wrong
-   phone number on two listings. 047's updates are keyed by `external_id`, so
-   it is idempotent and safe to re-run.
+   language in them (see above). **Never run 041 without 047** — 041 alone
+   publishes `(727) 540-1900` on PSTA Access and Mobility-on-Demand, which is
+   the general InfoLine rather than the programme's own number.
+
+Both are safe to re-run: 041's `INSERT`s are `ON CONFLICT (id) DO NOTHING` over
+stable uuid5 ids, and 047's `UPDATE`s are keyed by `external_id`.
 
 Idempotent: both `INSERT`s are `ON CONFLICT (id) DO NOTHING` over stable uuid5
 ids (`uuid5(NAMESPACE_URL, 'https://streetrise.org/seed/041/<external_id>')`),

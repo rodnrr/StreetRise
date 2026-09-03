@@ -1,6 +1,31 @@
 # Applying Migrations 042–046 (+048) — Transit stops from four Florida GTFS feeds
 
-**Status: NOT APPLIED.** Written 2026-09-03.
+**Status: APPLIED to live 2026-09-03** (042–046 plus 048), by the maintainer.
+Verified from this session by reading live: **11,091 stops**, **184 routes**,
+four distinct feed fingerprints, and **35** `public_transit_accessible` flags
+carrying the `transit_feed` stamp.
+
+> ### ⚠️ One outstanding re-run: migration 045
+>
+> Live carries the **pre-correction** Miami-Dade rows. 045 was regenerated
+> after it was applied, to drop routes that neither board nor alight at a stop
+> (a `stop_times` call with `pickup_type = 1` **and** `drop_off_type = 1`).
+> Two stops on live are still wrong:
+>
+> | Stop | Says it is served by | Should be |
+> |---|---|---|
+> | `mdt:7836` — NW 20 ST & NW 5 PL | `MIAALP`, 20, 32 | 20, 32 |
+> | `mdt:9656` — SW 344 ST & SW 2 AV (E/F) | `301`, 302, 344 | 302, 344 |
+>
+> **Re-running 045 in full is the fix, and it is safe.** The upsert restamps
+> all 6,973 Miami-Dade rows with the new fingerprint `03abfad9b9e5`, so the
+> trailing `DELETE ... feed_fingerprint IS DISTINCT FROM` matches nothing;
+> neither stop moves, so no distance and no flag changes; and the backfill runs
+> with `resources_updated_at` disabled, as it always does. Verify with the
+> query at the end of this file.
+>
+> Low urgency — two stops each naming one route that passes through without
+> stopping — but it is a claim about service that a passenger cannot use.
 
 | Migration | Agency | County | Stops | Routes | Feed | Size |
 |---|---|---|---|---|---|---|
@@ -160,7 +185,10 @@ dense, so the TRUE flag is very likely right anyway, but **the underlying
 geocoding bug is real and worth fixing separately.** It is logged in
 `docs/OPEN_ITEMS.md`.
 
-## How to apply
+## How it was applied (and how to re-run it)
+
+Done on live 2026-09-03. Recorded here for a rebuild, a second environment, or
+the outstanding 045 re-run noted at the top.
 
 1. Supabase dashboard → project `mldatfcwnmvrmxumzxyb` → **SQL Editor**.
 2. Paste and run `supabase/migrations/042_transit_stops.sql`.
@@ -277,3 +305,22 @@ Then open a Tampa listing as an anonymous visitor and confirm the Get There
 panel shows the nearest stop — that is the RLS check, since `anon` has to read
 both tables. Open one of the Plant City parks and confirm it shows the amber
 "nearest HART stop is about 8 mi away" line instead.
+
+### Verifying the 045 re-run
+
+```sql
+-- Both rows should come back with the route that only passes through removed,
+-- and the new fingerprint. Before the re-run, 7836 lists MIAALP and 9656
+-- lists 301.
+SELECT id, stop_name, route_short_names, feed_fingerprint
+FROM transit_stops
+WHERE id IN ('mdt:7836', 'mdt:9656')
+ORDER BY id;
+
+-- Nothing should have been deleted: Miami-Dade stays at 6,973 stops, and every
+-- row should carry the new fingerprint.
+SELECT feed_fingerprint, count(*)
+FROM transit_stops
+WHERE agency = 'mdt'
+GROUP BY 1;
+```
