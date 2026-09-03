@@ -342,6 +342,14 @@ service under the currently-active calendar, carrying its coordinates, the
 routes calling there, day-type coverage, and the weekday service window; plus a
 small routes table with fares. Public-read / admin-write RLS mirroring `faq`.
 
+The app reads them through `nearest_transit_stop(lat, lng, radius_km)`, a
+`SECURITY INVOKER` SQL function (so RLS still applies) that narrows by bounding
+box and returns the single closest row. Nearest-neighbour is the one place the
+map's "fetch once, filter in the browser" rule does not apply: a 40 km box
+around downtown Miami holds 6,964 of 6,973 stops, so the ordering has to happen
+where the rows are. The distance the UI *displays* still comes from `geo.ts`,
+so only one implementation ever produces a user-visible number.
+
 Loaded from an agency's published GTFS bundle by `scripts/build-transit-sql.ts`,
 whose output is committed as a migration — so the provenance of every row is
 reproducible and a feed refresh is a re-run, not hand-editing. **Only

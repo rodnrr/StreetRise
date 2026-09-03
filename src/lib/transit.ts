@@ -100,8 +100,6 @@ export const AGENCY_BY_COUNTY: Record<string, string> = {
 
 /** Within this, the stop is a normal walk — the standard quarter-mile rule. */
 export const WALKABLE_KM = 0.4
-/** Beyond WALKABLE_KM but still a reasonable walk for someone with no option. */
-export const NEARBY_KM = 1.2
 /**
  * Outside this, treat the silence as "we hold no feed covering this address"
  * rather than "no bus". Wide enough to still reach the outlying Hillsborough
@@ -141,39 +139,23 @@ export type TransitLookup =
   | { kind: 'stale_feed' }
 
 /**
- * Degrees of latitude/longitude for a radius in km, used to build the
- * bounding box the query scans. Longitude degrees shrink towards the poles,
- * so the box is widened by 1/cos(lat) — at Tampa's latitude that is about
- * 13%. Both axes are then padded by 20% so the box can never clip a stop the
- * exact great-circle test would have accepted.
+ * The single closest stop within the radius, chosen by the database.
+ *
+ * The ordering has to happen server-side, and that is not an optimisation.
+ * A 40 km box around downtown Miami contains 6,964 of Miami-Dade's 6,973
+ * stops; an earlier revision fetched a capped, UNORDERED page of them and
+ * picked the nearest of whatever came back, which silently discarded 92% of
+ * the candidates and could report a farther stop, miss a walkable one, or
+ * wrongly conclude there was no coverage (caught in review on PR #100).
+ *
+ * `nearest_transit_stop()` (migration 042) does the bounding-box narrow and
+ * the distance ordering in one indexed query and returns exactly one row.
  */
-function boundingBox(origin: LatLng, radiusKm: number) {
-  const latDeg = (radiusKm / 111.32) * 1.2
-  const lngDeg = latDeg / Math.max(Math.cos((origin.lat * Math.PI) / 180), 0.1)
-  return {
-    minLat: origin.lat - latDeg, maxLat: origin.lat + latDeg,
-    minLng: origin.lng - lngDeg, maxLng: origin.lng + lngDeg,
-  }
-}
-
-async function stopsInBox(origin: LatLng, radiusKm: number): Promise<TransitStop[]> {
-  const b = boundingBox(origin, radiusKm)
-  const { data, error } = await db.transit_stops()
-    .select('*')
-    .gte('lat', b.minLat).lte('lat', b.maxLat)
-    .gte('lng', b.minLng).lte('lng', b.maxLng)
-    .limit(500)
+async function nearestStop(origin: LatLng, radiusKm: number): Promise<TransitStop | null> {
+  const { data, error } = await db.nearestTransitStop(origin.lat, origin.lng, radiusKm)
   if (error) throw error
-  return (data ?? []) as TransitStop[]
-}
-
-function nearest(origin: LatLng, stops: TransitStop[]): { stop: TransitStop; km: number } | null {
-  let best: { stop: TransitStop; km: number } | null = null
-  for (const stop of stops) {
-    const km = distanceKm(origin, { lat: stop.lat, lng: stop.lng })
-    if (!best || km < best.km) best = { stop, km }
-  }
-  return best
+  const rows = (data ?? []) as TransitStop[]
+  return rows[0] ?? null
 }
 
 /** True when the agency's published validity window has run out. */
@@ -185,11 +167,11 @@ export function isFeedExpired(stop: TransitStop, now: Date): boolean {
 /**
  * Find the nearest known stop to a point.
  *
- * Runs the tight box first because that is the answer in the overwhelming
- * majority of cases and keeps the scan to a handful of rows. Only when that
- * comes back empty does it widen — the wide query exists to distinguish "the
- * nearest stop is far" from "we have no data here", which are very different
- * things to tell someone.
+ * One query at the full coverage radius: the database returns the true
+ * nearest row, so there is no need to probe outwards and no risk of a capped
+ * page hiding the real answer. The radius is what distinguishes "the nearest
+ * stop is far" from "we hold no data here", which are very different things
+ * to tell someone.
  */
 export async function lookupNearestStop(
   origin: LatLng,
@@ -201,20 +183,24 @@ export async function lookupNearestStop(
   const coverage = coverageFor(opts.city)
   if (coverage === 'none') return { kind: 'no_coverage' }
 
-  let found = nearest(origin, await stopsInBox(origin, NEARBY_KM))
-  if (!found) found = nearest(origin, await stopsInBox(origin, COVERAGE_RADIUS_KM))
-  if (!found || found.km > COVERAGE_RADIUS_KM) return { kind: 'no_coverage' }
-  if (isFeedExpired(found.stop, now)) return { kind: 'stale_feed' }
+  const stop = await nearestStop(origin, COVERAGE_RADIUS_KM)
+  if (!stop) return { kind: 'no_coverage' }
+  if (isFeedExpired(stop, now)) return { kind: 'stale_feed' }
 
-  if (found.km <= WALKABLE_KM) {
-    const fareFreeRoutes = await fareFreeAmong(found.stop)
-    return { kind: 'walkable', stop: found.stop, km: found.km, fareFreeRoutes }
+  // The distance the UI SHOWS is measured here, with the same `geo.ts` helper
+  // the map uses, so there is exactly one implementation a user-visible number
+  // can come from. The copy of the formula inside the SQL function only ever
+  // decides which row wins.
+  const km = distanceKm(origin, { lat: stop.lat, lng: stop.lng })
+  if (km > COVERAGE_RADIUS_KM) return { kind: 'no_coverage' }
+
+  if (km <= WALKABLE_KM) {
+    return { kind: 'walkable', stop, km, fareFreeRoutes: await fareFreeAmong(stop) }
   }
   // Everything below here is a claim about ABSENCE — "nothing closer than
   // this" — which only the authoritative case has standing to make.
   if (coverage !== 'authoritative') return { kind: 'no_coverage' }
-  const fareFreeRoutes = await fareFreeAmong(found.stop)
-  return { kind: 'distant', stop: found.stop, km: found.km, fareFreeRoutes }
+  return { kind: 'distant', stop, km, fareFreeRoutes: await fareFreeAmong(stop) }
 }
 
 /**

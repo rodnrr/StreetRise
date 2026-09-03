@@ -26,13 +26,12 @@
 -- and nothing in the schema could express it before.
 --
 -- ── Why not PostGIS ─────────────────────────────────────────
--- The app queries a small lat/lng bounding box around one resource and
--- computes exact great-circle distance in the browser with the `geo.ts`
--- helpers it already uses for the map. That needs a plain btree index on
--- (lat, lng) and nothing else. Enabling PostGIS for a nearest-neighbour
--- query over 2,245 rows would be a new extension, a new dependency in the
--- app's mental model, and a second distance implementation that could
--- disagree with the one the map already ships.
+-- The nearest-stop lookup is a single `ORDER BY <haversine> LIMIT 1` inside
+-- the `nearest_transit_stop()` function below, narrowed first by a bounding
+-- box that the btree index on (lat, lng) can serve. For a few thousand rows
+-- per agency that is fast and exact. Enabling PostGIS would be a new
+-- extension and a new dependency in the app's mental model to buy an index
+-- this workload does not need.
 --
 -- ── Why an agency column ────────────────────────────────────
 -- This feed is HART, which is Hillsborough only. PSTA (Pinellas), LYNX
@@ -143,7 +142,77 @@ CREATE TRIGGER transit_routes_updated_at
 
 
 -- ════════════════════════════════════════════════════════════════
--- 3. RLS
+-- 3. nearest_transit_stop()
+-- ════════════════════════════════════════════════════════════════
+-- Nearest-neighbour lookup, server-side.
+--
+-- This deliberately does NOT follow the map's "fetch the set once, filter in
+-- the browser" pattern, and the difference matters. That pattern exists so
+-- every facet can show the number of results it would return; it works
+-- because the public resource set is a few hundred rows. Nearest-neighbour
+-- is a different shape of question over a much larger table: Miami-Dade
+-- alone is 6,973 stops, and a 40 km bounding box around downtown contains
+-- 6,964 of them. Shipping those to a phone to pick one is absurd, and
+-- capping the fetch instead — as an earlier revision of this did with an
+-- unordered `LIMIT 500` — silently discards 92% of the candidates before
+-- the nearest is chosen, which can report a farther stop, miss a walkable
+-- one, or wrongly claim no coverage (caught in review on PR #100).
+--
+-- Ordering has to happen where all the candidates are. The bounding box
+-- narrows the scan using the btree index; the haversine then orders only
+-- what survives, and LIMIT 1 returns a single row.
+--
+-- The app still measures the distance it DISPLAYS with `geo.ts`, the same
+-- helper the map uses, so there remains exactly one distance implementation
+-- that a user-visible number can come from. The copy of the formula here
+-- only ever decides ordering.
+--
+-- SECURITY INVOKER (the default, stated explicitly because it is load
+-- bearing) means RLS still applies to the caller — this function is a
+-- convenience, not a way around the policies below. `search_path` is pinned,
+-- per the hardening advice `get_advisors` gives for every other function in
+-- this schema.
+
+CREATE FUNCTION nearest_transit_stop(
+  in_lat       DOUBLE PRECISION,
+  in_lng       DOUBLE PRECISION,
+  in_radius_km DOUBLE PRECISION DEFAULT 40
+)
+RETURNS SETOF transit_stops
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+AS $$
+  WITH b AS (
+    -- Latitude degrees are ~111.32 km everywhere; longitude degrees shrink
+    -- towards the poles, hence the 1/cos(lat) widening. Both axes carry a
+    -- 20% margin so the box can never clip a stop the ORDER BY would have
+    -- ranked first. GREATEST() guards the polar singularity.
+    SELECT (in_radius_km / 111.32) * 1.2 AS lat_deg,
+           ((in_radius_km / 111.32) * 1.2)
+             / GREATEST(cos(radians(in_lat)), 0.1) AS lng_deg
+  )
+  SELECT s.*
+  FROM transit_stops s, b
+  WHERE s.lat BETWEEN in_lat - b.lat_deg AND in_lat + b.lat_deg
+    AND s.lng BETWEEN in_lng - b.lng_deg AND in_lng + b.lng_deg
+  ORDER BY 2 * 6371 * asin(sqrt(
+             sin(radians(s.lat - in_lat) / 2) ^ 2
+             + cos(radians(in_lat)) * cos(radians(s.lat))
+               * sin(radians(s.lng - in_lng) / 2) ^ 2
+           ))
+  LIMIT 1;
+$$;
+
+-- The Get There panel renders for visitors who never sign in, so anon needs
+-- to call this. RLS still gates which rows come back.
+GRANT EXECUTE ON FUNCTION nearest_transit_stop(DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION)
+  TO anon, authenticated;
+
+
+-- ════════════════════════════════════════════════════════════════
+-- 4. RLS
 -- ════════════════════════════════════════════════════════════════
 -- Public read, admin write — the same shape as `faq` and `blog_posts`.
 -- This is published open data from a public transit agency; there is

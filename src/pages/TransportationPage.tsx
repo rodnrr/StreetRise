@@ -234,7 +234,7 @@ function OptionCard({ option }: { option: RideOption }) {
 }
 
 export default function TransportationPage() {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const toast = useToast()
   const [params] = useSearchParams()
   const storedLocation = useMapStore((s) => s.userLocation)
@@ -282,9 +282,15 @@ export default function TransportationPage() {
 
   const ranked = useMemo(
     () => rankRideOptions(programs ?? [], answers, { destinationCity: destination?.city, t }),
-    // `t` is recreated each render; the language it closes over is what matters.
+    // `lang`, not `t`: the translator is a fresh closure every render, so
+    // depending on it would recompute the whole ranking each time. The active
+    // language is the thing that actually changes the output — every reason and
+    // caution below is a translated sentence, and without this a visitor who
+    // switched EN↔ES on the results screen kept the previous language's
+    // explanations under freshly re-rendered headings (caught in review on
+    // PR #100).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [programs, answers, destination?.city],
+    [programs, answers, destination?.city, lang],
   )
 
   const inArea = ranked.filter((o) => o.fit !== 'other_area')

@@ -50,6 +50,16 @@ export const db = {
   transit_stops:    () => supabase.from('transit_stops') as any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   transit_routes:   () => supabase.from('transit_routes') as any,
+  /**
+   * Nearest-neighbour stop lookup (migration 042). An RPC rather than a
+   * table read because ordering by distance has to happen where all the
+   * candidate rows are — see the function's own comment in that migration.
+   */
+  nearestTransitStop: (lat: number, lng: number, radiusKm: number) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).rpc('nearest_transit_stop', {
+      in_lat: lat, in_lng: lng, in_radius_km: radiusKm,
+    }),
 }
 
 export function subscribeToBedUpdates(
