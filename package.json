@@ -2,7 +2,7 @@
   "name": "streetrise",
   "version": "0.1.0",
   "private": true,
-  "description": "StreetRise — real-time resource discovery for people in need",
+  "description": "StreetRise \u2014 real-time resource discovery for people in need",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,7 +15,8 @@
     "agent:work": "npx tsx scripts/work-exchange-agent.ts",
     "worker:blog:typecheck": "tsc -p workers/blog-publisher/tsconfig.json",
     "worker:blog:dev": "wrangler dev --config workers/blog-publisher/wrangler.jsonc",
-    "worker:blog:deploy": "wrangler deploy --config workers/blog-publisher/wrangler.jsonc"
+    "worker:blog:deploy": "wrangler deploy --config workers/blog-publisher/wrangler.jsonc",
+    "transit:sql": "tsx scripts/build-transit-sql.ts"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",

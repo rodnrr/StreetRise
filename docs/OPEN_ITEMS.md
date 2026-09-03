@@ -1,5 +1,91 @@
 # Open Items
 
+## Session of 2026-09-03 — transportation assistance layer
+
+Shipped: `/transportation` (directory + Ride Assistance Finder), the "Get There"
+panel on the map sheet and `/resources/:id`, `src/lib/transport.ts`,
+`src/lib/rideOptions.ts`, `src/lib/transit.ts` (nearest bus stop from static
+GTFS, gated on per-county feed coverage), `scripts/build-transit-sql.ts`,
+`publicTags()`, EN/ES strings, and migrations 041–046. Open items this raised:
+
+- **Migration 041 is written but NOT applied, and has unverified facts in it.**
+  Read `docs/apply-migration-041.md` before running it. The authoring session
+  had no network route to `psta.net` or `gohart.org`, so phone numbers,
+  addresses, and the "eight designated transit locations" figure for PSTA
+  Direct Connect are all uncorroborated. Every row seeds as `pending` and every
+  description tells the reader to confirm with the agency, so nothing published
+  over-claims — but do not flip a row to `verified` without an actual check.
+- **Transportation coverage is Pinellas + Hillsborough only.** Public copy says
+  Tampa Bay, Orlando and Miami. Orlando (LYNX / ACCESS LYNX) and Miami-Dade
+  (Golden Passport, STS, Go Connect) have directly equivalent programmes and are
+  not seeded. The finder is honest about it — an Orlando visitor is told these
+  programmes serve a different service area rather than being shown a false
+  match — but it is a real hole. Next transportation batch should close it.
+- **The seeded transportation rows are deliberately not on the map**
+  (`is_map_ready = FALSE`, no coordinates). So applying 041 does *not* light up
+  the `transportation` need chip on `/map`; `isUsefulOption()` will keep hiding
+  it. That is the right call for countywide programmes with no public doorway,
+  and it is a decision worth re-taking rather than a bug — see the runbook's
+  "What it does NOT do" section.
+- **`COUNTY_BY_CITY` in `rideOptions.ts` is hand-maintained.** It maps the
+  cities StreetRise lists in to their Florida county, which is what lets the
+  finder tell a Pinellas programme from a Miami trip. A city that is missing
+  yields `null`, which the matcher treats as "maybe" rather than "no", so a gap
+  costs ranking quality and never hides a programme. Worth extending whenever a
+  seed batch adds a new metro.
+- **Migrations 042–046 (transit stops) are written but NOT applied.** Runbook:
+  `docs/apply-migrations-042-046.md`. Unlike 041, the data is first-hand — read
+  straight out of each agency's published GTFS bundle — so there is nothing to
+  verify, only to apply. Four feeds: HART (Hillsborough), MCAT (Manatee),
+  Miami-Dade Transit, GoPasco. 045 is ~1.4 MB and 043 ~410 KB, which are
+  unpleasant pastes on a phone; worth applying through tooling instead.
+- **PSTA and LYNX are the biggest remaining transit gaps.** Orlando has 31
+  public listings and Pinellas around 30 (Clearwater 12, St. Petersburg 11,
+  plus Largo, Safety Harbor, Tarpon Springs, Palm Harbor, Tierra Verde) — none
+  of them get a nearest-stop line, because `AGENCY_BY_COUNTY` correctly reports
+  no coverage for Orange, Osceola and Pinellas. Both agencies publish GTFS.
+  Adding either is `npm run transit:sql`, a new migration, and one line in
+  `AGENCY_BY_COUNTY`. Broward (13 listings) and Polk (23) are next after those.
+- **Feeds expire, and nothing currently watches for it.** Every stop carries
+  `feed_valid_until` and `src/lib/transit.ts` goes silent past it, so the
+  failure mode is safe — but silent. HART's feed runs out **2027-01-02**, MCAT's
+  2027-06-04, Miami-Dade's 2027-12-31; GoPasco publishes to 2031. When the first
+  one lapses the nearest-stop line will simply disappear for Hillsborough with
+  no warning anywhere. Worth an admin-dashboard check, or a calendar reminder to
+  re-run `npm run transit:sql` each quarter.
+- **`COUNTY_BY_CITY` now gates two features, not one.** It was added for the
+  Ride Assistance Finder; `transit.ts` reads it too, to decide whether we hold
+  an authoritative feed for an address. Verified 2026-09-03 that all 40 distinct
+  cities on live resolve. A city missing from it is not a crash but it does
+  suppress the "nearest stop is 8 miles away" line — which matters most for
+  exactly the remote listings whose towns are likeliest to be missing. Re-check
+  it whenever a seed batch adds a metro; the query is in that file's comment.
+- **Several listings share one rounded coordinate — real geocoding bug, found
+  2026-09-03.** Red Shield Center, Trinity Cafe Nebraska, Recuperative Care
+  Program and an emergency shelter all carry `27.9614,-82.4597`; three more
+  share `28.05071,-82.451` and three share `27.93536,-82.37841`. Those are
+  distinct services at distinct addresses — Red Shield and Trinity Cafe are
+  about 2 km apart. Surfaced by matching listings against HART stop
+  coordinates, where seven of the eleven "near transit" hits turned out to be
+  in these clusters. The transit backfill only ever raises a flag and all three
+  clusters are in stop-dense central Tampa, so the flag is very likely right
+  anyway — but the coordinates are wrong and every distance measured from them
+  is wrong with them. Re-geocode from the real street addresses.
+- **The GTFS importer had a silent time-parsing bug worth remembering.** HART
+  right-aligns single-digit hours (`' 5:01:41'`), so an anchored `\d+` pattern
+  rejected them and dropped every departure before 10am — making the first bus
+  of the day look like a mid-morning one on every stop in the feed. Caught by
+  cross-checking one stop against the raw file before shipping. Any future feed
+  importer should assume this kind of formatting slop rather than trusting the
+  spec.
+- **No route planning, by design.** The finder hands the trip to Google or Apple
+  Maps rather than computing an itinerary. If StreetRise ever wants "PSTA Route
+  18 → 52, 47 minutes" in its own UI, that needs a real GTFS/routing backend and
+  is a much larger piece of work — not a tweak to `transport.ts`.
+
+---
+
+
 ## Session of 2026-09-01 — full cross-reference audit (GitHub, Supabase, main)
 
 Ran at the maintainer's request: cross-check `CLAUDE.md`/`README.md`/this file against actual `main`, all GitHub branches/PRs, and live Supabase (project `mldatfcwnmvrmxumzxyb`), since two weeks of merged work (2026-08-19 through 08-31) had never been reflected in the docs. `CLAUDE.md` and `README.md` were rewritten to match; this entry records what changed and what's still open from that pass.
@@ -135,7 +221,7 @@ exactly one error — `supabase.from('bookings') as any` at `supabase.ts:29` —
 
 ---
 
-## Next commit — internal tags are leaking onto public pages
+## Internal tags were leaking onto public pages (CLOSED 2026-09-03)
 
 `src/pages/ResourceDetailPage.tsx` lines ~307–313 render **every** tag as a
 public badge with no filtering:
@@ -186,6 +272,16 @@ silently swallow a future legitimate tag that happens to contain a colon.
 
 Also check whether these tags feed the SEO description or structured data on
 that page before shipping, so they don't leak via metadata instead.
+
+**Closed 2026-09-03**, shipped exactly as recommended above. `publicTags()` now
+lives in `src/lib/mapFilters.ts` and `ResourceDetailPage.tsx` renders
+`publicTags(resource.tags)`, dropping the block entirely when nothing survives
+the filter. `ride` was added to `INTERNAL_TAG_PREFIXES` at the same time — the
+transportation layer's `ride:kind:` / `ride:mode:` / `ride:elig:` / `ride:area:`
+/ `ride:notice:` vocabulary (migration 041) would otherwise have made this leak
+five families worse on every transportation listing. Checked and clear on the
+metadata question: `ResourceDetailPage` renders no `SeoHead` and no structured
+data, so tags were never reaching page metadata.
 
 ---
 

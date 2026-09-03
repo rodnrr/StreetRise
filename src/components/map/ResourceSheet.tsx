@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Phone, Globe, MapPin, Users, X, CheckCircle, Clock, Navigation,
+  Phone, Globe, MapPin, Users, X, CheckCircle, Clock,
   MessageSquare, CalendarCheck, ArrowRight,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -12,6 +12,7 @@ import {
   POPULATION_FOCUS_LABEL_KEY,
 } from '@/lib/mapFilters'
 import { formatDistance } from '@/lib/geo'
+import GetThere from '@/components/shared/GetThere'
 import { useI18n } from '@/lib/i18n'
 import type { Resource } from '@/types'
 
@@ -50,14 +51,6 @@ function availabilityLabel(r: Resource, t: (key: string) => string) {
 function requestLabel(r: Resource, t: (key: string) => string) {
   if (r.availability_status === 'full' || r.availability_status === 'closed') return t('booking.joinWaitlist')
   return r.category === 'shelter' ? t('booking.requestSpot') : t('booking.requestHelp')
-}
-
-function directionsUrl(r: Resource) {
-  if (r.lat != null && r.lng != null) {
-    return `https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}`
-  }
-  const dest = [r.address?.street, r.address?.city, r.address?.state, r.address?.zip].filter(Boolean).join(', ')
-  return dest ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}` : null
 }
 
 const FACILITIES: { key: keyof Resource; icon: string; labelKey: string }[] = [
@@ -129,7 +122,6 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
   const isConfidential = r.access_type === 'confidential_address' || r.access_type === 'phone_intake'
   const isDV = r.population_focus?.includes('domestic_violence')
   const hideAddress = isDV && isConfidential
-  const directions = directionsUrl(r)
   const hours = (r.hours_of_operation as { summary?: string } | null)?.summary
   const showBeds = r.category === 'shelter' && r.beds_total != null
   const facilities = FACILITIES.filter((f) => r[f.key])
@@ -264,6 +256,15 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
               </span>
             )}
           </div>
+
+          {/* Get There — replaces the single "Directions" action that used to
+              sit in the footer grid. Driving is one of its four tiles, so
+              nothing is lost, and transit/walking/cycling are the modes that
+              actually matter to someone without a car. The same confidential /
+              phone-intake gate applies inside the component. */}
+          <div className="border-t border-gray-100 pt-3">
+            <GetThere resource={r} variant="compact" />
+          </div>
         </div>
 
         {/* ── Actions ── */}
@@ -292,13 +293,6 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
           />
           {r.website && (
             <Action href={r.website} external icon={<Globe size={16} />} label={t('resourceSheet.website')} />
-          )}
-          {/* Gated on isConfidential, not hideAddress: a confidential-address or
-              phone-intake listing must never get a directions link, whether or
-              not it is also tagged domestic violence. The list row already tells
-              people to call for the location. */}
-          {directions && !isConfidential && (
-            <Action href={directions} external icon={<Navigation size={16} />} label={t('resourceSheet.directions')} />
           )}
           <Link
             to={`/resources/${r.id}`}

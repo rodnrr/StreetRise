@@ -1113,6 +1113,34 @@ export const TRUST_LEVEL_CLASSES: Record<TrustLevel, string> = {
   stale:  'text-red-700 bg-red-50',
 }
 
+// ── Tag display ───────────────────────────────────────────────────
+
+/**
+ * Tag prefixes that are internal bookkeeping, not something to show the public.
+ *
+ * `resources.tags` mixes two different things: plain descriptive tags a
+ * provider or seed wrote for people to read ("school uniforms", "walk-in"),
+ * and `key:value` entries the pipeline and the app read for themselves
+ * (`import:`, `access_src:`, and the `ride:` vocabulary the Ride Assistance
+ * Finder matches on — see `rideOptions.ts`). Rendering the second kind as a
+ * badge tells a visitor nothing and makes the listing look machine-generated.
+ */
+const INTERNAL_TAG_PREFIXES = ['subcategory', 'service_area', 'import', 'access_src', 'ride']
+
+/**
+ * The subset of a resource's tags that is safe and useful to render publicly.
+ *
+ * Filtering on an explicit prefix list rather than on "contains a colon" is
+ * deliberate: it will not silently swallow a future legitimate tag that happens
+ * to contain one.
+ */
+export function publicTags(tags: string[] | null | undefined): string[] {
+  return (tags ?? []).filter((tag) => {
+    const prefix = tag.split(':')[0]
+    return !tag.includes(':') || !INTERNAL_TAG_PREFIXES.includes(prefix)
+  })
+}
+
 // ── Filter Utilities ──────────────────────────────────────────────
 
 /**

@@ -30,7 +30,7 @@ Known open items (most recently verified 2026-09-01 unless a line says otherwise
 - ~~Migration 030 was not yet applied to live~~ — **applied and verified 2026-08-18** (`docs/apply-migration-030.md`). Both `provider_last_read_at` and `admin_last_read_at` exist on live with the intended shape, and `admin_last_read_at` carries real values, so writes to it are landing rather than no-opping as they did before the columns existed. (Those values do not by themselves prove the app path: `conversations_update` is column-agnostic and the SQL editor can write the column too, so the authenticated smoke test in the runbook is still outstanding.) **Unread does not fully clear yet — re-confirmed in code 2026-09-01**: opening a thread marks it read, but *sending* into the open thread re-marks it unread for the sender. Read `AdminChat.tsx`'s and `ProviderChat.tsx`'s `sendMessage` mutations directly: neither `onSuccess` handler calls `markConversationRead`, so `bump_conversation_on_message` advances `last_message_at` and nothing marks the sender's own thread read again (see `docs/OPEN_ITEMS.md`). Note the apply is **not** recorded in `supabase_migrations.schema_migrations` — that table is drifted well beyond 032–035, see Database Migrations; verify live columns, not that table.
 - **`npm run lint`, `npm run typecheck`, and `npm run build` are all clean** (re-verified 2026-08-06). The previously documented lint error on `supabase.from('bookings') as any` is gone — `src/lib/supabase.ts` now carries an `eslint-disable-next-line` for it, so the cast itself is still lint debt to unwind when `database.types.ts` is regenerated.
 - **`BlogPostPage` does not render markdown** — `body_markdown` is shown in a `whitespace-pre-wrap` div. `cover_image_url` now renders (hero on `BlogPostPage`, thumbnail on `BlogIndexPage`, og:image) when set; images are hosted in the R2 bucket `assets-streetrise` — upload + DB-update runbook in `docs/r2-blog-images.md`.
-- **Internal tags leak on `ResourceDetailPage`** — tags with `subcategory:`, `service_area:`, `import:`, `access_src:` prefixes render as public badges. Recommended fix (a `publicTags()` filter) is written up in `docs/OPEN_ITEMS.md`.
+- ~~Internal tags leak on `ResourceDetailPage`~~ — **fixed 2026-09-03.** `publicTags()` now lives in `src/lib/mapFilters.ts` and `ResourceDetailPage` renders `publicTags(resource.tags)`, dropping the block when nothing survives. `INTERNAL_TAG_PREFIXES` is `subcategory`, `service_area`, `import`, `access_src`, `ride` — the last added with the transportation layer, whose whole matching vocabulary is `ride:`-prefixed. Filtering on an explicit prefix list, not on "contains a colon", so a future legitimate tag with a colon is not swallowed. `ResourceDetailPage` renders no `SeoHead` and no structured data, so these tags were never reaching page metadata either.
 - **Provider signup depends on two column defaults.** `providers_insert_self` (tightened by migration 023) requires `claim_status='claimed'` and `source_type='self_registered'`, but `ProviderOnboarding.tsx` sets neither — the column defaults supply both before `WITH CHECK` runs. Drop or change those defaults and provider signup starts failing RLS.
 - **Therefore: a seed migration MUST set `claim_status='unclaimed'` and `source_type='seeded'` explicitly.** Those column defaults exist for the signup path above, so an INSERT that omits them marks a seeded org as though a person had registered and claimed it — false provenance, and a dead end, because a `claimed` org can never be claimed at `/claim`. Migration 027 exists because this went wrong once; it happened again while applying 036 and was caught by diffing live against the migration file. Every seeded provider on live should be `unclaimed`/`seeded` with `user_id IS NULL`.
 - ~~Claiming an org hides it from `/work`~~ — **fixed by migration 033**, which adds `providers_pending_claim_read` so a mid-claim org stays publicly visible.
@@ -39,6 +39,8 @@ Known open items (most recently verified 2026-09-01 unless a line says otherwise
 - ~~`/community-voices` missing from `public/sitemap.xml` — deliberate or a gap?~~ — **resolved 2026-09-01: deliberate.** Read `CommunityVoicesPage.tsx` directly: `SeoHead` is passed `noindex` (confirmed in `SeoHead.tsx` this renders `<meta name="robots" content="noindex, nofollow">`), and the file's own comment says why — "No fabricated testimonials — honest empty state until real stories exist" / "noindex (and kept out of sitemap.xml) until there is real content." The page currently renders an empty state, not real testimonials. Add it to the sitemap once real stories are collected; not before.
 - **Privacy Policy and Terms of Use lost their "not reviewed by an attorney" disclaimers when they were rewritten — found 2026-09-01.** Diffed `PrivacyPage.tsx` and `TermsPage.tsx` against their pre-2026-08-26 versions: both previously carried an explicit amber warning box ("Draft template... has not been reviewed by an attorney — please have counsel review before treating it as \[official/binding\]"). That box is gone in the current versions (direct commits by the maintainer, not through a PR — see the "Redesign About page" commit in the same window). In its place are full, formal-reading legal documents: the Privacy Policy now covers cookies/device storage, data retention periods, a children's-privacy/COPPA-style clause, and disclosure categories including an ownership-transfer clause; the Terms of Use now include a "Disclaimer of warranties" section and a "Limitation of responsibility" section (liability limits, no consequential/punitive damages) plus an acceptable-use policy and moderation/suspension rights. Neither page indicates actual attorney review took place. Given StreetRise's requests can carry health, disability, domestic-violence, and family-status information, publishing specific, legally-consequential-reading data-handling and liability language without confirmed counsel review is a real exposure, not just a docs-accuracy issue. Not fixed here — this needs the maintainer's call on whether the current text has actually been reviewed, and if not, whether to restore a disclaimer or get it reviewed before it stays live as-is.
 - **Migrations 038/039 added to the repo 2026-08-24 (PR #85) — nothing to apply.** Both are backfills that already ran against live in May/June 2026 via a since-deleted session branch; the files are reproduced verbatim from live's migration history for repo completeness. **038 is not safe to blindly re-run against live** — flagged by Codex review on PR #92, 2026-09-01, and confirmed by reading the file: it ends with an unguarded `UPDATE resources SET stale_after_days = stale_after_days` (no WHERE clause), which fires `resources_updated_at` on every row and stamps `updated_at = now()` table-wide, corrupting the "Updated Xd ago" freshness display — the same hazard migration 037 hits with the identical statement, but 037 wraps it in `DISABLE/ENABLE TRIGGER` and 038 does not. 038's own header comment now documents this; it's safe to run once against an unseeded database, not safe to re-run against live. 039 has no such issue (every UPDATE is `WHERE gender_policy = 'unknown'`-guarded, genuinely idempotent). See Database Migrations for detail and the `supabase_migrations.schema_migrations` drift this surfaced.
+- **Migration 041 (transportation assistance seed) is written but NOT applied, and carries unverified facts.** Read `docs/apply-migration-041.md` before running it. It seeds the platform's first `transportation` listings — 2 providers (PSTA, HART) and 6 programmes — closing the same gap migration 036 closed for `clothing`: `SELECT count(*) FROM resources WHERE category = 'transportation'` returns **0** on live (verified 2026-09-03), so the `transportation` need chip has always matched nothing and `isUsefulOption()` has hidden it. Two things to know. (1) **The authoring session could not reach `psta.net` or `gohart.org`** (network egress blocked), so phone numbers, addresses, and the "eight designated transit locations" figure for PSTA Direct Connect are uncorroborated; every row seeds `pending` and every description says to confirm with the agency, but do not flip one to `verified` without a real check. (2) **These rows deliberately never reach the map** — `lat`/`lng` NULL, `is_map_ready = FALSE`, `access_type = 'phone_intake'` — because a countywide paratransit or fare programme has a service area, not a doorway, and because nothing was geocoded. So applying 041 does *not* light up the `transportation` chip on `/map`; the listings surface through `/transportation`, the "Get There" panel, the homepage grid and the footer. Coverage is **Pinellas + Hillsborough only**; Orlando (LYNX / ACCESS LYNX) and Miami-Dade (Golden Passport, STS, Go Connect) are equivalent and unseeded.
+
 - **`get_advisors` (security) surfaced items not previously logged here** — verified 2026-09-01, none blocking, worth a deliberate look: (1) `public.resource_import_staging` has RLS enabled with zero policies, which blocks all `/rest/v1/` access to it entirely (see that table's entry in Data Model); (2) eight functions (`is_verified_provider`, `is_admin`, `my_provider_id`, `bump_conversation_on_message`, `update_updated_at`, `fn_update_resource_confidence`, `compute_confidence_score`, `conversation_messages_broadcast_trigger`) have a mutable `search_path`, standard Postgres hardening advice is to pin it; (3) several `SECURITY DEFINER` functions are callable by `anon`/`authenticated` over the API — the RLS-helper ones (`is_admin`, `my_provider_id`, `is_verified_provider`) are meant to be, but `booking_update_preserves_request_fields`, `resource_update_preserves_admin_fields`, and `rls_auto_enable` should each be checked against what they're actually meant to allow before assuming that's fine; (4) leaked-password protection (HaveIBeenPwned check) is disabled in Supabase Auth — a one-click enable in the dashboard, not a schema change.
 
 ---
@@ -131,6 +133,12 @@ src/
     lazyWithReload.ts       # React.lazy that survives a deploy under an open tab
     i18n.ts                 # EN/ES dictionary + useI18n() hook — see State Management
     resourceFaq.ts          # Deterministic instant-answer FAQ engine — see below
+    transport.ts            # Travel modes + Google/Apple Maps directions deep links.
+                            # No routing backend — the trip is handed to a map app.
+    rideOptions.ts          # Ride Assistance Finder matching engine — see Transportation
+    transit.ts              # Nearest bus stop for a listing, from static GTFS
+                            # (migrations 042/043). Renders NOTHING on an expired
+                            # feed or outside agency coverage — see Transportation
     seo/                    # SeoHead.tsx, structuredData.ts
 
   pages/
@@ -139,6 +147,7 @@ src/
     ResourceDetailPage.tsx  # Single resource detail
     BookingPage.tsx         # Booking/request form (anonymous allowed)
     WorkExchangePage.tsx    # Work exchange listing page
+    TransportationPage.tsx  # Transportation directory + Ride Assistance Finder
     DonatePage.tsx          # Stripe donation checkout
     FaqPage.tsx             # FAQ (loaded from DB)
     LoginPage.tsx           # Custom email/password form using supabase.auth directly
@@ -170,7 +179,8 @@ src/
 
   components/
     shared/                 # RootLayout (nav, footer, Get Help Now CTA, mobile tab bar),
-                            # Footer, ToastContainer, LangToggle (EN/ES switch)
+                            # Footer, ToastContainer, LangToggle (EN/ES switch),
+                            # GetThere (travel-mode tiles + ride-assistance entry point)
     provider/               # ProviderLayout, BedCountUpdater
     admin/                  # AdminLayout (mobile nav, pending-count badges)
     map/                    # ResourceMarker (cached div icons), ResourceCard (list row),
@@ -193,6 +203,11 @@ docs/
   apply-migration-037.md    # Hand-apply runbook (037 = confidence trigger parity; DDL is a
                             # no-op on live, but its backfill re-scores 66 rows — read first)
   apply-migration-040.md    # Hand-apply runbook (040 = stale_after_days default 30 → 90)
+  apply-migration-041.md    # Hand-apply runbook (041 = transportation assistance seed) —
+                            # NOT APPLIED, and has unverified facts in it. Read it first.
+  apply-migrations-042-046.md # Hand-apply runbook (042 = transit tables DDL;
+                            # 043/044/045/046 = HART / MCAT / Miami-Dade / GoPasco
+                            # GTFS loads + transit backfill) — NOT APPLIED
   auth-setup.md             # Password reset, magic link, and social sign-in: what ships in
                             # code vs. what needs dashboard configuration (all web-UI steps)
   deploy-blog-worker.md     # How the blog publisher Worker deploys — GitHub Actions workflow
@@ -209,6 +224,9 @@ docs/
 scripts/
   deploy-pages.sh           # Cloudflare Pages deploy (validates env vars)
   import-seed-candidates.ts # Seed import (needs SUPABASE_SERVICE_ROLE_KEY)
+  build-transit-sql.ts      # Static GTFS bundle → transit_stops/transit_routes SQL.
+                            # `npm run transit:sql -- <gtfs-dir> <agency>`. Output is
+                            # committed as a migration; re-run per agency feed release.
   work-exchange-agent.ts    # Re-verifies /work listings + drafts new ones into a review queue.
                             # Needs SUPABASE_SERVICE_ROLE_KEY + ANTHROPIC_API_KEY. Never publishes.
 
@@ -220,7 +238,7 @@ workers/
                             # service-role key. Covers go to the Supabase `blog-images`
                             # bucket, not R2. Reached from the AI Draft panel on /admin/blog.
 
-supabase/migrations/        # 001–040 with gaps: NO 012, 013, or 021 exist.
+supabase/migrations/        # 001–046 with gaps: NO 012, 013, or 021 exist.
                             # See Migrations section — applied to live BY HAND.
 
 public/
@@ -242,6 +260,7 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/resources/:id` | `ResourceDetailPage` | Lazy |
 | `/book/:resourceId` | `BookingPage` | Lazy; anonymous allowed. `?intent=question` switches it to "Ask a Question": party size and dates are hidden and `notes` becomes required. Same `bookings` row either way. |
 | `/work` | `WorkExchangePage` | Lazy |
+| `/transportation` | `TransportationPage` | Lazy; transportation directory + Ride Assistance Finder. `?to=<resourceId>` prefills the destination, `?mode=wheelchair` preselects accessible transport. **Not** a `CategoryPage` — see Transportation Assistance Layer |
 | `/donate` | `DonatePage` | Lazy; Stripe checkout |
 | `/faq` | `FaqPage` | Lazy; data from DB |
 | `/login` | `LoginPage` | Lazy; `?signup=1` opens signup tab; `?next=` redirect; magic-link sign-in; social buttons render only for providers Supabase reports as enabled |
@@ -258,7 +277,7 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/portal/*` | Provider portal | Auth-gated; dashboard, onboarding, listings, bookings, messages, work |
 | `/admin/*` | Admin portal | Auth-gated; dashboard, providers, resources (+new), bookings, work-exchange, messages, faq, blog |
 
-**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/claim`, `/work`, `/donate`, `/faq`, the 11 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, `/portal/*`, `/admin/*`, or individual `/claim/:id` pages.
+**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/claim`, `/work`, `/transportation`, `/donate`, `/faq`, the 11 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, `/portal/*`, `/admin/*`, or individual `/claim/:id` pages.
 **robots.txt disallows:** `/portal/`, `/admin/`
 
 ---
@@ -295,7 +314,7 @@ Individual service listings owned by a provider.
 - `availability_status`: `available | limited | full | unknown | closed`
 - `beds_available` / `beds_total`: populated for `shelter` resources; drives realtime UI
 - `hours_of_operation`: `{ monday: { open, close, closed }, …, notes, summary, source_url, verified_at }`. The per-day shape is what `AdminResourceEdit` writes and `ResourceDetailPage` renders, and it is what powers the "Open right now" filter; `summary` is the human sentence shown on the map card. **111 of 146 public listings carry per-day hours as of 2026-08-17** (researched from public sources); 38 of those were reshaped from the seeded summary and are tagged `basis: 'listing_summary'` for auditing. Where a service has two sittings a day (lunch *and* dinner) the day window deliberately under-claims and `summary`/`notes` carry the full picture — a false "open" sends someone on a wasted trip.
-- `tags`: mixes public tags with internal `key:value` tags (`subcategory:`, `service_area:`, `import:`, `access_src:`) — currently all rendered publicly on `ResourceDetailPage` (open item)
+- `tags`: mixes public tags with internal `key:value` tags (`subcategory:`, `service_area:`, `import:`, `access_src:`, `ride:`). Filtered at render by `publicTags()` in `mapFilters.ts` — see `INTERNAL_TAG_PREFIXES`. **The `ride:` family is load-bearing, not decorative**: it is the entire matching vocabulary of the Ride Assistance Finder (`ride:kind:`, `ride:mode:`, `ride:elig:`, `ride:area:`, `ride:notice:`), which is why adding a transportation programme takes a row and no code. See Transportation Assistance Layer.
 - Facility booleans (migration 011): `has_showers`, `has_restrooms`, `serves_meals`, `has_laundry`, `pet_friendly`, `wheelchair_accessible`, `public_transit_accessible`, `phone_required_before_arrival`, `overnight_allowed`
 - Trust fields (migration 010): `confidence_score` (0–100), `stale_after_days`, `last_provider_update_at`, `last_verified_at`. `stale_after_days` default raised 30 → 90 by migration 040 (**applied and verified live 2026-09-03** — `docs/apply-migration-040.md`). As of 2026-09-03 the freshness this drives is **internal-only** (provider portal + admin) — the public "may be outdated" badge was removed from the map card, detail sheet, and `/resources/:id`; see Known Open Items.
 - Import fields (migrations 009/016): `external_id` (stable, human-readable, e.g. `ACTS-001`), `import_batch`, `import_source`
@@ -316,6 +335,57 @@ Migration 035 adds provenance: `external_id`, `source_url` (the public "get invo
 Review queue for `scripts/work-exchange-agent.ts` (migration 035). One row per proposed change: `kind` (`new | update | delist`), `status` (`pending | approved | rejected | applied`), the `proposed` payload as JSONB, plus `source_url`, a verbatim `evidence` quote from the page, `confidence`, and the run/model that produced it.
 
 **The agent never publishes.** It writes `last_verified_at` / `last_verify_status` on `work_exchanges` and nothing else; every content change lands here and an admin approves it at `/admin/work-exchange`. RLS is admin-only — not public (unreviewed machine output about a real charity) and not provider-readable (a provider should not see a draft about their org before a human has). Two partial unique indexes keep re-runs from duplicating an already-open proposal. Runbook: `docs/work-exchange-agent.md`.
+
+### `transit_stops` / `transit_routes`
+Static GTFS data (migrations 042/043, **not applied**). One row per stop with
+service under the currently-active calendar, carrying its coordinates, the
+routes calling there, day-type coverage, and the weekday service window; plus a
+small routes table with fares. Public-read / admin-write RLS mirroring `faq`.
+
+The app reads them through `nearest_transit_stop(lat, lng, radius_km, agency)`, a
+`SECURITY INVOKER` SQL function (so RLS still applies) that narrows by bounding
+box and returns the single closest row. Nearest-neighbour is the one place the
+map's "fetch once, filter in the browser" rule does not apply: a 40 km box
+around downtown Miami holds 6,964 of 6,973 stops, so the ordering has to happen
+where the rows are. The distance the UI *displays* still comes from `geo.ts`,
+so only one implementation ever produces a user-visible number.
+
+The `agency` argument is not optional in spirit: agencies overlap at county
+lines (HART and GoPasco publish stops 2–3 m apart around Wesley Chapel), so a
+lookup that does not scope to the county's own operator names the wrong one —
+and once that other agency's feed expires, silences the panel on a stale-feed
+check while a valid stop sits beside it. It is passed NULL only when the city
+does not resolve to a county, where any walkable stop is still positive evidence.
+
+`resources.public_transit_accessible_source` records whether that flag came
+from a feed (`'transit_feed'`) or a human (NULL). The seed backfills raise
+freely but **lower only rows they stamped**, so a GTFS refresh that withdraws a
+stop also withdraws the claim, while a provider's hand-set TRUE — 19 of the 29
+true rows on live — survives every refresh untouched. A
+`resources_transit_flag_on_move` trigger covers the other direction: the edit
+pages write `lat`/`lng`, so a corrected geocode recomputes the flag rather than
+leaving one derived for the old position. Hand-set values are returned
+untouched by both paths.
+
+Loaded from an agency's published GTFS bundle by `scripts/build-transit-sql.ts`,
+whose output is committed as a migration — so the provenance of every row is
+reproducible and a feed refresh is a re-run, not hand-editing. **Only
+service_ids active on the build date are counted**, so a stop that lost its
+service in the last shake-up cannot keep making a listing look reachable.
+
+Keys are `<agency>:<id>` and every row carries `agency`, because the loaded feed
+is HART (Hillsborough only) and PSTA/LYNX/Miami-Dade number their stops from 1
+too. Adding one of those is another import run, not a schema change.
+
+Every row also carries `feed_fingerprint`, a hash of what a loader run emitted.
+That, not the publisher's `feed_version`, is what the cleanup `DELETE` keys on:
+a published version does not reliably move when the network does (HART ships two
+service periods under one version), so keying on it would leave withdrawn stops
+behind, still claiming service.
+
+Every row also carries `feed_valid_until` from the agency's `feed_info.txt`.
+Past that date `src/lib/transit.ts` renders nothing rather than last quarter's
+network — the same fail-closed instinct as the map's "Open right now" filter.
 
 ### `blog_posts`
 Backs `/blog` and `/admin/blog` (migration 029). Public-read/admin-write RLS mirroring `faq`. `body_markdown` is not yet rendered as markdown on the public page.
@@ -411,6 +481,118 @@ Powers the instant-answer panel on the booking flow's "Ask a Question" mode (`/b
 
 ---
 
+## Transportation Assistance Layer
+
+Finding a shelter, pantry or clinic is only half the problem if the person
+cannot physically get there. Three pieces, added 2026-09-03:
+
+**1. "Get There" on every listing** — `src/components/shared/GetThere.tsx`,
+rendered in `ResourceSheet` (compact) and on `/resources/:id` (card). Six tiles:
+public transit / walking / bicycle / driving hand the trip to Google Maps (Apple
+Maps offered as a secondary link on Apple devices) with the destination
+prefilled; ride assistance and accessible transport open `/transportation`.
+`src/lib/transport.ts` builds the URLs.
+
+It **replaced** the single "Directions" action that used to sit in
+`ResourceSheet`'s footer grid — driving is one of the four tiles, so nothing was
+lost. `canRouteTo()` reproduces the existing gate: a `confidential_address` or
+`phone_intake` listing gets no map links and no destination carried into the
+finder, because its stored address is not where the service reaches the public.
+
+**2. `/transportation`** — `src/pages/TransportationPage.tsx`. A directory of
+every transportation programme plus the Ride Assistance Finder, on one route.
+`?to=<resourceId>` prefills the destination; `?mode=wheelchair` preselects
+accessible transport.
+
+**Deliberately not a `CategoryPage`.** Transportation programmes are
+service-area-scoped rather than point-located: several have no coordinates at
+all, and `fetchCategoryResources()` requires `is_map_ready` plus non-null
+lat/lng. Routing this through `categories.ts` would hide exactly the listings
+the page exists to surface. `fetchRideAssistance()` in `rideOptions.ts` is a
+separate query that keeps the rest of the public visibility predicate and drops
+only the coordinate requirement — same precedent as `fetchCategoryResources()`
+being separate from `fetchMapResources()`.
+
+**3. The matching engine** — `src/lib/rideOptions.ts`. Five plain questions
+(destination, origin, when, usable modes, eligibility) ranked against the
+`ride:` tags on each programme. Same discipline as `resourceFaq.ts`:
+
+- **Nothing is invented.** Every reason and caution is assembled from a stored
+  field. A rule with nothing to say stays silent.
+- **No route planning.** StreetRise does not compute itineraries, quote fares,
+  or estimate trip times — a map app does. "PSTA Route 18 → 52, 47 minutes" in
+  StreetRise's own UI would need a real GTFS/routing backend; that is a much
+  larger piece of work, not a tweak to `transport.ts`.
+- **Unknown means "maybe".** A programme recording no area, mode or eligibility
+  rule is never excluded on that basis — it ranks lower and says what it does
+  not know. The single exception fails closed: a programme whose published
+  service area definitely excludes the destination moves to an "other service
+  areas" section rather than being hidden.
+- **Qualification is never asserted.** The strongest claim is "you may qualify",
+  next to the requirement the programme publishes.
+
+**Privacy is a design constraint here, not a footnote.** The eligibility step
+asks about income, disability, Medicaid and veteran status — the most sensitive
+things anyone types into StreetRise. Those answers live in React state for the
+length of the visit and nowhere else: **no Supabase write, no URL parameter, no
+persisted store, no analytics call.** If that ever changes it changes as an
+opt-in on an account the person created, never as a default. Do not "improve"
+this by persisting answers for convenience.
+
+`COUNTY_BY_CITY` in `rideOptions.ts` maps the cities StreetRise lists in to
+their Florida county — that is what distinguishes a Pinellas programme from a
+Miami trip. A missing city yields `null`, treated as "maybe", so a gap costs
+ranking quality and never hides a programme. Extend it when a seed batch adds a
+metro.
+
+**4. Nearest bus stop on a listing** — `src/lib/transit.ts`, rendered inside the
+Get There panel. Reads static GTFS loaded by migrations 042–046: which stop is
+closest, which routes call there, which days they run, and the weekday window.
+No realtime feed and no API key — a stop's location changes on service-change
+dates, not by the minute.
+
+**Coverage is per county, and that gate is what keeps it honest.**
+`AGENCY_BY_COUNTY` in `transit.ts` lists the four counties we hold a feed for
+(Hillsborough/HART, Manatee/MCAT, Miami-Dade/MDT, Pasco/GoPasco). PSTA, LYNX
+and Broward County Transit are **not** loaded. Distance alone is not a
+sufficient test: GoPasco's service area borders Pinellas, so a Tarpon Springs
+listing can sit 2 km from a GoPasco stop while being served all day by PSTA —
+saying "nearest stop: GoPasco, 2 km" there is a partial answer dressed as a
+complete one. So a listing in a county with no loaded feed renders nothing, and
+a listing whose city does not resolve to a county (`countyForCity` in
+`rideOptions.ts`) gets `partial` coverage: a genuinely walkable stop still
+shows, because that is positive evidence, but the "nearest stop is 8 miles
+away" line is suppressed, because that one asserts an absence.
+
+The *negative* is the valuable half. Four listings on live are 7–11 miles from
+any HART stop, and telling someone without a car that before they set out
+matters more than confirming a stop is close. That negative is computed at read
+time rather than stored, so it cannot go stale against a feed that has moved on.
+
+Three cases render **nothing**, deliberately: an expired feed (`feed_valid_until`
+has passed), an address outside the agency data we hold (read as "no coverage",
+never as "no bus"), and any error. Where a stop is found but distant the copy
+says "nearest **HART** stop" — naming the agency, because we are reporting the
+limit of our data, not asserting no operator serves the address.
+
+It also surfaces something the app never said: HART's own fare data prices the
+TECO Line Streetcar and the airport SkyConnect at **$0.00**. `is_fare_free` is
+set only from an explicit 0.00 — a NULL fare is unknown, not free.
+
+**Data**: migration 041 (**not applied** — `docs/apply-migration-041.md`) seeds
+PSTA and HART assistance programmes. Migrations 042–046 (**not applied** —
+`docs/apply-migrations-042-046.md`) add the transit tables and four counties'
+stops. Adding a fifth agency is `npm run transit:sql -- <gtfs-dir> <slug>`, a
+new migration from its output, and one line in `AGENCY_BY_COUNTY` — not a
+schema change. **PSTA (Pinellas) and LYNX (Orange/Osceola) are the biggest
+remaining gaps**: Orlando alone has 31 listings and Pinellas about 30, and
+neither gets a nearest-stop line today. Coverage is Pinellas + Hillsborough only; Orlando and
+Miami-Dade equivalents are unseeded. Until then `/transportation` renders an
+honest empty state, and the finder tells an Orlando visitor these programmes
+serve a different area rather than showing a false match.
+
+---
+
 ## Supabase Client & Data Access
 
 ```ts
@@ -499,7 +681,7 @@ Migrations live in `supabase/migrations/`, numbered 001–039 **with gaps: 012, 
 
 **Do not regenerate `src/lib/database.types.ts` from the CLI** unless you have confirmed live has every migration the code depends on — the `blog_posts` block and the two conversation read columns were hand-written to match intended state, and a regen against a lagging DB would delete them.
 
-Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage (**applied — verified live 2026-09-01**, `blog-images` bucket exists with `public=true`), 032 South Florida seed, 033/034 claim submissions + notification fields, 035 work exchange provenance + agent review queue, 036 student clothing seed + `students` population tag, 037 confidence-trigger parity, **038/039 (added 2026-08-24, PR #85) are repo-completeness re-adds only** — both are backfills that were run against live back in May/June 2026 (038 on 2026-05-25, 039 on 2026-06-18) via a now-deleted session branch and never made it into the repo; the SQL files are reproduced verbatim from live's migration history. There is nothing to "apply" for 038/039 — they already happened. **039 is genuinely idempotent** (every UPDATE is `WHERE gender_policy = 'unknown'`-guarded). **038 is not** — its last statement is an unguarded table-wide `UPDATE resources SET stale_after_days = stale_after_days`, which stamps `updated_at = now()` on every row via `resources_updated_at` (same hazard migration 037 explicitly guards against with `DISABLE/ENABLE TRIGGER` for the identical statement). Re-running 038 against live or any already-seeded database manufactures false freshness table-wide; see that migration's own header comment before ever re-running it. **040 (added 2026-09-03) raises `resources.stale_after_days` from 30 to 90**, default and backfill — **applied and verified live 2026-09-03**; runbook `docs/apply-migration-040.md`. Same DISABLE/ENABLE TRIGGER idiom as 037 so the backfill didn't touch `updated_at` (confirmed: `max(updated_at)` identical before/after).
+Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage (**applied — verified live 2026-09-01**, `blog-images` bucket exists with `public=true`), 032 South Florida seed, 033/034 claim submissions + notification fields, 035 work exchange provenance + agent review queue, 036 student clothing seed + `students` population tag, 037 confidence-trigger parity, **038/039 (added 2026-08-24, PR #85) are repo-completeness re-adds only** — both are backfills that were run against live back in May/June 2026 (038 on 2026-05-25, 039 on 2026-06-18) via a now-deleted session branch and never made it into the repo; the SQL files are reproduced verbatim from live's migration history. There is nothing to "apply" for 038/039 — they already happened. **039 is genuinely idempotent** (every UPDATE is `WHERE gender_policy = 'unknown'`-guarded). **038 is not** — its last statement is an unguarded table-wide `UPDATE resources SET stale_after_days = stale_after_days`, which stamps `updated_at = now()` on every row via `resources_updated_at` (same hazard migration 037 explicitly guards against with `DISABLE/ENABLE TRIGGER` for the identical statement). Re-running 038 against live or any already-seeded database manufactures false freshness table-wide; see that migration's own header comment before ever re-running it. **042–046 (added 2026-09-03) add the transit tables and load four Florida GTFS feeds — NOT APPLIED; `docs/apply-migrations-042-046.md`. 042 is DDL only; 043 (HART/Hillsborough, 2,245 stops), 044 (MCAT/Manatee, 928), 045 (Miami-Dade, 6,973) and 046 (GoPasco/Pasco, 945) are generated rows, each ending with the same guarded `public_transit_accessible` backfill that only ever raises the flag. 045 is ~1.4 MB.** **041 (added 2026-09-03) seeds the first `transportation` listings — NOT APPLIED, and carries facts nobody could verify from the session that wrote it; read `docs/apply-migration-041.md` before running it.** **040 (added 2026-09-03) raises `resources.stale_after_days` from 30 to 90**, default and backfill — **applied and verified live 2026-09-03**; runbook `docs/apply-migration-040.md`. Same DISABLE/ENABLE TRIGGER idiom as 037 so the backfill didn't touch `updated_at` (confirmed: `max(updated_at)` identical before/after).
 
 **Live carries schema objects that no migration creates.** Two were found on PR #79: the `trg_resource_confidence` trigger + `fn_update_resource_confidence()` function (captured by migration 037) and the Christian Service Center provider row created by the OB3 import script (captured by 036 section 1b). Verifying a change against live cannot detect this class by construction — live is the environment that hides it. Before writing a migration that depends on a trigger, function, policy or row, confirm a migration actually creates it.
 
