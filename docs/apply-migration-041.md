@@ -74,6 +74,36 @@ One correction to the brief was applied in the file: HARTPlus reservations are
 documented as **one to three days** in advance, not specifically "the day
 before".
 
+### Migration 047 resolves most of this — apply it too
+
+**Since this runbook was written, the maintainer reached the agencies' own
+pages on 2026-09-03 and `047_correct_transportation_seed_accuracy.sql` records
+what they found.** It is the answer to the table below, so **run 047 straight
+after 041**; 041 alone leaves the uncorrected values in place.
+
+What 047 settles:
+
+- **Phone numbers were wrong.** PSTA Access and Mobility-on-Demand are
+  `(727) 540-1888`, not the `(727) 540-1900` seeded for all of them — that
+  number is for TD applications and general information. This was the entry in
+  the table below flagged as the one that strands someone.
+- **`website` now deep-links each programme** to its current official page
+  instead of pointing at the org root.
+- **The HARTPlus timing "correction" above was itself wrong.** Reservations are
+  required **the day before** service, as the original brief said — so the
+  maintainer's brief was right and the public sources this session found were
+  not. Worth reading as a caution about the rest of this section.
+- **Eligibility determination** is completed **within 21 days after the
+  application process is complete** — an upper bound, not the "at least 21
+  days" floor seeded here, which was pessimistic in a way that could discourage
+  someone from applying.
+- **The MOD description no longer names a specific taxi vendor**, because
+  PSTA's own pages are not internally consistent about it.
+
+Still unverified after 047, so still check before flipping any row to
+`verified`: the **eight designated transit locations** figure for Direct
+Connect, and both street addresses.
+
 **Check these before flipping any row to `verified`:**
 
 | Claim | Where | Why it matters |
@@ -116,6 +146,11 @@ programme, and the finder says so rather than listing it as an answer.
 1. Supabase dashboard → project `mldatfcwnmvrmxumzxyb` → **SQL Editor**.
 2. Paste `supabase/migrations/041_seed_transportation_assistance.sql`.
 3. Run it once.
+4. **Then paste and run `supabase/migrations/047_correct_transportation_seed_accuracy.sql`.**
+   041 seeds the rows; 047 corrects the phone numbers, deep links and timing
+   language in them (see above). Applying 041 without 047 publishes a wrong
+   phone number on two listings. 047's updates are keyed by `external_id`, so
+   it is idempotent and safe to re-run.
 
 Idempotent: both `INSERT`s are `ON CONFLICT (id) DO NOTHING` over stable uuid5
 ids (`uuid5(NAMESPACE_URL, 'https://streetrise.org/seed/041/<external_id>')`),

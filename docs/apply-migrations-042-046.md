@@ -1,4 +1,4 @@
-# Applying Migrations 042–046 — Transit stops from four Florida GTFS feeds
+# Applying Migrations 042–046 (+048) — Transit stops from four Florida GTFS feeds
 
 **Status: NOT APPLIED.** Written 2026-09-03.
 
@@ -165,6 +165,15 @@ geocoding bug is real and worth fixing separately.** It is logged in
 1. Supabase dashboard → project `mldatfcwnmvrmxumzxyb` → **SQL Editor**.
 2. Paste and run `supabase/migrations/042_transit_stops.sql`.
 3. Paste and run `supabase/migrations/043_seed_hart_transit.sql`.
+4. Then 044 (MCAT), 045 (Miami-Dade) and 046 (GoPasco) — independent of each
+   other and of order, each self-contained.
+5. **Finally run `supabase/migrations/048_optimize_transit_rls.sql`.** It
+   replaces 042's admin `FOR ALL` policy on each transit table with
+   write-only admin policies, leaving a single public SELECT path. 042's
+   version is functionally correct but trips Supabase's
+   `multiple_permissive_policies` advisor, since the public and admin SELECT
+   paths overlap on tables that are public-read anyway. Applying 042 without
+   048 works; it just leaves that warning standing.
 
 043 is ~410 KB, which is an unpleasant paste on a phone. Both are idempotent —
 043's INSERTs are `ON CONFLICT (id) DO UPDATE`, so a re-run refreshes rather
