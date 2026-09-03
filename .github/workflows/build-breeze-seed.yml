@@ -26,94 +26,22 @@ jobs:
 
       - run: npm ci
 
-      - name: Align GTFS importer and Sarasota coverage
-        run: |
-          python <<'PY'
-          from pathlib import Path
-
-          # Future feed migrations must use the same one-mile/current-feed rule
-          # migration 054 establishes. Otherwise a later seed could regress it.
-          p = Path('scripts/build-transit-sql.ts')
-          s = p.read_text()
-          old_comment = ''' * 400 m is a quarter mile, the standard planning threshold for walking to a
- * stop. The bounding box is wider than the radius on both axes so it narrows
- * the scan without clipping a qualifying stop; the haversine inside decides.'''
-          new_comment = ''' * The feed-derived “Near public transit” product threshold is exactly 1,609.34 m
- * (1 mile). The bounding box is only an indexed prefilter and is deliberately
- * 20% wider so it cannot clip a qualifying stop; the haversine inside decides.
- * Expired feeds cannot raise or preserve an automated transit-access claim.'''
-          assert old_comment in s, 'GTFS importer proximity comment changed; review manually'
-          s = s.replace(old_comment, new_comment, 1)
-
-          old_near = '''const NEAR_STOP_EXISTS = `    SELECT 1
-    FROM transit_stops s
-    WHERE s.lat BETWEEN r.lat - 0.005 AND r.lat + 0.005
-      AND s.lng BETWEEN r.lng - 0.006 AND r.lng + 0.006
-      AND 2 * 6371000 * asin(sqrt(
-            sin(radians(s.lat - r.lat) / 2) ^ 2
-            + cos(radians(r.lat)) * cos(radians(s.lat))
-              * sin(radians(s.lng - r.lng) / 2) ^ 2
-          )) <= 400`'''
-          new_near = '''const NEAR_STOP_EXISTS = `    SELECT 1
-    FROM transit_stops s
-    WHERE (s.feed_valid_until IS NULL OR s.feed_valid_until >= CURRENT_DATE)
-      AND s.lat BETWEEN r.lat - ((1.60934 / 111.32) * 1.2)
-                    AND r.lat + ((1.60934 / 111.32) * 1.2)
-      AND s.lng BETWEEN r.lng - (((1.60934 / 111.32) * 1.2)
-                                  / GREATEST(cos(radians(r.lat)), 0.1))
-                    AND r.lng + (((1.60934 / 111.32) * 1.2)
-                                  / GREATEST(cos(radians(r.lat)), 0.1))
-      AND 2 * 6371000 * asin(sqrt(
-            sin(radians(s.lat - r.lat) / 2) ^ 2
-            + cos(radians(r.lat)) * cos(radians(s.lat))
-              * sin(radians(s.lng - r.lng) / 2) ^ 2
-          )) <= 1609.34`'''
-          assert old_near in s, 'GTFS importer NEAR_STOP_EXISTS changed; review manually'
-          s = s.replace(old_near, new_near, 1)
-          s = s.replace('-- Raise: a stop within 400 m, stamped so a later refresh knows this TRUE is',
-                        '-- Raise: a current-feed stop within 1,609.34 m (1 mile), stamped so a later refresh knows this TRUE is', 1)
-          p.write_text(s)
-
-          # Register Breeze as the authoritative Sarasota County fixed-route feed.
-          p = Path('src/lib/transit.ts')
-          s = p.read_text()
-          label_needle = "  citrus_connection: 'Citrus Connection',\n  sunrail:"
-          assert label_needle in s, 'agency label anchor changed'
-          s = s.replace(label_needle, "  citrus_connection: 'Citrus Connection',\n  breeze:            'Breeze Transit',\n  sunrail:", 1)
-          county_needle = "  manatee:      ['mcat'],\n  miami_dade:"
-          assert county_needle in s, 'county mapping anchor changed'
-          s = s.replace(county_needle, "  manatee:      ['mcat'],\n  sarasota:     ['breeze'],\n  miami_dade:", 1)
-          p.write_text(s)
-
-          # Sarasota and Venice already resolve. Add other unambiguous Sarasota
-          # County place names Breeze serves so future resource seeds do not
-          # silently downgrade to partial transit coverage.
-          p = Path('src/lib/rideOptions.ts')
-          s = p.read_text()
-          city_needle = "  sarasota: 'sarasota', venice: 'sarasota',"
-          assert city_needle in s, 'Sarasota city mapping anchor changed'
-          s = s.replace(city_needle,
-                        "  sarasota: 'sarasota', venice: 'sarasota', 'north port': 'sarasota',\n  nokomis: 'sarasota', osprey: 'sarasota', 'siesta key': 'sarasota',", 1)
-          p.write_text(s)
-          PY
-
-      - name: Download and validate current Breeze GTFS
+      - name: Download and validate Breeze GTFS
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p /tmp/breeze
           curl --fail --location --retry 3 --retry-delay 2 \
             --connect-timeout 20 --max-time 180 \
             --user-agent 'StreetRise GTFS importer (https://streetrise.org)' \
             'https://breezerider.tripsparkhost.com/static/google_transit.zip' \
             -o /tmp/breeze.zip
           echo '20c127087e440ccc5f0b53b31d2c7a62c37e98e1  /tmp/breeze.zip' | sha1sum -c -
+          sha256sum /tmp/breeze.zip | tee /tmp/breeze-sha256.txt
           unzip -q /tmp/breeze.zip -d /tmp/breeze
-          test -s /tmp/breeze/agency.txt
-          test -s /tmp/breeze/routes.txt
-          test -s /tmp/breeze/stops.txt
-          test -s /tmp/breeze/trips.txt
-          test -s /tmp/breeze/stop_times.txt
-          test -s /tmp/breeze/feed_info.txt
+          for required in agency.txt routes.txt stops.txt trips.txt stop_times.txt feed_info.txt; do
+            test -s "/tmp/breeze/$required"
+          done
 
       - name: Generate migration 055
         shell: bash
@@ -125,41 +53,26 @@ jobs:
           cat /tmp/breeze-build.log
           grep -q 'feed valid until 2026-12-04' supabase/migrations/055_seed_breeze_transit.sql
           grep -q '1310 stops, 15 routes' supabase/migrations/055_seed_breeze_transit.sql
-          grep -q 'feed_valid_until IS NULL OR s.feed_valid_until >= CURRENT_DATE' supabase/migrations/055_seed_breeze_transit.sql
-          grep -q '<= 1609.34' supabase/migrations/055_seed_breeze_transit.sql
 
-      - name: Record provenance
-        shell: bash
-        run: |
-          set -euo pipefail
-          export BREEZE_SHA256="$(sha256sum /tmp/breeze.zip | awk '{print $1}')"
-          python <<'PY'
-          import os
-          from pathlib import Path
-          p = Path('docs/transit-feed-provenance-2026-09-03.md')
-          s = p.read_text()
-          anchor = "| `053_seed_citrus_connection_transit.sql` | `citrus_connection` | Citrus Connection — Polk | `https://www.ccbusinfo.com/InfoPoint/gtfs-zip.ashx`"
-          line = next((ln for ln in s.splitlines() if ln.startswith(anchor)), None)
-          assert line, 'provenance table anchor changed'
-          breeze = (
-            "| `055_seed_breeze_transit.sql` | `breeze` | Breeze Transit — Sarasota | "
-            "`https://breezerider.tripsparkhost.com/static/google_transit.zip` | `"
-            + os.environ['BREEZE_SHA256']
-            + "` | 1,310 stops / 15 routes | 2026-12-04 |"
-          )
-          s = s.replace(line, line + '\n' + breeze, 1)
-          p.write_text(s)
-          PY
+          # Migration 054 is the canonical current-feed/one-mile derivation.
+          # Remove the generator's legacy embedded 400 m backfill and invoke 054.
+          sed -i '/^-- Re-derive resources.public_transit_accessible from the stops now loaded\./,$d' \
+            supabase/migrations/055_seed_breeze_transit.sql
+          cat >> supabase/migrations/055_seed_breeze_transit.sql <<'SQL'
+          -- Recompute feed-derived accessibility using migration 054's
+          -- current-feed, exactly-one-mile rule while preserving human-set TRUEs.
+          SELECT public.refresh_transit_accessibility_flags();
+          SQL
+          grep -q 'refresh_transit_accessibility_flags' supabase/migrations/055_seed_breeze_transit.sql
+          ! grep -q '<= 400' supabase/migrations/055_seed_breeze_transit.sql
 
-      - name: Commit generated Breeze coverage
+      - name: Commit Breeze migration
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'StreetRise Transit Builder'
           git config user.email 'actions@users.noreply.github.com'
-          git add scripts/build-transit-sql.ts src/lib/transit.ts src/lib/rideOptions.ts \
-            docs/transit-feed-provenance-2026-09-03.md \
-            supabase/migrations/055_seed_breeze_transit.sql
+          git add supabase/migrations/055_seed_breeze_transit.sql
           git diff --cached --stat
-          git commit -m 'feat: add Breeze Transit coverage for Sarasota'
+          git commit -m 'feat: seed Breeze Transit for Sarasota'
           git push origin HEAD:feat/transit-coverage-expansion
