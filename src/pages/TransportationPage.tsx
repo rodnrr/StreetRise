@@ -614,7 +614,15 @@ export default function TransportationPage() {
             subtitle={t('transportation.directorySubtitle')}
           />
           {isLoading && <div className="space-y-3">{[0, 1].map((i) => <div key={i} className="skeleton h-24" />)}</div>}
-          {!isLoading && (programs?.length ?? 0) === 0 && (
+          {isError && (
+            <EmptyState icon={SearchX} title={t('map.loadError')} description={t('map.loadErrorHint')} />
+          )}
+          {/* `!isError` matters: on a failed fetch `programs` is undefined and
+              isLoading is false, so without it the directory told visitors no
+              transportation programmes exist when in fact the query failed
+              (caught in review on PR #100). The results view already guarded
+              this; the directory did not. */}
+          {!isLoading && !isError && (programs?.length ?? 0) === 0 && (
             <EmptyState
               icon={SearchX}
               title={t('ride.noProgramsTitle')}

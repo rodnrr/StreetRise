@@ -105,6 +105,23 @@ export function rideFacet(r: Resource, facet: RideFacet): string[] {
   return out
 }
 
+/**
+ * Kinds that are not, in themselves, a way to complete a trip.
+ *
+ * Travel training teaches someone to use the bus. It is genuinely valuable —
+ * often more so than a paratransit application, since it takes an afternoon
+ * rather than three weeks — but it cannot get anybody anywhere TODAY, and it
+ * was being labelled "Closest match" for a Tampa rider who picked regular bus
+ * and "Right now" (area + mode + no eligibility rule + phone = 7). Its own
+ * description says it is not a ride; the badge said otherwise (caught in
+ * review on PR #100).
+ *
+ * These are not hidden or penalised for a scheduled trip, where learning the
+ * network genuinely helps. They are capped below the top badge, and say why,
+ * when the trip is needed now or later today.
+ */
+const NON_RIDE_KINDS = new Set(['travel_training'])
+
 export const RIDE_KIND_LABEL_KEY: Record<string, string> = {
   fare_assistance:      'ride.kind.fare_assistance',
   paratransit:          'ride.kind.paratransit',
@@ -122,15 +139,6 @@ const ELIG_REQUIREMENT_KEY: Record<string, string> = {
   medicaid:   'ride.requirement.medicaid',
   veteran:    'ride.requirement.veteran',
 }
-
-/**
- * `ride:kind:` values that help someone become able to travel but do not carry
- * them anywhere. Named as a set rather than tested inline because "is this
- * actually a ride?" is a property of the kind, and a trip-planning or
- * bus-buddy programme added later would otherwise reintroduce the bug this
- * exists to prevent.
- */
-const NON_RIDE_KINDS = new Set(['travel_training'])
 
 /**
  * How much a programme's lead time counts against it, given when the trip is.
@@ -455,6 +463,16 @@ function scoreOption(r: Resource, ctx: ScoreContext): RideOption {
     score += NOTICE_SCORE[notice]?.[answers.when] ?? 0
   }
 
+  // ── Is this even a ride? ──
+  // The badge cap below is what stops this outranking a real ride, but a lower
+  // badge does not tell anyone WHY. Someone who needs to travel now, reading a
+  // list of transport programmes, should not have to open the listing to learn
+  // that this one teaches you to ride rather than carrying you.
+  const supportOnly = rideFacet(r, 'kind').some((k) => NON_RIDE_KINDS.has(k))
+  if (supportOnly && answers.when !== 'scheduled') {
+    cautions.push(t('ride.caution.notARide'))
+  }
+
   // A phone number is the difference between an option and a leaflet.
   if (r.phone) score += 1
 
@@ -477,8 +495,6 @@ function scoreOption(r: Resource, ctx: ScoreContext): RideOption {
   //    need, the less a course can answer it.
   //
   // Both caught in review on PR #100.
-  const supportOnly = rideFacet(r, 'kind').some((k) => NON_RIDE_KINDS.has(k))
-
   const fit: RideFit = outOfArea
     ? 'other_area'
     : supportOnly
