@@ -174,11 +174,21 @@ npm run transit:sql -- /tmp/gtfs hart > supabase/migrations/0NN_seed_hart_transi
 ```
 
 Commit the output as a **new** migration; don't patch 043. The generated SQL
-ends with `DELETE … WHERE feed_version IS DISTINCT FROM '<new version>'`, so
-stops that disappeared from the network are removed rather than lingering and
+ends with `DELETE … WHERE feed_fingerprint IS DISTINCT FROM '<run fingerprint>'`,
+so stops that disappeared from the network are removed rather than lingering and
 claiming service that no longer exists — and then re-runs the
 `public_transit_accessible` backfill, so a listing whose only nearby stop was
 withdrawn loses the flag along with the stop.
+
+The cleanup keys on `feed_fingerprint` — a hash of the rows a run emits —
+rather than on the publisher's `feed_version`, because the published string does
+not reliably move when the network does. HART's 2608.1 bundle carries two
+service periods, so regenerating it for the later one (via the optional `asOf`
+argument) emits a different stop set under an identical version; keyed on
+`feed_version` the cleanup would spare everything dropped, and one HART stop is
+in exactly that position. An agency republishing a corrected bundle without
+bumping its version has the same effect. `feed_version` remains as human-facing
+provenance.
 
 That backfill is **emitted by the generator**, not hand-written into 043–046,
 and that placement is load-bearing: a refresh commits this output verbatim, so

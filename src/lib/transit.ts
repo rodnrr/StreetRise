@@ -54,6 +54,8 @@ export interface TransitStop {
   weekday_first: string | null
   weekday_last: string | null
   feed_version: string | null
+  /** Identifies the loader run that wrote this row; see migration 042. */
+  feed_fingerprint: string | null
   feed_valid_until: string | null
 }
 

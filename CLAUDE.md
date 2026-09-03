@@ -373,6 +373,12 @@ Keys are `<agency>:<id>` and every row carries `agency`, because the loaded feed
 is HART (Hillsborough only) and PSTA/LYNX/Miami-Dade number their stops from 1
 too. Adding one of those is another import run, not a schema change.
 
+Every row also carries `feed_fingerprint`, a hash of what a loader run emitted.
+That, not the publisher's `feed_version`, is what the cleanup `DELETE` keys on:
+a published version does not reliably move when the network does (HART ships two
+service periods under one version), so keying on it would leave withdrawn stops
+behind, still claiming service.
+
 Every row also carries `feed_valid_until` from the agency's `feed_info.txt`.
 Past that date `src/lib/transit.ts` renders nothing rather than last quarter's
 network — the same fail-closed instinct as the map's "Open right now" filter.

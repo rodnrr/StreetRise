@@ -72,6 +72,18 @@ CREATE TABLE transit_routes (
   fare_currency     TEXT,
   is_fare_free      BOOLEAN NOT NULL DEFAULT FALSE,
   feed_version      TEXT,
+  -- Identifies the RUN that produced this row, and is what the loader's
+  -- cleanup DELETE matches on. Deliberately separate from `feed_version`:
+  -- that is the publisher's string, and it does not always move when the
+  -- emitted network does. HART's 2608.1 bundle carries two service periods,
+  -- so regenerating it for the later one keeps the same published version
+  -- while emitting a different set of stops — leaving anything dropped from
+  -- the network behind, still claiming service (caught in review on PR #100).
+  -- An agency republishing a corrected bundle under an unchanged version has
+  -- the same effect. The fingerprint is computed from the rows actually
+  -- emitted, so it moves whenever membership does.
+  feed_fingerprint  TEXT,
+
   feed_valid_until  DATE,
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -122,6 +134,18 @@ CREATE TABLE transit_stops (
   -- feed has expired rather than quietly serving last quarter's network —
   -- same reasoning as the map's "Open right now" filter failing closed.
   feed_version      TEXT,
+  -- Identifies the RUN that produced this row, and is what the loader's
+  -- cleanup DELETE matches on. Deliberately separate from `feed_version`:
+  -- that is the publisher's string, and it does not always move when the
+  -- emitted network does. HART's 2608.1 bundle carries two service periods,
+  -- so regenerating it for the later one keeps the same published version
+  -- while emitting a different set of stops — leaving anything dropped from
+  -- the network behind, still claiming service (caught in review on PR #100).
+  -- An agency republishing a corrected bundle under an unchanged version has
+  -- the same effect. The fingerprint is computed from the rows actually
+  -- emitted, so it moves whenever membership does.
+  feed_fingerprint  TEXT,
+
   feed_valid_until  DATE,
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
