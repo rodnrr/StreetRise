@@ -132,7 +132,9 @@ jobs:
           build_feed bct 052_seed_bct_transit.sql \
             'https://files.mobilitydatabase.org/mdb-330/mdb-330-202606300003/mdb-330-202606300003.zip'
 
-          build_feed citrus 053_seed_citrus_connection_transit.sql \
+          # Citrus Connection is the Polk County/Lakeland transit brand. Use a
+          # disambiguated slug so it can never be confused with Citrus County.
+          build_feed citrus_connection 053_seed_citrus_connection_transit.sql \
             'https://www.ccbusinfo.com/InfoPoint/gtfs-zip.ashx'
 
           echo '--- build report ---'
