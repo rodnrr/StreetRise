@@ -422,13 +422,25 @@ function scoreOption(r: Resource, ctx: ScoreContext): RideOption {
   // A phone number is the difference between an option and a leaflet.
   if (r.phone) score += 1
 
+  // Some transportation resources help a person become able to use transit
+  // but do not themselves provide or pay for the current trip. Travel training
+  // is the first such kind: HART's seeded listing explicitly says it is a
+  // training session, not a ride. A high numeric relevance score must therefore
+  // never turn it into "Closest match" for trip fulfillment. Keep it visible,
+  // cap it at "possible" for a planned trip, and at "check" for now/today.
+  const supportOnly = rideFacet(r, 'kind').includes('travel_training')
+
   const fit: RideFit = outOfArea
     ? 'other_area'
-    : score >= 6
-      ? 'best'
-      : score >= 2
+    : supportOnly
+      ? answers.when === 'scheduled' && score >= 2
         ? 'possible'
         : 'check'
+      : score >= 6
+        ? 'best'
+        : score >= 2
+          ? 'possible'
+          : 'check'
 
   return { resource: r, fit, score, reasons, cautions }
 }
