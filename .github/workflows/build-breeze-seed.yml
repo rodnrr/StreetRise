@@ -1,5 +1,5 @@
-# One-time builder; remove after migration 055 is committed.
-name: Build Breeze Transit seed
+# One-time cleanup pass. This workflow deletes itself after committing.
+name: Finalize Breeze Transit integration
 
 on:
   push:
@@ -12,68 +12,83 @@ permissions:
   contents: write
 
 jobs:
-  build-breeze:
+  finalize-breeze:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - run: npm ci
-
-      - name: Download and validate Breeze GTFS
+      - name: Make future GTFS refreshes use the canonical one-mile rule
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/breeze
-          curl --fail --location --retry 3 --retry-delay 2 \
-            --connect-timeout 20 --max-time 180 \
-            --user-agent 'StreetRise GTFS importer (https://streetrise.org)' \
-            'https://breezerider.tripsparkhost.com/static/google_transit.zip' \
-            -o /tmp/breeze.zip
-          echo '20c127087e440ccc5f0b53b31d2c7a62c37e98e1  /tmp/breeze.zip' | sha1sum -c -
-          sha256sum /tmp/breeze.zip | tee /tmp/breeze-sha256.txt
-          unzip -q /tmp/breeze.zip -d /tmp/breeze
-          for required in agency.txt routes.txt stops.txt trips.txt stop_times.txt feed_info.txt; do
-            test -s "/tmp/breeze/$required"
-          done
+          python <<'PY'
+          from pathlib import Path
 
-      - name: Generate migration 055
+          p = Path('scripts/build-transit-sql.ts')
+          s = p.read_text()
+          start_marker = "/**\n * Re-derive `resources.public_transit_accessible`"
+          end_marker = "// ── Emit ─────────────────────────────────────────────────────────"
+          start = s.index(start_marker)
+          end = s.index(end_marker, start)
+          replacement = '''/**
+ * Re-derive the feed-managed transit-access flag after every future GTFS load.
+ *
+ * Migration 054 owns the product rule: a currently-valid GTFS stop within
+ * exactly 1,609.34 m (1 mile), while preserving human-set TRUE values. Keeping
+ * that rule in one database function prevents a later feed refresh from
+ * reintroducing the generator's former 400 m / no-expiry behavior.
+ *
+ * Historical migrations 043–053 retain the SQL they were generated with;
+ * migrations generated after 054 call this canonical function instead.
+ */
+const BACKFILL_SQL = `-- Recompute feed-derived transit accessibility using migration 054's canonical rule.
+SELECT public.refresh_transit_accessibility_flags();`
+
+'''
+          s = s[:start] + replacement + s[end:]
+          p.write_text(s)
+
+          # Resolve the main unambiguous Sarasota County place names StreetRise
+          # may store as resource cities. Ambiguous cross-county places such as
+          # Englewood and Longboat Key are intentionally not hard-coded.
+          p = Path('src/lib/rideOptions.ts')
+          s = p.read_text()
+          old = "  sarasota: 'sarasota', venice: 'sarasota',"
+          new = "  sarasota: 'sarasota', venice: 'sarasota', 'north port': 'sarasota',\n  nokomis: 'sarasota', osprey: 'sarasota', 'siesta key': 'sarasota', laurel: 'sarasota',"
+          assert old in s, 'Sarasota city mapping anchor changed'
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          # Record the exact validated Breeze archive used for migration 055.
+          p = Path('docs/transit-feed-provenance-2026-09-03.md')
+          s = p.read_text()
+          if '`055_seed_breeze_transit.sql`' not in s:
+            anchor_prefix = "| `053_seed_citrus_connection_transit.sql` | `citrus_connection` |"
+            line = next((ln for ln in s.splitlines() if ln.startswith(anchor_prefix)), None)
+            assert line, 'provenance table anchor changed'
+            breeze = (
+              "| `055_seed_breeze_transit.sql` | `breeze` | Breeze Transit — Sarasota County | "
+              "`https://breezerider.tripsparkhost.com/static/google_transit.zip` | "
+              "`e658c0031c44d8947ac02b1db6b6f5d464fcc37fcf2f1d23a2295978c13a95d9` | "
+              "1,310 stops / 15 routes | 2026-12-04 |"
+            )
+            s = s.replace(line, line + '\n' + breeze, 1)
+          p.write_text(s)
+          PY
+
+      - name: Remove one-time builder and commit cleanup
         shell: bash
         run: |
           set -euo pipefail
-          npx tsx scripts/build-transit-sql.ts /tmp/breeze breeze 20260903 \
-            > supabase/migrations/055_seed_breeze_transit.sql \
-            2> /tmp/breeze-build.log
-          cat /tmp/breeze-build.log
-          grep -q 'feed valid until 2026-12-04' supabase/migrations/055_seed_breeze_transit.sql
-          grep -q '1310 stops, 15 routes' supabase/migrations/055_seed_breeze_transit.sql
-
-          # Migration 054 is the canonical current-feed/one-mile derivation.
-          # Remove the generator's legacy embedded 400 m backfill and invoke 054.
-          sed -i '/^-- Re-derive resources.public_transit_accessible from the stops now loaded\./,$d' \
-            supabase/migrations/055_seed_breeze_transit.sql
-          cat >> supabase/migrations/055_seed_breeze_transit.sql <<'SQL'
-          -- Recompute feed-derived accessibility using migration 054's
-          -- current-feed, exactly-one-mile rule while preserving human-set TRUEs.
-          SELECT public.refresh_transit_accessibility_flags();
-          SQL
-          grep -q 'refresh_transit_accessibility_flags' supabase/migrations/055_seed_breeze_transit.sql
-          ! grep -q '<= 400' supabase/migrations/055_seed_breeze_transit.sql
-
-      - name: Commit Breeze migration
-        shell: bash
-        run: |
-          set -euo pipefail
+          git rm .github/workflows/build-breeze-seed.yml
           git config user.name 'StreetRise Transit Builder'
           git config user.email 'actions@users.noreply.github.com'
-          git add supabase/migrations/055_seed_breeze_transit.sql
+          git add scripts/build-transit-sql.ts src/lib/rideOptions.ts \
+            docs/transit-feed-provenance-2026-09-03.md
+          git diff --cached --check
           git diff --cached --stat
-          git commit -m 'feat: seed Breeze Transit for Sarasota'
+          git commit -m 'chore: finalize Breeze transit coverage'
           git push origin HEAD:feat/transit-coverage-expansion
