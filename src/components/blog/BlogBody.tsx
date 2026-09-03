@@ -71,19 +71,63 @@ function renderInline(text: string): ReactNode[] {
   return tokens
 }
 
-function legacyParagraphs(source: string): Block[] {
-  const sentences = source
-    .replace(/\s+/g, ' ')
+/** Preserve authored hard line breaks while still applying inline formatting. */
+function renderInlineWithBreaks(text: string): ReactNode[] {
+  const lines = text.split('\n')
+  const nodes: ReactNode[] = []
+
+  lines.forEach((line, index) => {
+    if (index > 0) nodes.push(<br key={`br-${index}`} />)
+    nodes.push(...renderInline(line))
+  })
+
+  return nodes
+}
+
+function splitLegacySentences(value: string): string[] {
+  return value
+    .replace(/[\t ]+/g, ' ')
     .trim()
     .split(/(?<=[.!?])\s+(?=[A-Z0-9“])/)
     .filter(Boolean)
+}
 
-  if (sentences.length < 4) return [{ type: 'paragraph', text: source.trim() }]
-
+function legacyParagraphs(source: string): Block[] {
   const blocks: Block[] = []
-  for (let i = 0; i < sentences.length; i += 2) {
-    blocks.push({ type: 'paragraph', text: sentences.slice(i, i + 2).join(' ') })
+  let preservedLines: string[] = []
+
+  const flushPreservedLines = () => {
+    if (!preservedLines.length) return
+    blocks.push({ type: 'paragraph', text: preservedLines.join('\n') })
+    preservedLines = []
   }
+
+  for (const rawLine of source.split('\n')) {
+    const line = rawLine.trim()
+    if (!line) {
+      flushPreservedLines()
+      continue
+    }
+
+    const sentences = splitLegacySentences(line)
+
+    // Long legacy lines benefit from the old sentence-grouping fallback, but
+    // grouping is performed per authored line so a hard break can never be
+    // swallowed into the surrounding prose.
+    if (sentences.length >= 4) {
+      flushPreservedLines()
+      for (let i = 0; i < sentences.length; i += 2) {
+        blocks.push({ type: 'paragraph', text: sentences.slice(i, i + 2).join(' ') })
+      }
+      continue
+    }
+
+    // Short lines may be headings, addresses, phone numbers, or CTAs. Keep
+    // their exact line boundaries and render them with explicit <br> elements.
+    preservedLines.push(line)
+  }
+
+  flushPreservedLines()
   return blocks
 }
 
@@ -91,8 +135,8 @@ function parseBlocks(source: string): Block[] {
   const normalized = source.replace(/\r\n?/g, '\n').trim()
   if (!normalized) return []
 
-  // Older StreetRise posts were stored as one long plain-text string. Give
-  // those a readable paragraph rhythm without pretending they contain markup.
+  // Older StreetRise posts were stored as plain text. Give one-line prose a
+  // readable paragraph rhythm, but preserve every authored hard line break.
   if (!MARKDOWN_BLOCK_RE.test(normalized) && !normalized.includes('\n\n')) {
     return legacyParagraphs(normalized)
   }
@@ -202,7 +246,7 @@ export default function BlogBody({ content }: { content: string }) {
           )
         }
         if (block.type === 'paragraph') {
-          return <p key={index} className="mb-6">{renderInline(block.text)}</p>
+          return <p key={index} className="mb-6">{renderInlineWithBreaks(block.text)}</p>
         }
         if (block.type === 'quote') {
           return (
