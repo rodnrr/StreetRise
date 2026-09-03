@@ -31,6 +31,19 @@ function safeHref(value: string): string | null {
   }
 }
 
+/** Turn authored hard breaks into explicit React <br> nodes. */
+function renderTextWithBreaks(text: string, keyPrefix: string): ReactNode[] {
+  const lines = text.split('\n')
+  const nodes: ReactNode[] = []
+
+  lines.forEach((line, index) => {
+    if (index > 0) nodes.push(<br key={`${keyPrefix}-br-${index}`} />)
+    if (line) nodes.push(line)
+  })
+
+  return nodes
+}
+
 function renderInline(text: string, keyPrefix = 'inline'): ReactNode[] {
   const tokens: ReactNode[] = []
   const pattern = /(\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*)/g
@@ -38,7 +51,14 @@ function renderInline(text: string, keyPrefix = 'inline'): ReactNode[] {
   let match: RegExpExecArray | null
 
   while ((match = pattern.exec(text)) !== null) {
-    if (match.index > cursor) tokens.push(text.slice(cursor, match.index))
+    if (match.index > cursor) {
+      tokens.push(
+        ...renderTextWithBreaks(
+          text.slice(cursor, match.index),
+          `${keyPrefix}-text-${cursor}`,
+        ),
+      )
+    }
 
     if (match[2] && match[3]) {
       const href = safeHref(match[3])
@@ -52,38 +72,40 @@ function renderInline(text: string, keyPrefix = 'inline'): ReactNode[] {
             rel={external ? 'noopener noreferrer' : undefined}
             className="font-medium text-primary-700 underline decoration-primary-300 decoration-2 underline-offset-2 transition-colors hover:text-primary-900 dark:text-primary-300 dark:decoration-primary-700 dark:hover:text-primary-200"
           >
-            {match[2]}
+            {renderTextWithBreaks(match[2], `${keyPrefix}-link-${match.index}-label`)}
           </a>,
         )
       } else {
-        tokens.push(match[2])
+        tokens.push(
+          ...renderTextWithBreaks(match[2], `${keyPrefix}-invalid-link-${match.index}`),
+        )
       }
     } else if (match[4]) {
-      tokens.push(<strong key={`${keyPrefix}-strong-${match.index}`} className="font-semibold text-slate-900 dark:text-white">{match[4]}</strong>)
+      tokens.push(
+        <strong
+          key={`${keyPrefix}-strong-${match.index}`}
+          className="font-semibold text-slate-900 dark:text-white"
+        >
+          {renderTextWithBreaks(match[4], `${keyPrefix}-strong-${match.index}-text`)}
+        </strong>,
+      )
     } else if (match[5]) {
-      tokens.push(<em key={`${keyPrefix}-em-${match.index}`}>{match[5]}</em>)
+      tokens.push(
+        <em key={`${keyPrefix}-em-${match.index}`}>
+          {renderTextWithBreaks(match[5], `${keyPrefix}-em-${match.index}-text`)}
+        </em>,
+      )
     }
 
     cursor = pattern.lastIndex
   }
 
-  if (cursor < text.length) tokens.push(text.slice(cursor))
+  if (cursor < text.length) {
+    tokens.push(
+      ...renderTextWithBreaks(text.slice(cursor), `${keyPrefix}-text-${cursor}`),
+    )
+  }
   return tokens
-}
-
-/** Preserve authored hard line breaks while still applying inline formatting. */
-function renderInlineWithBreaks(text: string): ReactNode[] {
-  const lines = text.split('\n')
-  const nodes: ReactNode[] = []
-
-  lines.forEach((line, index) => {
-    if (index > 0) nodes.push(<br key={`line-${index}-br`} />)
-    // `renderInline` starts match indexes at zero for every line, so include
-    // the line index in its key prefix to keep sibling token keys unique.
-    nodes.push(...renderInline(line, `line-${index}`))
-  })
-
-  return nodes
 }
 
 function splitLegacySentences(value: string): string[] {
@@ -248,7 +270,7 @@ export default function BlogBody({ content }: { content: string }) {
           )
         }
         if (block.type === 'paragraph') {
-          return <p key={index} className="mb-6">{renderInlineWithBreaks(block.text)}</p>
+          return <p key={index} className="mb-6">{renderInline(block.text, `block-${index}`)}</p>
         }
         if (block.type === 'quote') {
           return (
