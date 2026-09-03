@@ -14,6 +14,7 @@ Raw GTFS ZIP archives are **not** committed to the repository. Only generated SQ
 | `051_seed_lynx_transit.sql` | `lynx` | LYNX — Orange, Osceola, Seminole | `http://gtfsrt.golynx.com/gtfsrt/google_transit.zip` | `cbca5a8b07e49b21ede1491e841543b4d78c65a709161d26664d3b9d4e6bc9d6` | 3,687 stops / 62 routes | 2026-12-12 |
 | `052_seed_bct_transit.sql` | `bct` | Broward County Transit — Broward | Mobility Database official BCT archive `mdb-330-202606300003` | `486e7cc3a40f0fa39fd9124258af11199f65921dcdc93de6bf69d9340a4c5afe` | 4,657 active stops / 44 routes | 2026-09-26 |
 | `053_seed_citrus_connection_transit.sql` | `citrus_connection` | Citrus Connection — Polk | `https://www.ccbusinfo.com/InfoPoint/gtfs-zip.ashx` | `2c606f89a0034205edb05bbeaff44f8722b7b7fecc2edfbfc045b1ad3772cdd6` | 949 stops / 27 routes | 2027-12-31 |
+| `055_seed_breeze_transit.sql` | `breeze` | Breeze Transit — Sarasota County | `https://breezerider.tripsparkhost.com/static/google_transit.zip` | `e658c0031c44d8947ac02b1db6b6f5d464fcc37fcf2f1d23a2295978c13a95d9` | 1,310 stops / 15 routes | 2026-12-04 |
 
 ### Broward source note
 
