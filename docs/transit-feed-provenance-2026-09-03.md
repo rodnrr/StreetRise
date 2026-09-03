@@ -16,6 +16,10 @@ Raw GTFS ZIP archives are **not** committed to the repository. Only generated SQ
 | `053_seed_citrus_connection_transit.sql` | `citrus_connection` | Citrus Connection — Polk | `https://www.ccbusinfo.com/InfoPoint/gtfs-zip.ashx` | `2c606f89a0034205edb05bbeaff44f8722b7b7fecc2edfbfc045b1ad3772cdd6` | 949 stops / 27 routes | 2027-12-31 |
 | `055_seed_breeze_transit.sql` | `breeze` | Breeze Transit — Sarasota County | `https://breezerider.tripsparkhost.com/static/google_transit.zip` | `e658c0031c44d8947ac02b1db6b6f5d464fcc37fcf2f1d23a2295978c13a95d9` | 1,310 stops / 15 routes | 2026-12-04 |
 
+### Breeze source note
+
+Sarasota County identifies Breeze Transit as its public transit system and publishes developer guidance for GTFS data. The producer feed used here is Breeze's TripSpark-hosted static GTFS endpoint. Before migration 055 was committed, the archive was independently cross-checked against the current cataloged Breeze feed, then pinned during the build by its SHA-1 (`20c127087e440ccc5f0b53b31d2c7a62c37e98e1`) and SHA-256 above. The importer emitted feed version `2026 Spring V1 and 77 78 R03`, 1,310 active stops and 15 routes, with service through 2026-12-04. Migration 055 finishes by calling migration 054's canonical current-feed / one-mile accessibility refresh rather than carrying the generator's former 400 m rule.
+
 ### Broward source note
 
 Broward County Transit's producer URL (`https://www.broward.org/bct/documents/google_transit.zip`) returned HTTP 403 during the build. The accepted input is the exact official BCT snapshot archived by Mobility Database (`mdb-330`), downloaded there on 2026-06-30. Mobility Database reports 44 routes and a service period beginning 2026-06-21 and ending 2026-09-26/27. The archive URL is pinned in the temporary build history rather than silently substituting a different network.
