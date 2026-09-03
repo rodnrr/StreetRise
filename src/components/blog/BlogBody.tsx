@@ -31,14 +31,34 @@ function safeHref(value: string): string | null {
   }
 }
 
-function renderInline(text: string): ReactNode[] {
+/** Turn authored hard breaks into explicit React <br> nodes. */
+function renderTextWithBreaks(text: string, keyPrefix: string): ReactNode[] {
+  const lines = text.split('\n')
+  const nodes: ReactNode[] = []
+
+  lines.forEach((line, index) => {
+    if (index > 0) nodes.push(<br key={`${keyPrefix}-br-${index}`} />)
+    if (line) nodes.push(line)
+  })
+
+  return nodes
+}
+
+function renderInline(text: string, keyPrefix = 'inline'): ReactNode[] {
   const tokens: ReactNode[] = []
   const pattern = /(\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*)/g
   let cursor = 0
   let match: RegExpExecArray | null
 
   while ((match = pattern.exec(text)) !== null) {
-    if (match.index > cursor) tokens.push(text.slice(cursor, match.index))
+    if (match.index > cursor) {
+      tokens.push(
+        ...renderTextWithBreaks(
+          text.slice(cursor, match.index),
+          `${keyPrefix}-text-${cursor}`,
+        ),
+      )
+    }
 
     if (match[2] && match[3]) {
       const href = safeHref(match[3])
@@ -46,44 +66,92 @@ function renderInline(text: string): ReactNode[] {
         const external = /^https?:\/\//i.test(href)
         tokens.push(
           <a
-            key={`link-${match.index}`}
+            key={`${keyPrefix}-link-${match.index}`}
             href={href}
             target={external ? '_blank' : undefined}
             rel={external ? 'noopener noreferrer' : undefined}
             className="font-medium text-primary-700 underline decoration-primary-300 decoration-2 underline-offset-2 transition-colors hover:text-primary-900 dark:text-primary-300 dark:decoration-primary-700 dark:hover:text-primary-200"
           >
-            {match[2]}
+            {renderTextWithBreaks(match[2], `${keyPrefix}-link-${match.index}-label`)}
           </a>,
         )
       } else {
-        tokens.push(match[2])
+        tokens.push(
+          ...renderTextWithBreaks(match[2], `${keyPrefix}-invalid-link-${match.index}`),
+        )
       }
     } else if (match[4]) {
-      tokens.push(<strong key={`strong-${match.index}`} className="font-semibold text-slate-900 dark:text-white">{match[4]}</strong>)
+      tokens.push(
+        <strong
+          key={`${keyPrefix}-strong-${match.index}`}
+          className="font-semibold text-slate-900 dark:text-white"
+        >
+          {renderTextWithBreaks(match[4], `${keyPrefix}-strong-${match.index}-text`)}
+        </strong>,
+      )
     } else if (match[5]) {
-      tokens.push(<em key={`em-${match.index}`}>{match[5]}</em>)
+      tokens.push(
+        <em key={`${keyPrefix}-em-${match.index}`}>
+          {renderTextWithBreaks(match[5], `${keyPrefix}-em-${match.index}-text`)}
+        </em>,
+      )
     }
 
     cursor = pattern.lastIndex
   }
 
-  if (cursor < text.length) tokens.push(text.slice(cursor))
+  if (cursor < text.length) {
+    tokens.push(
+      ...renderTextWithBreaks(text.slice(cursor), `${keyPrefix}-text-${cursor}`),
+    )
+  }
   return tokens
 }
 
-function legacyParagraphs(source: string): Block[] {
-  const sentences = source
-    .replace(/\s+/g, ' ')
+function splitLegacySentences(value: string): string[] {
+  return value
+    .replace(/[\t ]+/g, ' ')
     .trim()
     .split(/(?<=[.!?])\s+(?=[A-Z0-9“])/)
     .filter(Boolean)
+}
 
-  if (sentences.length < 4) return [{ type: 'paragraph', text: source.trim() }]
-
+function legacyParagraphs(source: string): Block[] {
   const blocks: Block[] = []
-  for (let i = 0; i < sentences.length; i += 2) {
-    blocks.push({ type: 'paragraph', text: sentences.slice(i, i + 2).join(' ') })
+  let preservedLines: string[] = []
+
+  const flushPreservedLines = () => {
+    if (!preservedLines.length) return
+    blocks.push({ type: 'paragraph', text: preservedLines.join('\n') })
+    preservedLines = []
   }
+
+  for (const rawLine of source.split('\n')) {
+    const line = rawLine.trim()
+    if (!line) {
+      flushPreservedLines()
+      continue
+    }
+
+    const sentences = splitLegacySentences(line)
+
+    // Long legacy lines benefit from the old sentence-grouping fallback, but
+    // grouping is performed per authored line so a hard break can never be
+    // swallowed into the surrounding prose.
+    if (sentences.length >= 4) {
+      flushPreservedLines()
+      for (let i = 0; i < sentences.length; i += 2) {
+        blocks.push({ type: 'paragraph', text: sentences.slice(i, i + 2).join(' ') })
+      }
+      continue
+    }
+
+    // Short lines may be headings, addresses, phone numbers, or CTAs. Keep
+    // their exact line boundaries and render them with explicit <br> elements.
+    preservedLines.push(line)
+  }
+
+  flushPreservedLines()
   return blocks
 }
 
@@ -91,8 +159,8 @@ function parseBlocks(source: string): Block[] {
   const normalized = source.replace(/\r\n?/g, '\n').trim()
   if (!normalized) return []
 
-  // Older StreetRise posts were stored as one long plain-text string. Give
-  // those a readable paragraph rhythm without pretending they contain markup.
+  // Older StreetRise posts were stored as plain text. Give one-line prose a
+  // readable paragraph rhythm, but preserve every authored hard line break.
   if (!MARKDOWN_BLOCK_RE.test(normalized) && !normalized.includes('\n\n')) {
     return legacyParagraphs(normalized)
   }
@@ -190,38 +258,38 @@ export default function BlogBody({ content }: { content: string }) {
         if (block.type === 'h2') {
           return (
             <h2 key={index} className="mb-4 mt-10 text-2xl font-bold tracking-tight text-slate-950 first:mt-0 dark:text-white sm:text-3xl">
-              {renderInline(block.text)}
+              {renderInline(block.text, `block-${index}`)}
             </h2>
           )
         }
         if (block.type === 'h3') {
           return (
             <h3 key={index} className="mb-3 mt-8 text-xl font-semibold text-slate-900 dark:text-white sm:text-2xl">
-              {renderInline(block.text)}
+              {renderInline(block.text, `block-${index}`)}
             </h3>
           )
         }
         if (block.type === 'paragraph') {
-          return <p key={index} className="mb-6">{renderInline(block.text)}</p>
+          return <p key={index} className="mb-6">{renderInline(block.text, `block-${index}`)}</p>
         }
         if (block.type === 'quote') {
           return (
             <blockquote key={index} className="my-8 rounded-r-2xl border-l-4 border-primary-500 bg-primary-50/70 px-5 py-4 text-lg font-medium leading-8 text-slate-800 dark:bg-primary-950/30 dark:text-slate-100">
-              {renderInline(block.text)}
+              {renderInline(block.text, `block-${index}`)}
             </blockquote>
           )
         }
         if (block.type === 'ul') {
           return (
             <ul key={index} className="mb-7 ml-6 list-disc space-y-2 marker:text-primary-500">
-              {block.items.map((item, itemIndex) => <li key={itemIndex} className="pl-1">{renderInline(item)}</li>)}
+              {block.items.map((item, itemIndex) => <li key={itemIndex} className="pl-1">{renderInline(item, `block-${index}-item-${itemIndex}`)}</li>)}
             </ul>
           )
         }
         if (block.type === 'ol') {
           return (
             <ol key={index} className="mb-7 ml-6 list-decimal space-y-2 marker:font-semibold marker:text-primary-600 dark:marker:text-primary-400">
-              {block.items.map((item, itemIndex) => <li key={itemIndex} className="pl-1">{renderInline(item)}</li>)}
+              {block.items.map((item, itemIndex) => <li key={itemIndex} className="pl-1">{renderInline(item, `block-${index}-item-${itemIndex}`)}</li>)}
             </ol>
           )
         }
