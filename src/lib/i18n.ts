@@ -1086,7 +1086,9 @@ const en: Dict = {
   'ride.reason.provides': 'Provides: {modes}.',
   'ride.reason.mayQualify': 'You may qualify — this program is for people who meet {requirement}.',
   'ride.reason.noEligibilityRule': 'No income or disability test published.',
-  'ride.caution.outOfArea': 'Only serves {area}, which does not cover your destination.',
+  'ride.caution.outOfArea': 'Only serves {area}, which covers neither where you are nor where you are going.',
+  'ride.caution.originOutOfArea': 'Serves {area}, so it covers your destination but may not be able to pick you up in {origin}. Ask them whether they can start the trip there.',
+  'ride.caution.destinationOutOfArea': 'Serves {area}, so it can pick you up but may not be able to take you into {destination}. Ask them how far they go.',
   'ride.caution.modeMismatch': 'Does not provide the kind of transportation you said you can use.',
   'ride.caution.requires': 'Requires {requirement}.',
 
@@ -2175,7 +2177,9 @@ const es: Dict = {
   'ride.reason.provides': 'Ofrece: {modes}.',
   'ride.reason.mayQualify': 'Podrías calificar — este programa es para personas que cumplen {requirement}.',
   'ride.reason.noEligibilityRule': 'No publica requisitos de ingresos ni de discapacidad.',
-  'ride.caution.outOfArea': 'Solo da servicio en {area}, que no cubre tu destino.',
+  'ride.caution.outOfArea': 'Solo da servicio en {area}, que no cubre ni dónde estás ni a dónde vas.',
+  'ride.caution.originOutOfArea': 'Da servicio en {area}, así que cubre tu destino pero quizá no pueda recogerte en {origin}. Pregúntales si pueden iniciar el viaje ahí.',
+  'ride.caution.destinationOutOfArea': 'Da servicio en {area}, así que puede recogerte pero quizá no pueda llevarte a {destination}. Pregúntales hasta dónde llegan.',
   'ride.caution.modeMismatch': 'No ofrece el tipo de transporte que indicaste que puedes usar.',
   'ride.caution.requires': 'Requiere {requirement}.',
 

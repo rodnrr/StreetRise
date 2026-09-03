@@ -236,7 +236,7 @@ function OptionCard({ option }: { option: RideOption }) {
 export default function TransportationPage() {
   const { t, lang } = useI18n()
   const toast = useToast()
-  const [params] = useSearchParams()
+  const [params, setSearchParams] = useSearchParams()
   const storedLocation = useMapStore((s) => s.userLocation)
 
   const destinationId = params.get('to')
@@ -281,7 +281,11 @@ export default function TransportationPage() {
   const answers: RideAnswers = useMemo(() => ({ modes, eligibility, when }), [modes, eligibility, when])
 
   const ranked = useMemo(
-    () => rankRideOptions(programs ?? [], answers, { destinationCity: destination?.city, t }),
+    () => rankRideOptions(programs ?? [], answers, {
+      destinationCity: destination?.city,
+      originText,
+      t,
+    }),
     // `lang`, not `t`: the translator is a fresh closure every render, so
     // depending on it would recompute the whole ranking each time. The active
     // language is the thing that actually changes the output — every reason and
@@ -290,7 +294,7 @@ export default function TransportationPage() {
     // explanations under freshly re-rendered headings (caught in review on
     // PR #100).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [programs, answers, destination?.city, lang],
+    [programs, answers, destination?.city, originText, lang],
   )
 
   const inArea = ranked.filter((o) => o.fit !== 'other_area')
@@ -323,9 +327,19 @@ export default function TransportationPage() {
   }
 
   const restart = () => {
+    // `?to=` has to go, not just the typed text. It is what populates
+    // `destinationResource`, so leaving it in place returned the wizard to the
+    // destination step still showing the original listing as a fixed value,
+    // with no way to search for anywhere else — and that is the entry path
+    // almost everyone arrives by, from the Get There panel (caught in review
+    // on PR #100). `replace` keeps this out of the back-button history.
+    if (params.has('to') || params.has('mode')) {
+      setSearchParams(new URLSearchParams(), { replace: true })
+    }
     setStep('destination')
     setDestinationText('')
     setOriginText('')
+    setOrigin(null)
     setWhen('now')
     setModes([])
     setEligibility([])

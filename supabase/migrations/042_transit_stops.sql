@@ -312,9 +312,18 @@ COMMENT ON COLUMN resources.public_transit_accessible_source IS
 -- intended — the table is public-read — and it keeps this from becoming a
 -- privilege escalation path the way a DEFINER function could.
 --
--- Scoped by `UPDATE OF lat, lng` plus a WHEN clause, so an ordinary edit that
--- does not move the listing costs nothing, and the loader's own backfill —
--- which updates the flag but never the coordinates — cannot re-enter it.
+-- It fires on INSERT as well as on a coordinate change. Without the INSERT
+-- arm, every listing created after these migrations would sit at the column's
+-- FALSE default until the next quarterly GTFS refresh happened to sweep it up
+-- — and both `AdminResourceCreate` and the new-listing path in
+-- `ProviderListingEdit` insert coordinates (caught in review on PR #100). A new
+-- listing 50 m from a stop would be absent from the "Near transit" filter for
+-- months.
+--
+-- The UPDATE arm is scoped by `UPDATE OF lat, lng` plus a WHEN clause, so an
+-- ordinary edit that does not move the listing costs nothing, and the loader's
+-- own backfill — which updates the flag but never the coordinates — cannot
+-- re-enter it.
 
 CREATE FUNCTION resources_refresh_transit_flag()
 RETURNS TRIGGER
@@ -324,8 +333,12 @@ AS $$
 DECLARE
   near_stop BOOLEAN;
 BEGIN
-  -- A human's TRUE is never revised by anything automated.
-  IF OLD.public_transit_accessible AND OLD.public_transit_accessible_source IS NULL THEN
+  -- A human's TRUE is never revised by anything automated. On INSERT there is
+  -- no OLD, and a row arriving with TRUE and no source is exactly that case —
+  -- a seed or an import stating it deliberately — so it is left alone too.
+  IF NEW.public_transit_accessible AND NEW.public_transit_accessible_source IS NULL
+     AND (TG_OP = 'INSERT' OR (OLD.public_transit_accessible
+                               AND OLD.public_transit_accessible_source IS NULL)) THEN
     RETURN NEW;
   END IF;
 
@@ -365,6 +378,12 @@ CREATE TRIGGER resources_transit_flag_on_move
   BEFORE UPDATE OF lat, lng ON resources
   FOR EACH ROW
   WHEN (NEW.lat IS DISTINCT FROM OLD.lat OR NEW.lng IS DISTINCT FROM OLD.lng)
+  EXECUTE FUNCTION resources_refresh_transit_flag();
+
+CREATE TRIGGER resources_transit_flag_on_insert
+  BEFORE INSERT ON resources
+  FOR EACH ROW
+  WHEN (NEW.lat IS NOT NULL AND NEW.lng IS NOT NULL)
   EXECUTE FUNCTION resources_refresh_transit_flag();
 
 

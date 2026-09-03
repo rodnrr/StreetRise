@@ -249,6 +249,23 @@ export function countyForCity(city: string | null | undefined): string | null {
   return COUNTY_BY_CITY[key] ?? null
 }
 
+/**
+ * County slug from free text — a city, or an address containing one.
+ *
+ * Tries the whole string first, then each comma-separated part, so both
+ * "Clearwater" and "1059 N Hercules Ave, Clearwater, FL" resolve.
+ */
+export function countyForFreeText(text: string | null | undefined): string | null {
+  if (!text) return null
+  const trimmed = text.trim()
+  if (!trimmed) return null
+  for (const part of [trimmed, ...trimmed.split(',').map((p) => p.trim())]) {
+    const county = countyForCity(part)
+    if (county) return county
+  }
+  return null
+}
+
 // ── Matching ─────────────────────────────────────────────────────
 
 /**
@@ -275,6 +292,13 @@ interface ScoreContext {
   answers: RideAnswers
   /** Destination county, or null when the city is not in COUNTY_BY_CITY. */
   destinationCounty: string | null
+  /**
+   * Origin county, where the person told us and we could resolve it. Null when
+   * they skipped the question, used browser geolocation (coordinates carry no
+   * city, and there is no reverse geocoder here), or named somewhere the table
+   * does not cover.
+   */
+  originCounty: string | null
   t: (key: string) => string
 }
 
@@ -283,27 +307,60 @@ function labelList(keys: string[], t: (key: string) => string, lookup: Record<st
 }
 
 function scoreOption(r: Resource, ctx: ScoreContext): RideOption {
-  const { answers, destinationCounty, t } = ctx
+  const { answers, destinationCounty, originCounty, t } = ctx
   const reasons: string[] = []
   const cautions: string[] = []
   let score = 0
   let outOfArea = false
 
   // ── Service area ──
+  // A trip has TWO ends, and a door-to-door programme has to reach both.
+  // Scoring on the destination alone ranked HARTPlus a top match for a
+  // Pinellas-to-Tampa trip — Hillsborough covers where you are going, but HART
+  // paratransit cannot collect you in Pinellas — while pushing the PSTA
+  // programmes that could start the trip into the "other areas" bucket
+  // (caught in review on PR #100).
+  //
+  // Where only one end is covered the programme is neither hidden nor treated
+  // as out of area: it ranks below a full match and says which end it cannot
+  // reach. Only a programme covering NEITHER end fails closed. An unknown
+  // origin costs nothing, keeping the house rule that a missing answer never
+  // counts against anyone.
   const areas = rideFacet(r, 'area')
   if (areas.length > 0) {
     const areaNames = labelList(areas, t, COUNTY_LABEL_KEY)
-    if (destinationCounty && areas.includes(destinationCounty)) {
+    const coversDestination = !!destinationCounty && areas.includes(destinationCounty)
+    const coversOrigin = !!originCounty && areas.includes(originCounty)
+    const crossCounty = !!destinationCounty && !!originCounty && destinationCounty !== originCounty
+
+    if (!destinationCounty) {
+      // Could not resolve where they are going. Say what the programme covers
+      // and let the person judge it.
+      reasons.push(t('ride.reason.servesArea').replace('{area}', areaNames))
+      if (coversOrigin) score += 2
+    } else if (coversDestination && (!originCounty || coversOrigin)) {
       score += 3
       reasons.push(t('ride.reason.servesArea').replace('{area}', areaNames))
-    } else if (destinationCounty) {
-      // Explicit mismatch — the one place this engine fails closed.
+    } else if (coversDestination && crossCounty) {
+      score += 1
+      reasons.push(t('ride.reason.servesArea').replace('{area}', areaNames))
+      cautions.push(
+        t('ride.caution.originOutOfArea')
+          .replace('{area}', areaNames)
+          .replace('{origin}', labelList([originCounty!], t, COUNTY_LABEL_KEY)),
+      )
+    } else if (coversOrigin) {
+      score += 1
+      reasons.push(t('ride.reason.servesArea').replace('{area}', areaNames))
+      cautions.push(
+        t('ride.caution.destinationOutOfArea')
+          .replace('{area}', areaNames)
+          .replace('{destination}', labelList([destinationCounty], t, COUNTY_LABEL_KEY)),
+      )
+    } else {
+      // Covers neither end — the one place this engine fails closed.
       outOfArea = true
       cautions.push(t('ride.caution.outOfArea').replace('{area}', areaNames))
-    } else {
-      // We could not resolve the destination to a county. Say what the
-      // programme covers and let the person judge it.
-      reasons.push(t('ride.reason.servesArea').replace('{area}', areaNames))
     }
   }
 
@@ -387,11 +444,17 @@ function scoreOption(r: Resource, ctx: ScoreContext): RideOption {
 export function rankRideOptions(
   resources: Resource[],
   answers: RideAnswers,
-  opts: { destinationCity?: string | null; t: (key: string) => string },
+  opts: {
+    destinationCity?: string | null
+    /** Free text the person typed for where they are now, if anything. */
+    originText?: string | null
+    t: (key: string) => string
+  },
 ): RideOption[] {
   const ctx: ScoreContext = {
     answers,
     destinationCounty: countyForCity(opts.destinationCity),
+    originCounty: countyForFreeText(opts.originText),
     t: opts.t,
   }
   return resources
