@@ -116,6 +116,14 @@ export default function AdminResources() {
     setSelected(allVisibleSelected ? new Set() : new Set(filtered.map(r => r.id)))
   }
 
+  // Selecting under one filter view, then switching verification/freshness/
+  // search, can leave `selected` holding ids that have scrolled out of
+  // `filtered` — rows nobody looked at in the current batch. Intersecting
+  // with `filtered` here means Quick Refresh (and the "N selected" count)
+  // can only ever act on what's actually on screen right now, regardless of
+  // what got selected under a previous filter.
+  const visibleSelectedIds = filtered.filter(r => selected.has(r.id)).map(r => r.id)
+
   const AVAIL_STYLE: Record<string, string> = {
     available: 'text-green-400', limited: 'text-yellow-400',
     full: 'text-red-400', unknown: 'text-gray-500', closed: 'text-gray-500'
@@ -180,11 +188,11 @@ export default function AdminResources() {
               className="w-4 h-4 accent-primary-600" />
             Select all ({filtered.length})
           </label>
-          {selected.size > 0 && (
+          {visibleSelectedIds.length > 0 && (
             <>
-              <span className="text-xs text-gray-500">{selected.size} selected</span>
+              <span className="text-xs text-gray-500">{visibleSelectedIds.length} selected</span>
               <button
-                onClick={() => bulkRefresh.mutate([...selected])}
+                onClick={() => bulkRefresh.mutate(visibleSelectedIds)}
                 disabled={bulkRefresh.isPending}
                 className="ml-auto flex items-center gap-1.5 bg-primary-600 hover:bg-primary-500 text-white text-xs font-medium rounded-xl px-3 py-1.5 transition-colors"
               >
