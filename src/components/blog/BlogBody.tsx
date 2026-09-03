@@ -31,7 +31,7 @@ function safeHref(value: string): string | null {
   }
 }
 
-function renderInline(text: string): ReactNode[] {
+function renderInline(text: string, keyPrefix = 'inline'): ReactNode[] {
   const tokens: ReactNode[] = []
   const pattern = /(\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*)/g
   let cursor = 0
@@ -46,7 +46,7 @@ function renderInline(text: string): ReactNode[] {
         const external = /^https?:\/\//i.test(href)
         tokens.push(
           <a
-            key={`link-${match.index}`}
+            key={`${keyPrefix}-link-${match.index}`}
             href={href}
             target={external ? '_blank' : undefined}
             rel={external ? 'noopener noreferrer' : undefined}
@@ -59,9 +59,9 @@ function renderInline(text: string): ReactNode[] {
         tokens.push(match[2])
       }
     } else if (match[4]) {
-      tokens.push(<strong key={`strong-${match.index}`} className="font-semibold text-slate-900 dark:text-white">{match[4]}</strong>)
+      tokens.push(<strong key={`${keyPrefix}-strong-${match.index}`} className="font-semibold text-slate-900 dark:text-white">{match[4]}</strong>)
     } else if (match[5]) {
-      tokens.push(<em key={`em-${match.index}`}>{match[5]}</em>)
+      tokens.push(<em key={`${keyPrefix}-em-${match.index}`}>{match[5]}</em>)
     }
 
     cursor = pattern.lastIndex
@@ -77,8 +77,10 @@ function renderInlineWithBreaks(text: string): ReactNode[] {
   const nodes: ReactNode[] = []
 
   lines.forEach((line, index) => {
-    if (index > 0) nodes.push(<br key={`br-${index}`} />)
-    nodes.push(...renderInline(line))
+    if (index > 0) nodes.push(<br key={`line-${index}-br`} />)
+    // `renderInline` starts match indexes at zero for every line, so include
+    // the line index in its key prefix to keep sibling token keys unique.
+    nodes.push(...renderInline(line, `line-${index}`))
   })
 
   return nodes
@@ -234,14 +236,14 @@ export default function BlogBody({ content }: { content: string }) {
         if (block.type === 'h2') {
           return (
             <h2 key={index} className="mb-4 mt-10 text-2xl font-bold tracking-tight text-slate-950 first:mt-0 dark:text-white sm:text-3xl">
-              {renderInline(block.text)}
+              {renderInline(block.text, `block-${index}`)}
             </h2>
           )
         }
         if (block.type === 'h3') {
           return (
             <h3 key={index} className="mb-3 mt-8 text-xl font-semibold text-slate-900 dark:text-white sm:text-2xl">
-              {renderInline(block.text)}
+              {renderInline(block.text, `block-${index}`)}
             </h3>
           )
         }
@@ -251,21 +253,21 @@ export default function BlogBody({ content }: { content: string }) {
         if (block.type === 'quote') {
           return (
             <blockquote key={index} className="my-8 rounded-r-2xl border-l-4 border-primary-500 bg-primary-50/70 px-5 py-4 text-lg font-medium leading-8 text-slate-800 dark:bg-primary-950/30 dark:text-slate-100">
-              {renderInline(block.text)}
+              {renderInline(block.text, `block-${index}`)}
             </blockquote>
           )
         }
         if (block.type === 'ul') {
           return (
             <ul key={index} className="mb-7 ml-6 list-disc space-y-2 marker:text-primary-500">
-              {block.items.map((item, itemIndex) => <li key={itemIndex} className="pl-1">{renderInline(item)}</li>)}
+              {block.items.map((item, itemIndex) => <li key={itemIndex} className="pl-1">{renderInline(item, `block-${index}-item-${itemIndex}`)}</li>)}
             </ul>
           )
         }
         if (block.type === 'ol') {
           return (
             <ol key={index} className="mb-7 ml-6 list-decimal space-y-2 marker:font-semibold marker:text-primary-600 dark:marker:text-primary-400">
-              {block.items.map((item, itemIndex) => <li key={itemIndex} className="pl-1">{renderInline(item)}</li>)}
+              {block.items.map((item, itemIndex) => <li key={itemIndex} className="pl-1">{renderInline(item, `block-${index}-item-${itemIndex}`)}</li>)}
             </ol>
           )
         }
