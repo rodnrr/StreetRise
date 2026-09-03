@@ -141,6 +141,12 @@ const NOTICE_KEY: Record<string, string> = {
  * on the map is a property of the listing itself, which is why this table
  * lives here and not in `mapFilters.ts`.
  *
+ * `src/lib/transit.ts` reads it too, for the same reason in a different guise:
+ * transit feeds are published per agency and agencies are county-scoped, so
+ * the county is what decides whether we hold data authoritative enough to say
+ * anything about an address. Keep the two importers in mind when editing —
+ * a missing city degrades ride ranking AND silences the nearest-stop line.
+ *
  * Keys are lower-cased and stripped of punctuation by `countyForCity`, so
  * "St. Petersburg", "St Petersburg" and "SAINT PETERSBURG" all land here. A
  * city that is missing simply yields `null`, and an unknown county is treated
@@ -152,29 +158,35 @@ const COUNTY_BY_CITY: Record<string, string> = {
   largo: 'pinellas', 'pinellas park': 'pinellas', 'safety harbor': 'pinellas',
   dunedin: 'pinellas', 'tarpon springs': 'pinellas', seminole: 'pinellas',
   'treasure island': 'pinellas', gulfport: 'pinellas', oldsmar: 'pinellas',
+  'palm harbor': 'pinellas', 'tierra verde': 'pinellas',
   // Hillsborough
   tampa: 'hillsborough', brandon: 'hillsborough', riverview: 'hillsborough',
   'plant city': 'hillsborough', 'temple terrace': 'hillsborough', ruskin: 'hillsborough',
   'progress village': 'hillsborough', lutz: 'hillsborough', valrico: 'hillsborough',
-  'sun city center': 'hillsborough',
+  'sun city center': 'hillsborough', lithia: 'hillsborough', thonotosassa: 'hillsborough',
+  seffner: 'hillsborough', gibsonton: 'hillsborough', 'apollo beach': 'hillsborough',
   // Pasco / Hernando / Manatee / Sarasota / Polk
   'new port richey': 'pasco', 'port richey': 'pasco', 'dade city': 'pasco',
   hudson: 'pasco', 'wesley chapel': 'pasco', 'zephyrhills': 'pasco',
   brooksville: 'hernando', 'spring hill': 'hernando',
   bradenton: 'manatee', palmetto: 'manatee',
   sarasota: 'sarasota', venice: 'sarasota',
-  lakeland: 'polk', 'winter haven': 'polk',
+  lakeland: 'polk', 'winter haven': 'polk', bartow: 'polk', mulberry: 'polk',
+  'haines city': 'polk', 'lake wales': 'polk',
   // Orange / Osceola / Seminole
   orlando: 'orange', 'winter park': 'orange', apopka: 'orange', ocoee: 'orange',
   bithlo: 'orange', 'pine hills': 'orange', 'winter garden': 'orange', maitland: 'orange',
   kissimmee: 'osceola', 'st cloud': 'osceola', 'saint cloud': 'osceola',
+  kenansville: 'osceola',
   sanford: 'seminole', 'altamonte springs': 'seminole', longwood: 'seminole',
   // Miami-Dade / Broward
   miami: 'miami_dade', 'miami beach': 'miami_dade', hialeah: 'miami_dade',
   homestead: 'miami_dade', 'miami gardens': 'miami_dade', 'north miami': 'miami_dade',
   'coral gables': 'miami_dade', 'opa locka': 'miami_dade',
+  'cutler bay': 'miami_dade', 'florida city': 'miami_dade', doral: 'miami_dade',
   hollywood: 'broward', 'fort lauderdale': 'broward', 'pembroke pines': 'broward',
   'pompano beach': 'broward', 'dania beach': 'broward', hallandale: 'broward',
+  'pembroke park': 'broward', plantation: 'broward',
 }
 
 export const COUNTY_LABEL_KEY: Record<string, string> = {
@@ -192,7 +204,19 @@ export const COUNTY_LABEL_KEY: Record<string, string> = {
   broward:      'ride.county.broward',
 }
 
-/** County slug for a city name, or null when we genuinely do not know. */
+/**
+ * County slug for a city name, or null when we genuinely do not know.
+ *
+ * Worth re-checking against live whenever a seed batch adds a metro:
+ *
+ *   SELECT DISTINCT address->>'city' FROM resources
+ *   WHERE is_active AND is_map_ready AND lat IS NOT NULL;
+ *
+ * A city missing from the table is not a crash, but it is not free either —
+ * it downgrades the transit lookup to `partial`, which suppresses the "nearest
+ * stop is 8 miles away" line. That line matters most for exactly the remote
+ * listings whose towns are likeliest to be missing here.
+ */
 export function countyForCity(city: string | null | undefined): string | null {
   if (!city) return null
   const key = city

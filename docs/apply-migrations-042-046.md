@@ -1,8 +1,21 @@
-# Applying Migrations 042 & 043 — Transit stops from HART's GTFS feed
+# Applying Migrations 042–046 — Transit stops from four Florida GTFS feeds
 
-**Status: NOT APPLIED.** Written 2026-09-03. 042 creates the tables, 043 loads
-HART's feed into them and backfills `resources.public_transit_accessible`.
-**Run 042 first** — 043 inserts into tables 042 creates.
+**Status: NOT APPLIED.** Written 2026-09-03.
+
+| Migration | Agency | County | Stops | Routes | Feed | Size |
+|---|---|---|---|---|---|---|
+| **042** | — | — | — | — | DDL only | 6 KB |
+| **043** | HART | Hillsborough | 2,245 | 32 | `2608.1`, valid → 2027-01-02 | 410 KB |
+| **044** | MCAT | Manatee | 928 | 16 | `20260814`, valid → 2027-06-04 | 170 KB |
+| **045** | Miami-Dade Transit | Miami-Dade | 6,973 | 122 | derived, valid → 2027-12-31 | 1.4 MB |
+| **046** | GoPasco | Pasco | 945 | 14 | `20260828`, valid → 2031-12-13 | 180 KB |
+
+**Run 042 first** — the other four insert into tables it creates. 043–046 are
+independent of each other and can be applied in any order, or individually.
+Each is self-contained: it loads its agency's stops *and* runs the
+`public_transit_accessible` backfill, so applying just 045 correctly flags the
+Miami listings without a separate step. The backfill only ever raises a flag,
+so running it four times costs nothing.
 
 The app degrades honestly without them: `src/lib/transit.ts` returns
 `no_coverage` when the query finds nothing, and the Get There panel renders no
@@ -16,17 +29,30 @@ FALSE** — including First Baptist Progress Village, which is **17 metres** fro
 a stop on Route 8. The filter isn't empty, it's wrong, and it hides listings
 from the people who filter on it.
 
-Measured against HART's stop coordinates, of those 21 listings:
+Measured against the four feeds:
 
-| Distance to nearest HART stop | Count |
-|---|---|
-| ≤ 400 m (a quarter mile) | 11 |
-| 400 m – 800 m | 4 |
-| > 2 km | 6 |
+| | Hillsborough (HART) | Miami-Dade (MDT) | Pasco | Manatee |
+|---|---|---|---|---|
+| Listings on live | 21 | 25 | 2 | **0** |
+| Within 400 m of a stop | 11 | 23 | 0 | — |
+| Flag currently wrong (will be raised) | 11 | 5 | 0 | — |
 
-The far end matters as much as the near end. The four parks and campgrounds are
-**7 to 11 miles** from any stop. For someone without a car that is the single
-most important fact on the page, and the schema had no way to say it.
+The far end matters as much as the near end. Hillsborough's four parks and
+campgrounds are **7 to 11 miles** from any stop, and Pasco's two campgrounds
+are 1.5 and 3.8 miles out. For someone without a car that is the single most
+important fact on the page, and the schema had no way to say it.
+
+**Miami-Dade also confirms rather than corrects.** 18 of the 19 hand-set TRUE
+flags from migration 032 measure inside 400 m, most within 100 m — a good
+result for hand-entered data, and worth knowing. The one exception, Branches
+North Dade, comes out at 400.4 m: over the line by a rounding error, and left
+alone, because none of this ever lowers a flag.
+
+**Manatee loads stops that nothing currently matches.** There are no public
+Manatee listings on live (CLAUDE.md records migration 022 as having expanded
+into "Manatee/Bradenton", but nothing from it is publicly visible). It is still
+worth loading: the first Manatee listing gets a nearest-stop line the day it is
+added, and without it the app cannot distinguish "no feed" from "no transit".
 
 ## What each migration does
 

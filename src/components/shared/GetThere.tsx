@@ -31,7 +31,12 @@ function NearestStop({ resource, compact }: { resource: Resource; compact: boole
     // Stop locations change on service-change dates, not by the minute.
     staleTime: 1000 * 60 * 60,
     enabled: resource.lat != null && resource.lng != null,
-    queryFn: () => lookupNearestStop({ lat: resource.lat!, lng: resource.lng! }),
+    queryFn: () => lookupNearestStop(
+      { lat: resource.lat!, lng: resource.lng! },
+      // The city decides whether we hold a feed for this county at all, and
+      // therefore whether an absence of stops means anything. See coverageFor().
+      { city: resource.address?.city },
+    ),
   })
 
   if (!data || data.kind === 'no_coverage' || data.kind === 'stale_feed') return null

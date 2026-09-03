@@ -5,8 +5,8 @@
 Shipped: `/transportation` (directory + Ride Assistance Finder), the "Get There"
 panel on the map sheet and `/resources/:id`, `src/lib/transport.ts`,
 `src/lib/rideOptions.ts`, `src/lib/transit.ts` (nearest bus stop from static
-GTFS), `scripts/build-transit-sql.ts`, `publicTags()`, EN/ES strings, and
-migrations 041, 042 and 043. Open items this raised:
+GTFS, gated on per-county feed coverage), `scripts/build-transit-sql.ts`,
+`publicTags()`, EN/ES strings, and migrations 041–046. Open items this raised:
 
 - **Migration 041 is written but NOT applied, and has unverified facts in it.**
   Read `docs/apply-migration-041.md` before running it. The authoring session
@@ -33,11 +33,33 @@ migrations 041, 042 and 043. Open items this raised:
   yields `null`, which the matcher treats as "maybe" rather than "no", so a gap
   costs ranking quality and never hides a programme. Worth extending whenever a
   seed batch adds a new metro.
-- **Migrations 042/043 (transit stops) are written but NOT applied.** Runbook:
-  `docs/apply-migrations-042-043.md`. Unlike 041, the data is first-hand — read
-  straight out of HART's own published GTFS bundle — so there is nothing to
-  verify, only to apply. 043 is ~410 KB, which is an unpleasant paste on a
-  phone; worth asking whether to apply it through tooling instead.
+- **Migrations 042–046 (transit stops) are written but NOT applied.** Runbook:
+  `docs/apply-migrations-042-046.md`. Unlike 041, the data is first-hand — read
+  straight out of each agency's published GTFS bundle — so there is nothing to
+  verify, only to apply. Four feeds: HART (Hillsborough), MCAT (Manatee),
+  Miami-Dade Transit, GoPasco. 045 is ~1.4 MB and 043 ~410 KB, which are
+  unpleasant pastes on a phone; worth applying through tooling instead.
+- **PSTA and LYNX are the biggest remaining transit gaps.** Orlando has 31
+  public listings and Pinellas around 30 (Clearwater 12, St. Petersburg 11,
+  plus Largo, Safety Harbor, Tarpon Springs, Palm Harbor, Tierra Verde) — none
+  of them get a nearest-stop line, because `AGENCY_BY_COUNTY` correctly reports
+  no coverage for Orange, Osceola and Pinellas. Both agencies publish GTFS.
+  Adding either is `npm run transit:sql`, a new migration, and one line in
+  `AGENCY_BY_COUNTY`. Broward (13 listings) and Polk (23) are next after those.
+- **Feeds expire, and nothing currently watches for it.** Every stop carries
+  `feed_valid_until` and `src/lib/transit.ts` goes silent past it, so the
+  failure mode is safe — but silent. HART's feed runs out **2027-01-02**, MCAT's
+  2027-06-04, Miami-Dade's 2027-12-31; GoPasco publishes to 2031. When the first
+  one lapses the nearest-stop line will simply disappear for Hillsborough with
+  no warning anywhere. Worth an admin-dashboard check, or a calendar reminder to
+  re-run `npm run transit:sql` each quarter.
+- **`COUNTY_BY_CITY` now gates two features, not one.** It was added for the
+  Ride Assistance Finder; `transit.ts` reads it too, to decide whether we hold
+  an authoritative feed for an address. Verified 2026-09-03 that all 40 distinct
+  cities on live resolve. A city missing from it is not a crash but it does
+  suppress the "nearest stop is 8 miles away" line — which matters most for
+  exactly the remote listings whose towns are likeliest to be missing. Re-check
+  it whenever a seed batch adds a metro; the query is in that file's comment.
 - **Several listings share one rounded coordinate — real geocoding bug, found
   2026-09-03.** Red Shield Center, Trinity Cafe Nebraska, Recuperative Care
   Program and an emergency shelter all carry `27.9614,-82.4597`; three more

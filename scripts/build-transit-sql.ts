@@ -30,6 +30,7 @@
  */
 import { createReadStream, readFileSync, existsSync } from 'node:fs'
 import { createInterface } from 'node:readline'
+import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 
 const [dir, agencySlug, asOfArg] = process.argv.slice(2)
@@ -73,21 +74,50 @@ const q = (v: string | null | undefined) =>
 const arr = (vs: string[]) =>
   vs.length === 0 ? `'{}'` : `'{${vs.map((v) => `"${v.replace(/(["\\])/g, '\\$1')}"`).join(',')}}'`
 
-// ── Feed metadata ────────────────────────────────────────────────
-const feedInfo = readTable('feed_info.txt')[0] ?? {}
-const feedVersion = feedInfo.feed_version || null
-// Normalised to ISO YYYY-MM-DD. Postgres accepts GTFS's compact YYYYMMDD too,
-// but the emitted SQL is read by people during an apply, and an unpunctuated
-// date is the kind of thing that gets misread once and then trusted.
-const rawFeedEnd = feedInfo.feed_end_date || null
-const feedEnd = rawFeedEnd && /^\d{8}$/.test(rawFeedEnd)
-  ? `${rawFeedEnd.slice(0, 4)}-${rawFeedEnd.slice(4, 6)}-${rawFeedEnd.slice(6, 8)}`
-  : rawFeedEnd
 const asOf = asOfArg || new Date().toISOString().slice(0, 10).replace(/-/g, '')
 
+/**
+ * How far ahead to look when a feed describes its service only as a list of
+ * dates. Four weeks covers a full weekly cycle with room for variation,
+ * without letting a one-off special service months away look like a pattern.
+ */
+const LOOKAHEAD_DAYS = 28
+
+/** Day index (0 = Sunday) for a GTFS YYYYMMDD date, in UTC to avoid TZ drift. */
+function weekdayOf(yyyymmdd: string): number {
+  const y = Number(yyyymmdd.slice(0, 4))
+  const m = Number(yyyymmdd.slice(4, 6))
+  const d = Number(yyyymmdd.slice(6, 8))
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+}
+
+function addDays(yyyymmdd: string, days: number): string {
+  const y = Number(yyyymmdd.slice(0, 4))
+  const m = Number(yyyymmdd.slice(4, 6))
+  const d = Number(yyyymmdd.slice(6, 8))
+  const t = new Date(Date.UTC(y, m - 1, d + days))
+  return `${t.getUTCFullYear()}${String(t.getUTCMonth() + 1).padStart(2, '0')}${String(t.getUTCDate()).padStart(2, '0')}`
+}
+
+const horizon = addDays(asOf, LOOKAHEAD_DAYS)
+
 // ── Active calendar ──────────────────────────────────────────────
+// Two shapes exist in the wild and both turn up among Florida's agencies.
+// HART, MCAT and Miami-Dade publish `calendar.txt` with weekly patterns and
+// use `calendar_dates.txt` only for holiday exceptions. GoPasco publishes NO
+// calendar.txt at all — every operating day is an explicit `calendar_dates`
+// row, 1,657 of them running out to 2031.
+//
+// The rule: **calendar.txt wins wherever it describes a service today.** Its
+// weekly pattern is the agency's own statement of intent, and folding holiday
+// exceptions into it would corrupt that — HART adds its Sunday service on
+// Labor Day, a Monday, and reading that as "this service runs on Mondays"
+// would mark Sunday-only stops as having weekday service. Only services that
+// calendar.txt does not describe today fall through to having their day
+// pattern inferred from the dates they are actually scheduled to run.
 type ServiceDays = { weekday: boolean; saturday: boolean; sunday: boolean }
 const activeService = new Map<string, ServiceDays>()
+
 for (const c of readTable('calendar.txt')) {
   if (c.start_date <= asOf && asOf <= c.end_date) {
     activeService.set(c.service_id, {
@@ -97,10 +127,89 @@ for (const c of readTable('calendar.txt')) {
     })
   }
 }
+const fromCalendarCount = activeService.size
+
+const addedWeekdays = new Map<string, Set<number>>()
+for (const e of readTable('calendar_dates.txt')) {
+  // exception_type 2 is a removal. Removals are only ever holiday carve-outs
+  // from a calendar.txt pattern, and one cancelled Monday does not mean the
+  // service stops running on Mondays — so they are read for nothing here.
+  if (e.exception_type !== '1') continue
+  if (e.date < asOf || e.date > horizon) continue
+  let set = addedWeekdays.get(e.service_id)
+  if (!set) { set = new Set(); addedWeekdays.set(e.service_id, set) }
+  set.add(weekdayOf(e.date))
+}
+for (const [serviceId, days] of addedWeekdays) {
+  if (activeService.has(serviceId)) continue
+  activeService.set(serviceId, {
+    weekday: [1, 2, 3, 4, 5].some((d) => days.has(d)),
+    saturday: days.has(6),
+    sunday: days.has(0),
+  })
+}
+
 if (activeService.size === 0) {
-  console.error(`No service_id in calendar.txt is active on ${asOf} — refusing to emit an empty feed.`)
+  console.error(
+    `No service is active on ${asOf}: calendar.txt describes none, and calendar_dates.txt ` +
+    `adds none between then and ${horizon}. Refusing to emit an empty feed — check the ` +
+    `bundle is current, or pass an explicit reference date.`,
+  )
   process.exit(1)
 }
+console.error(
+  `active services: ${activeService.size} ` +
+  `(${fromCalendarCount} from calendar.txt, ${activeService.size - fromCalendarCount} from calendar_dates.txt)`,
+)
+
+// ── Feed metadata ────────────────────────────────────────────────
+// feed_info.txt is optional in GTFS and Miami-Dade omits it entirely, so both
+// fields need a fallback. They are not cosmetic: `feed_valid_until` is what
+// makes the app stop asserting a network it can no longer vouch for, and
+// `feed_version` is what the trailing DELETE uses to retire stops that have
+// left the network. A NULL version would make that DELETE a no-op forever.
+const feedInfo = readTable('feed_info.txt')[0] ?? {}
+
+function latestServiceDate(): string | null {
+  let latest: string | null = null
+  for (const c of readTable('calendar.txt')) {
+    if (activeService.has(c.service_id) && (!latest || c.end_date > latest)) latest = c.end_date
+  }
+  for (const e of readTable('calendar_dates.txt')) {
+    if (e.exception_type === '1' && activeService.has(e.service_id) && (!latest || e.date > latest)) {
+      latest = e.date
+    }
+  }
+  return latest
+}
+
+const rawFeedEnd = feedInfo.feed_end_date || latestServiceDate()
+// Normalised to ISO YYYY-MM-DD. Postgres accepts GTFS's compact YYYYMMDD too,
+// but the emitted SQL is read by people during an apply, and an unpunctuated
+// date is the kind of thing that gets misread once and then trusted.
+const feedEnd = rawFeedEnd && /^\d{8}$/.test(rawFeedEnd)
+  ? `${rawFeedEnd.slice(0, 4)}-${rawFeedEnd.slice(4, 6)}-${rawFeedEnd.slice(6, 8)}`
+  : rawFeedEnd
+
+/**
+ * Stand-in version for a feed that publishes none.
+ *
+ * Hashes the files that describe the NETWORK — which stops and routes exist,
+ * and when they run — but deliberately not stop_times.txt. A timetable tweak
+ * that moves departures around without adding or removing a stop should update
+ * rows in place (which ON CONFLICT already does) rather than look like a new
+ * feed. What the version has to detect is a stop leaving the network.
+ */
+function derivedVersion(): string {
+  const h = createHash('sha1')
+  for (const f of ['routes.txt', 'stops.txt', 'calendar.txt', 'calendar_dates.txt']) {
+    const path = join(dir, f)
+    if (existsSync(path)) h.update(readFileSync(path))
+  }
+  return `derived-${h.digest('hex').slice(0, 12)}`
+}
+
+const feedVersion = feedInfo.feed_version || derivedVersion()
 
 // ── Routes and fares ─────────────────────────────────────────────
 const fareAttrs = new Map(readTable('fare_attributes.txt').map((f) => [f.fare_id, f]))

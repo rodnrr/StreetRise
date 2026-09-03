@@ -1,7 +1,7 @@
 -- ================================================================
 -- StreetRise — Migration 043: HART static GTFS load + transit backfill
 --
--- NOT APPLIED. Runbook: docs/apply-migrations-042-043.md
+-- NOT APPLIED. Runbook: docs/apply-migrations-042-046.md
 -- Requires migration 042 (the tables) to have run first.
 --
 -- Two parts:

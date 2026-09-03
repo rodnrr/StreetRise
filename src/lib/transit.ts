@@ -35,6 +35,7 @@
 //    operator serves the address.
 
 import { db } from '@/lib/supabase'
+import { countyForCity } from '@/lib/rideOptions'
 import { distanceKm, formatDistance, kmToMiles, type LatLng } from '@/lib/geo'
 
 export interface TransitStop {
@@ -67,9 +68,34 @@ export interface TransitRoute {
   is_fare_free: boolean
 }
 
-/** Human label for an agency slug. Extend when a second feed is imported. */
+/** Public brand name for an agency slug, as the agency itself writes it. */
 export const AGENCY_LABEL: Record<string, string> = {
-  hart: 'HART',
+  hart:  'HART',
+  mcat:  'MCAT',
+  mdt:   'Miami-Dade Transit',
+  pasco: 'GoPasco',
+}
+
+/**
+ * Counties we hold a transit feed for, and which agency covers each.
+ *
+ * This is the gate that keeps the nearest-stop line honest as more feeds land.
+ * Distance alone is not enough: GoPasco's service area borders Pinellas, so a
+ * Tarpon Springs listing can sit a couple of kilometres from a GoPasco stop
+ * while being served all day by PSTA, whose feed we do not hold. Saying
+ * "nearest stop: GoPasco, 2 km" there is not false, but it is a partial answer
+ * dressed as a complete one.
+ *
+ * Florida's other big systems — PSTA in Pinellas, LYNX in Orange/Osceola/
+ * Seminole, Broward County Transit — are NOT loaded. Addresses in their
+ * counties get silence, which is the honest answer, and this map is what makes
+ * that distinguishable from "no bus".
+ */
+export const AGENCY_BY_COUNTY: Record<string, string> = {
+  hillsborough: 'hart',
+  manatee:      'mcat',
+  miami_dade:   'mdt',
+  pasco:        'pasco',
 }
 
 /** Within this, the stop is a normal walk — the standard quarter-mile rule. */
@@ -83,6 +109,26 @@ export const NEARBY_KM = 1.2
  * metro, so a Miami or Orlando listing correctly finds nothing.
  */
 export const COVERAGE_RADIUS_KM = 40
+
+/**
+ * How far we trust a lookup for this address.
+ *
+ *  • `authoritative` — the listing's county has a loaded feed, so both a
+ *    nearby stop AND the absence of one are meaningful.
+ *  • `partial` — we could not resolve the city to a county (a town missing
+ *    from COUNTY_BY_CITY). Positive evidence still counts: a stop 80 m away is
+ *    a fact whatever county we think it is in. But the "nearest stop is 8 miles
+ *    away" line is suppressed, because that one implies an absence we cannot
+ *    vouch for.
+ *  • `none` — the county is known and we hold no feed for it. Say nothing.
+ */
+export type CoverageLevel = 'authoritative' | 'partial' | 'none'
+
+export function coverageFor(city: string | null | undefined): CoverageLevel {
+  const county = countyForCity(city)
+  if (!county) return 'partial'
+  return AGENCY_BY_COUNTY[county] ? 'authoritative' : 'none'
+}
 
 export type TransitLookup =
   /** A stop close enough to walk to. */
@@ -147,19 +193,28 @@ export function isFeedExpired(stop: TransitStop, now: Date): boolean {
  */
 export async function lookupNearestStop(
   origin: LatLng,
-  opts: { now?: Date } = {},
+  opts: { now?: Date; city?: string | null } = {},
 ): Promise<TransitLookup> {
   const now = opts.now ?? new Date()
+
+  // A county we hold no feed for is answered without touching the network.
+  const coverage = coverageFor(opts.city)
+  if (coverage === 'none') return { kind: 'no_coverage' }
 
   let found = nearest(origin, await stopsInBox(origin, NEARBY_KM))
   if (!found) found = nearest(origin, await stopsInBox(origin, COVERAGE_RADIUS_KM))
   if (!found || found.km > COVERAGE_RADIUS_KM) return { kind: 'no_coverage' }
   if (isFeedExpired(found.stop, now)) return { kind: 'stale_feed' }
 
+  if (found.km <= WALKABLE_KM) {
+    const fareFreeRoutes = await fareFreeAmong(found.stop)
+    return { kind: 'walkable', stop: found.stop, km: found.km, fareFreeRoutes }
+  }
+  // Everything below here is a claim about ABSENCE — "nothing closer than
+  // this" — which only the authoritative case has standing to make.
+  if (coverage !== 'authoritative') return { kind: 'no_coverage' }
   const fareFreeRoutes = await fareFreeAmong(found.stop)
-  return found.km <= WALKABLE_KM
-    ? { kind: 'walkable', stop: found.stop, km: found.km, fareFreeRoutes }
-    : { kind: 'distant', stop: found.stop, km: found.km, fareFreeRoutes }
+  return { kind: 'distant', stop: found.stop, km: found.km, fareFreeRoutes }
 }
 
 /**

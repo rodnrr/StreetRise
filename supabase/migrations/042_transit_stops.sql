@@ -1,7 +1,7 @@
 -- ================================================================
 -- StreetRise — Migration 042: Transit stops and routes (DDL only)
 --
--- NOT APPLIED. Runbook: docs/apply-migrations-042-043.md
+-- NOT APPLIED. Runbook: docs/apply-migrations-042-046.md
 --
 -- Schema for static GTFS data, so a listing can answer "can I get here
 -- on the bus, and does one actually stop near enough to walk?".
