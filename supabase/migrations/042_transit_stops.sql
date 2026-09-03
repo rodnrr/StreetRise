@@ -176,7 +176,8 @@ CREATE TRIGGER transit_routes_updated_at
 CREATE FUNCTION nearest_transit_stop(
   in_lat       DOUBLE PRECISION,
   in_lng       DOUBLE PRECISION,
-  in_radius_km DOUBLE PRECISION DEFAULT 40
+  in_radius_km DOUBLE PRECISION DEFAULT 40,
+  in_agency    TEXT DEFAULT NULL
 )
 RETURNS SETOF transit_stops
 LANGUAGE sql
@@ -197,6 +198,7 @@ AS $$
   FROM transit_stops s, b
   WHERE s.lat BETWEEN in_lat - b.lat_deg AND in_lat + b.lat_deg
     AND s.lng BETWEEN in_lng - b.lng_deg AND in_lng + b.lng_deg
+    AND (in_agency IS NULL OR s.agency = in_agency)
   ORDER BY 2 * 6371 * asin(sqrt(
              sin(radians(s.lat - in_lat) / 2) ^ 2
              + cos(radians(in_lat)) * cos(radians(s.lat))
@@ -205,14 +207,65 @@ AS $$
   LIMIT 1;
 $$;
 
+-- `in_agency` scopes the search to one operator, and the app passes it
+-- whenever the listing's county resolves to a loaded feed. Agencies overlap at
+-- county lines: HART and GoPasco publish stops 2 and 3 METRES apart at the
+-- Wiregrass park-and-ride and AdventHealth Wesley Chapel. Without scoping, a
+-- Pasco address can be answered with the marginally-closer HART row — which
+-- names the wrong operator today, and after HART's feed expires (2027-01-02,
+-- against GoPasco's 2031-12-13) makes the whole panel go silent on an
+-- expired-feed check while a perfectly valid GoPasco stop sits three metres
+-- away. Caught in review on PR #100.
+--
+-- NULL means "any agency", which is what the app passes when it could not
+-- resolve the city to a county. A stop that is genuinely walkable is positive
+-- evidence whoever runs it, so that case stays unscoped.
+--
 -- The Get There panel renders for visitors who never sign in, so anon needs
 -- to call this. RLS still gates which rows come back.
-GRANT EXECUTE ON FUNCTION nearest_transit_stop(DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION)
+GRANT EXECUTE ON FUNCTION nearest_transit_stop(DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION, TEXT)
   TO anon, authenticated;
 
 
 -- ════════════════════════════════════════════════════════════════
--- 4. RLS
+-- 4. Provenance for the derived transit flag
+-- ════════════════════════════════════════════════════════════════
+-- `resources.public_transit_accessible` has two kinds of TRUE in it, and
+-- until now nothing could tell them apart:
+--
+--   • a HUMAN said so — 19 of the 29 rows true on live were hand-set by
+--     migration 032, and a provider who knows there is a stop outside their
+--     door that no published feed lists is the most valuable kind of TRUE
+--     this column can hold;
+--   • a FEED said so — what the backfill in 043–046 writes.
+--
+-- The distinction matters because of a real staleness path (caught in review
+-- on PR #100): the seed migrations only ever RAISE the flag, so when a later
+-- GTFS refresh withdraws the only stop near a listing, the generated DELETE
+-- removes the stop while the flag stays TRUE forever, and the map's "Near
+-- transit" facet and badge go on asserting access that no longer exists.
+--
+-- The obvious repair — reset the flag and recompute — is not safe. Run
+-- against live today it would clear exactly one row: Branches North Dade,
+-- which sits 400.2 m from its nearest stop. That is a hand-set flag two
+-- metres past an arbitrary threshold, and almost certainly right. Recomputing
+-- would quietly replace somebody's knowledge with our inference.
+--
+-- This column is what makes lowering safe: the backfill stamps the rows it
+-- raises, and only those rows are ever eligible to be lowered again. A NULL
+-- source is a human's TRUE and is never touched.
+
+ALTER TABLE resources
+  ADD COLUMN IF NOT EXISTS public_transit_accessible_source TEXT;
+
+COMMENT ON COLUMN resources.public_transit_accessible_source IS
+  'Where public_transit_accessible came from. ''transit_feed'' means a GTFS '
+  'proximity backfill set it and a later refresh may unset it. NULL means a '
+  'human set it and no automated pass may overwrite it.';
+
+
+-- ════════════════════════════════════════════════════════════════
+-- 5. RLS
 -- ════════════════════════════════════════════════════════════════
 -- Public read, admin write — the same shape as `faq` and `blog_posts`.
 -- This is published open data from a public transit agency; there is

@@ -342,13 +342,26 @@ service under the currently-active calendar, carrying its coordinates, the
 routes calling there, day-type coverage, and the weekday service window; plus a
 small routes table with fares. Public-read / admin-write RLS mirroring `faq`.
 
-The app reads them through `nearest_transit_stop(lat, lng, radius_km)`, a
+The app reads them through `nearest_transit_stop(lat, lng, radius_km, agency)`, a
 `SECURITY INVOKER` SQL function (so RLS still applies) that narrows by bounding
 box and returns the single closest row. Nearest-neighbour is the one place the
 map's "fetch once, filter in the browser" rule does not apply: a 40 km box
 around downtown Miami holds 6,964 of 6,973 stops, so the ordering has to happen
 where the rows are. The distance the UI *displays* still comes from `geo.ts`,
 so only one implementation ever produces a user-visible number.
+
+The `agency` argument is not optional in spirit: agencies overlap at county
+lines (HART and GoPasco publish stops 2–3 m apart around Wesley Chapel), so a
+lookup that does not scope to the county's own operator names the wrong one —
+and once that other agency's feed expires, silences the panel on a stale-feed
+check while a valid stop sits beside it. It is passed NULL only when the city
+does not resolve to a county, where any walkable stop is still positive evidence.
+
+`resources.public_transit_accessible_source` records whether that flag came
+from a feed (`'transit_feed'`) or a human (NULL). The seed backfills raise
+freely but **lower only rows they stamped**, so a GTFS refresh that withdraws a
+stop also withdraws the claim, while a provider's hand-set TRUE — 19 of the 29
+true rows on live — survives every refresh untouched.
 
 Loaded from an agency's published GTFS bundle by `scripts/build-transit-sql.ts`,
 whose output is committed as a migration — so the provenance of every row is

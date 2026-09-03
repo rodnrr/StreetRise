@@ -2392,15 +2392,56 @@ WHERE agency = 'hart' AND feed_version IS DISTINCT FROM '2608.1';
 -- the listing recently. A derived-data backfill stamping that across the
 -- table would manufacture freshness nobody earned, and the freshness signal
 -- is what the provider portal and admin queues are triaged on.
+--
+-- ── Only-raise was not enough ───────────────────────────────
+-- An earlier revision had no lowering step at all, on the reasoning that a
+-- FALSE written from one county's feed would assert "no bus" about addresses
+-- the feed never described. That reasoning still holds for rows we did not
+-- touch — but it left a real hole (caught in review on PR #100): when a later
+-- GTFS refresh withdraws the only stop near a listing, the generated DELETE
+-- removes the stop while the flag stays TRUE forever, so the map's "Near
+-- transit" facet and badge keep asserting access that no longer exists.
+--
+-- The lowering step below closes that WITHOUT the danger of a blind
+-- reset-and-recompute, which run against live today would clear Branches
+-- North Dade — a hand-set flag 400.2 m from its nearest stop, two metres past
+-- an arbitrary threshold and almost certainly correct. Only rows this backfill
+-- itself stamped `public_transit_accessible_source = 'transit_feed'` are
+-- eligible; a human's TRUE has a NULL source and is untouchable.
 
 ALTER TABLE resources DISABLE TRIGGER resources_updated_at;
 
+-- Raise: a stop within 400 m, stamped so a later refresh knows this TRUE is
+-- ours to revise.
 UPDATE resources r
-SET public_transit_accessible = TRUE
+SET public_transit_accessible = TRUE,
+    public_transit_accessible_source = 'transit_feed'
 WHERE NOT r.public_transit_accessible
   AND r.lat IS NOT NULL
   AND r.lng IS NOT NULL
   AND EXISTS (
+    SELECT 1
+    FROM transit_stops s
+    WHERE s.lat BETWEEN r.lat - 0.005 AND r.lat + 0.005
+      AND s.lng BETWEEN r.lng - 0.006 AND r.lng + 0.006
+      AND 2 * 6371000 * asin(sqrt(
+            sin(radians(s.lat - r.lat) / 2) ^ 2
+            + cos(radians(r.lat)) * cos(radians(s.lat))
+              * sin(radians(s.lng - r.lng) / 2) ^ 2
+          )) <= 400
+  );
+
+-- Lower: ONLY rows a previous run of this backfill raised, whose stop the
+-- current feeds no longer contain. `public_transit_accessible_source` is what
+-- makes this safe — a hand-set TRUE has a NULL source and is never eligible,
+-- so a provider's knowledge of a stop no published feed lists survives every
+-- refresh. On a first run this matches nothing, because nothing is stamped yet.
+UPDATE resources r
+SET public_transit_accessible = FALSE,
+    public_transit_accessible_source = NULL
+WHERE r.public_transit_accessible
+  AND r.public_transit_accessible_source = 'transit_feed'
+  AND NOT EXISTS (
     SELECT 1
     FROM transit_stops s
     WHERE s.lat BETWEEN r.lat - 0.005 AND r.lat + 0.005

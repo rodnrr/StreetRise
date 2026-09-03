@@ -55,10 +55,10 @@ export const db = {
    * table read because ordering by distance has to happen where all the
    * candidate rows are — see the function's own comment in that migration.
    */
-  nearestTransitStop: (lat: number, lng: number, radiusKm: number) =>
+  nearestTransitStop: (lat: number, lng: number, radiusKm: number, agency: string | null) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any).rpc('nearest_transit_stop', {
-      in_lat: lat, in_lng: lng, in_radius_km: radiusKm,
+      in_lat: lat, in_lng: lng, in_radius_km: radiusKm, in_agency: agency,
     }),
 }
 

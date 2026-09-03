@@ -122,10 +122,24 @@ export const COVERAGE_RADIUS_KM = 40
  */
 export type CoverageLevel = 'authoritative' | 'partial' | 'none'
 
-export function coverageFor(city: string | null | undefined): CoverageLevel {
+export interface Coverage {
+  level: CoverageLevel
+  /**
+   * The operator whose feed covers this address, or null when we could not
+   * resolve the county. Passed to the lookup so it searches ONE agency: HART
+   * and GoPasco publish stops 2 and 3 metres apart around Wesley Chapel, and
+   * answering a Pasco address with the marginally-closer HART row names the
+   * wrong operator — and once HART's feed expires, silences the panel
+   * entirely on a stale-feed check while a valid GoPasco stop sits beside it.
+   */
+  agency: string | null
+}
+
+export function coverageFor(city: string | null | undefined): Coverage {
   const county = countyForCity(city)
-  if (!county) return 'partial'
-  return AGENCY_BY_COUNTY[county] ? 'authoritative' : 'none'
+  if (!county) return { level: 'partial', agency: null }
+  const agency = AGENCY_BY_COUNTY[county]
+  return agency ? { level: 'authoritative', agency } : { level: 'none', agency: null }
 }
 
 export type TransitLookup =
@@ -151,8 +165,12 @@ export type TransitLookup =
  * `nearest_transit_stop()` (migration 042) does the bounding-box narrow and
  * the distance ordering in one indexed query and returns exactly one row.
  */
-async function nearestStop(origin: LatLng, radiusKm: number): Promise<TransitStop | null> {
-  const { data, error } = await db.nearestTransitStop(origin.lat, origin.lng, radiusKm)
+async function nearestStop(
+  origin: LatLng,
+  radiusKm: number,
+  agency: string | null,
+): Promise<TransitStop | null> {
+  const { data, error } = await db.nearestTransitStop(origin.lat, origin.lng, radiusKm, agency)
   if (error) throw error
   const rows = (data ?? []) as TransitStop[]
   return rows[0] ?? null
@@ -181,9 +199,12 @@ export async function lookupNearestStop(
 
   // A county we hold no feed for is answered without touching the network.
   const coverage = coverageFor(opts.city)
-  if (coverage === 'none') return { kind: 'no_coverage' }
+  if (coverage.level === 'none') return { kind: 'no_coverage' }
 
-  const stop = await nearestStop(origin, COVERAGE_RADIUS_KM)
+  // Scoped to the county's own operator where we know it; unscoped only when
+  // the city did not resolve, because then any walkable stop is still
+  // positive evidence regardless of who runs it.
+  const stop = await nearestStop(origin, COVERAGE_RADIUS_KM, coverage.agency)
   if (!stop) return { kind: 'no_coverage' }
   if (isFeedExpired(stop, now)) return { kind: 'stale_feed' }
 
@@ -199,7 +220,7 @@ export async function lookupNearestStop(
   }
   // Everything below here is a claim about ABSENCE — "nothing closer than
   // this" — which only the authoritative case has standing to make.
-  if (coverage !== 'authoritative') return { kind: 'no_coverage' }
+  if (coverage.level !== 'authoritative') return { kind: 'no_coverage' }
   return { kind: 'distant', stop, km, fareFreeRoutes: await fareFreeAmong(stop) }
 }
 
