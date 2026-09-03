@@ -10,8 +10,6 @@ import {
   RESOURCE_TYPE_LABEL_KEY,
   GENDER_POLICY_LABEL_KEY,
   POPULATION_FOCUS_LABEL_KEY,
-  getTrustInfo,
-  TRUST_LEVEL_CLASSES,
 } from '@/lib/mapFilters'
 import { formatDistance } from '@/lib/geo'
 import { useI18n } from '@/lib/i18n'
@@ -127,7 +125,6 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const trust = getTrustInfo(r)
   const emoji = CATEGORY_EMOJI[r.category] ?? '📍'
   const isConfidential = r.access_type === 'confidential_address' || r.access_type === 'phone_intake'
   const isDV = r.population_focus?.includes('domestic_violence')
@@ -267,10 +264,6 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
               </span>
             )}
           </div>
-
-          <span className={clsx('inline-flex items-center text-xs rounded-full px-2 py-0.5', TRUST_LEVEL_CLASSES[trust.level])}>
-            {trust.labelParams ? t(trust.labelKey).replace('{days}', trust.labelParams.days) : t(trust.labelKey)}
-          </span>
         </div>
 
         {/* ── Actions ── */}
