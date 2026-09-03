@@ -249,14 +249,26 @@ async function fareFreeAmong(stop: TransitStop): Promise<string[]> {
     .filter((n): n is string => !!n)
 }
 
-/** "Mon–Sun", "Mon–Sat", "Weekdays only" — or null when the feed says nothing. */
+/**
+ * Which days this stop actually has service, as an i18n key.
+ *
+ * Every one of the eight combinations gets its own answer, because collapsing
+ * any two of them advertises service on a day that has none. Saturday-only and
+ * Sunday-only used to share a "weekends only" label; across the four loaded
+ * feeds that is 26 Saturday-only stops and one Sunday-only stop being told
+ * they run on a day they do not (caught in review on PR #100). For someone
+ * deciding whether they can reach a Sunday meal service, that is the entire
+ * question.
+ */
 export function serviceDaysKey(stop: TransitStop): string | null {
   const { serves_weekday: w, serves_saturday: sa, serves_sunday: su } = stop
   if (w && sa && su) return 'transit.days.everyDay'
-  if (w && sa) return 'transit.days.monSat'
+  if (w && sa && !su) return 'transit.days.monSat'
+  if (w && !sa && su) return 'transit.days.weekdaysAndSunday'
   if (w && !sa && !su) return 'transit.days.weekdaysOnly'
-  if (!w && (sa || su)) return 'transit.days.weekendOnly'
-  if (w && su && !sa) return 'transit.days.weekdaysAndSunday'
+  if (!w && sa && su) return 'transit.days.weekendOnly'
+  if (!w && sa && !su) return 'transit.days.saturdayOnly'
+  if (!w && !sa && su) return 'transit.days.sundayOnly'
   return null
 }
 

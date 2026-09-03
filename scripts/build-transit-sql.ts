@@ -278,6 +278,77 @@ for await (const line of rl) {
 const hhmm = (m: number | null) =>
   m == null ? null : `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 
+/**
+ * Re-derive `resources.public_transit_accessible` from whatever stops are in
+ * the table after this run.
+ *
+ * Emitted verbatim into every generated migration so a feed refresh corrects
+ * the flag as well as the stops. It is agency-agnostic on purpose: it reads
+ * `transit_stops` as a whole, so it stays correct however many feeds are
+ * loaded, and a refresh of one agency cannot un-flag a listing served by
+ * another.
+ *
+ * ── Raise freely, lower only what we raised ─────────────────────
+ * The raise stamps `public_transit_accessible_source = 'transit_feed'`
+ * (migration 042). The lower clears ONLY rows carrying that stamp. A hand-set
+ * TRUE has a NULL source and is untouchable — 19 of the 29 rows true on live
+ * were set by hand, and a provider who knows about a stop no published feed
+ * lists holds the most valuable kind of TRUE this column has. A blind
+ * reset-and-recompute would have cleared Branches North Dade, 400.2 m from its
+ * nearest stop and almost certainly right.
+ *
+ * No branch writes FALSE for a row we did not raise. Each feed covers one
+ * county, so that would assert "no bus" about addresses it never described.
+ *
+ * `resources_updated_at` is disabled across both statements, the same idiom as
+ * migrations 037 and 040: "Updated 3d ago" claims a HUMAN checked the listing,
+ * and a derived backfill must not manufacture that.
+ *
+ * 400 m is a quarter mile, the standard planning threshold for walking to a
+ * stop. The bounding box is wider than the radius on both axes so it narrows
+ * the scan without clipping a qualifying stop; the haversine inside decides.
+ */
+const NEAR_STOP_EXISTS = `    SELECT 1
+    FROM transit_stops s
+    WHERE s.lat BETWEEN r.lat - 0.005 AND r.lat + 0.005
+      AND s.lng BETWEEN r.lng - 0.006 AND r.lng + 0.006
+      AND 2 * 6371000 * asin(sqrt(
+            sin(radians(s.lat - r.lat) / 2) ^ 2
+            + cos(radians(r.lat)) * cos(radians(s.lat))
+              * sin(radians(s.lng - r.lng) / 2) ^ 2
+          )) <= 400`
+
+const BACKFILL_SQL = `-- Re-derive resources.public_transit_accessible from the stops now loaded.
+ALTER TABLE resources DISABLE TRIGGER resources_updated_at;
+
+-- Raise: a stop within 400 m, stamped so a later refresh knows this TRUE is
+-- ours to revise.
+UPDATE resources r
+SET public_transit_accessible = TRUE,
+    public_transit_accessible_source = 'transit_feed'
+WHERE NOT r.public_transit_accessible
+  AND r.lat IS NOT NULL
+  AND r.lng IS NOT NULL
+  AND EXISTS (
+${NEAR_STOP_EXISTS}
+  );
+
+-- Lower: ONLY rows a previous run raised, whose stop the current feeds no
+-- longer contain. A hand-set TRUE has a NULL source and is never eligible.
+-- Matches nothing on a first run, because nothing is stamped yet.
+UPDATE resources r
+SET public_transit_accessible = FALSE,
+    public_transit_accessible_source = NULL
+WHERE r.public_transit_accessible
+  AND r.public_transit_accessible_source = 'transit_feed'
+  AND r.lat IS NOT NULL
+  AND r.lng IS NOT NULL
+  AND NOT EXISTS (
+${NEAR_STOP_EXISTS}
+  );
+
+ALTER TABLE resources ENABLE TRIGGER resources_updated_at;`
+
 // ── Emit ─────────────────────────────────────────────────────────
 const stops = readTable('stops.txt').filter((s) => agg.has(s.stop_id))
 const usedRouteIds = new Set<string>()
@@ -394,6 +465,18 @@ out.push(`DELETE FROM transit_stops`)
 out.push(`WHERE agency = ${q(agencySlug)} AND feed_version IS DISTINCT FROM ${q(feedVersion)};`)
 out.push(`DELETE FROM transit_routes`)
 out.push(`WHERE agency = ${q(agencySlug)} AND feed_version IS DISTINCT FROM ${q(feedVersion)};`)
+out.push('')
+
+// ── The proximity backfill travels WITH the data ────────────────
+// This is emitted rather than hand-written into the seed migrations, and that
+// placement is the whole point (caught in review on PR #100). The documented
+// refresh procedure commits this generator's output verbatim as a new
+// migration, so anything that only exists in 043–046 runs exactly once, at
+// first seed, and never again. The lowering statement below is precisely the
+// step a REFRESH needs: without it, a feed update that withdraws a listing's
+// only nearby stop deletes the stop above and leaves the listing's flag
+// claiming transit access that no longer exists.
+out.push(BACKFILL_SQL)
 
 console.log(out.join('\n'))
 console.error(`emitted ${stops.length} stops, ${routeRows.length} routes (feed ${feedVersion}, active as of ${asOf})`)

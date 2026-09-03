@@ -176,7 +176,14 @@ npm run transit:sql -- /tmp/gtfs hart > supabase/migrations/0NN_seed_hart_transi
 Commit the output as a **new** migration; don't patch 043. The generated SQL
 ends with `DELETE … WHERE feed_version IS DISTINCT FROM '<new version>'`, so
 stops that disappeared from the network are removed rather than lingering and
-claiming service that no longer exists.
+claiming service that no longer exists — and then re-runs the
+`public_transit_accessible` backfill, so a listing whose only nearby stop was
+withdrawn loses the flag along with the stop.
+
+That backfill is **emitted by the generator**, not hand-written into 043–046,
+and that placement is load-bearing: a refresh commits this output verbatim, so
+anything living only in the seed migrations would run once at first seed and
+never again. Every future migration this generator produces carries it.
 
 Adding PSTA, LYNX or Miami-Dade later is another run with a different agency
 slug — not a schema change. The `agency` column and the `<agency>:<id>` primary

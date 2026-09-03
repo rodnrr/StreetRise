@@ -2348,67 +2348,7 @@ WHERE agency = 'hart' AND feed_version IS DISTINCT FROM '2608.1';
 DELETE FROM transit_routes
 WHERE agency = 'hart' AND feed_version IS DISTINCT FROM '2608.1';
 
--- ════════════════════════════════════════════════════════════════
--- 3. Backfill resources.public_transit_accessible  (HAND-WRITTEN)
--- ════════════════════════════════════════════════════════════════
--- Today every one of the 21 Hillsborough listings on live says FALSE,
--- including First Baptist Progress Village, which is 17 METRES from a stop
--- on Route 8. The map renders that column as a "Near transit" facet, so it
--- is not merely empty — it is wrong, and it is hiding listings from exactly
--- the people who filter on it.
---
--- ── This only ever raises the flag ──────────────────────────
--- There is no branch that sets FALSE, deliberately, and that is not
--- squeamishness — a FALSE written from this data would be a lie in two
--- different ways:
---
---   • We hold ONE agency's feed. HART is Hillsborough. A St. Petersburg
---     listing is served by PSTA, a listing in Orlando by LYNX, and this
---     table knows about neither. Writing FALSE outside Hillsborough would
---     assert "no bus" on the basis of having no data.
---   • Even inside Hillsborough, a stop can exist that this feed does not
---     describe — a school-board shuttle, a new stop mid-quarter.
---
--- So: an explicit TRUE where we can measure a stop, and silence everywhere
--- else. This is the same fail-open rule the map applies to `overnight_allowed`
--- and `gender_policy`, and the same "only raises, never lowers" shape as
--- migration 040's stale_after_days backfill.
---
--- The far more useful negative — "the nearest stop is 11 miles away", true
--- of the four parks and campgrounds in this set — is NOT stored. It is
--- computed at read time from `transit_stops`, so it can never go stale
--- against a feed that has moved on. See src/lib/transit.ts.
---
--- ── 400 m ───────────────────────────────────────────────────
--- A quarter mile, the standard planning threshold for walking to a stop.
--- The bounding box (0.005° lat ≈ 555 m, 0.006° lng ≈ 590 m at this
--- latitude) is wider than the radius on both axes, so it narrows the scan
--- without clipping a qualifying stop; the haversine inside it is what
--- actually decides.
---
--- ── updated_at ──────────────────────────────────────────────
--- `resources_updated_at` is disabled across the UPDATE, same idiom as
--- migrations 037 and 040. "Updated 3d ago" is a claim that a HUMAN checked
--- the listing recently. A derived-data backfill stamping that across the
--- table would manufacture freshness nobody earned, and the freshness signal
--- is what the provider portal and admin queues are triaged on.
---
--- ── Only-raise was not enough ───────────────────────────────
--- An earlier revision had no lowering step at all, on the reasoning that a
--- FALSE written from one county's feed would assert "no bus" about addresses
--- the feed never described. That reasoning still holds for rows we did not
--- touch — but it left a real hole (caught in review on PR #100): when a later
--- GTFS refresh withdraws the only stop near a listing, the generated DELETE
--- removes the stop while the flag stays TRUE forever, so the map's "Near
--- transit" facet and badge keep asserting access that no longer exists.
---
--- The lowering step below closes that WITHOUT the danger of a blind
--- reset-and-recompute, which run against live today would clear Branches
--- North Dade — a hand-set flag 400.2 m from its nearest stop, two metres past
--- an arbitrary threshold and almost certainly correct. Only rows this backfill
--- itself stamped `public_transit_accessible_source = 'transit_feed'` are
--- eligible; a human's TRUE has a NULL source and is untouchable.
-
+-- Re-derive resources.public_transit_accessible from the stops now loaded.
 ALTER TABLE resources DISABLE TRIGGER resources_updated_at;
 
 -- Raise: a stop within 400 m, stamped so a later refresh knows this TRUE is
@@ -2431,16 +2371,16 @@ WHERE NOT r.public_transit_accessible
           )) <= 400
   );
 
--- Lower: ONLY rows a previous run of this backfill raised, whose stop the
--- current feeds no longer contain. `public_transit_accessible_source` is what
--- makes this safe — a hand-set TRUE has a NULL source and is never eligible,
--- so a provider's knowledge of a stop no published feed lists survives every
--- refresh. On a first run this matches nothing, because nothing is stamped yet.
+-- Lower: ONLY rows a previous run raised, whose stop the current feeds no
+-- longer contain. A hand-set TRUE has a NULL source and is never eligible.
+-- Matches nothing on a first run, because nothing is stamped yet.
 UPDATE resources r
 SET public_transit_accessible = FALSE,
     public_transit_accessible_source = NULL
 WHERE r.public_transit_accessible
   AND r.public_transit_accessible_source = 'transit_feed'
+  AND r.lat IS NOT NULL
+  AND r.lng IS NOT NULL
   AND NOT EXISTS (
     SELECT 1
     FROM transit_stops s

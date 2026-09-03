@@ -123,6 +123,28 @@ const ELIG_REQUIREMENT_KEY: Record<string, string> = {
   veteran:    'ride.requirement.veteran',
 }
 
+/**
+ * How much a programme's lead time counts against it, given when the trip is.
+ *
+ * A table rather than nested conditions because the interesting cases are the
+ * ones that read wrong in prose. An earlier revision exempted `next_day` from
+ * any penalty for a trip needed *today* — the exact opposite of what the
+ * notice means (caught in review on PR #100). With area, mode and eligibility
+ * all matching, that let HARTPlus and PSTA Access rank "Closest match" for a
+ * trip later today, when neither can be booked before tomorrow. That is the
+ * failure the whole `ride:notice:` vocabulary exists to prevent.
+ *
+ * `scheduled` forgives lead time, which is the point of planning ahead —
+ * except for `enrollment`, which is weeks of certification rather than days of
+ * notice and stays a mild mark against even a future trip. The caution text is
+ * shown either way; this only decides ordering.
+ */
+const NOTICE_SCORE: Record<string, Record<RideWhen, number>> = {
+  next_day:   { now: -2, today: -2, scheduled: 0 },
+  advance:    { now: -2, today: -2, scheduled: 0 },
+  enrollment: { now: -3, today: -3, scheduled: -1 },
+}
+
 const NOTICE_KEY: Record<string, string> = {
   same_day:   'ride.notice.same_day',
   next_day:   'ride.notice.next_day',
@@ -331,13 +353,13 @@ function scoreOption(r: Resource, ctx: ScoreContext): RideOption {
     const key = NOTICE_KEY[notice]
     if (!key) continue
     if (notice === 'same_day') {
-      if (answers.when === 'now') score += 2
+      // Being arrangeable today is only an advantage when the trip is today.
+      if (answers.when !== 'scheduled') score += 2
       reasons.push(t(key))
       continue
     }
     cautions.push(t(key))
-    if (answers.when === 'now') score -= notice === 'enrollment' ? 3 : 2
-    else if (answers.when === 'today' && notice !== 'next_day') score -= 1
+    score += NOTICE_SCORE[notice]?.[answers.when] ?? 0
   }
 
   // A phone number is the difference between an option and a leaflet.

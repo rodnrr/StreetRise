@@ -1116,6 +1116,8 @@ const en: Dict = {
   'transit.days.monSat': 'Mon–Sat, no Sunday service',
   'transit.days.weekdaysOnly': 'weekdays only',
   'transit.days.weekendOnly': 'weekends only',
+  'transit.days.saturdayOnly': 'Saturdays only — no Sunday or weekday service',
+  'transit.days.sundayOnly': 'Sundays only — no Saturday or weekday service',
   'transit.days.weekdaysAndSunday': 'weekdays and Sunday, no Saturday service',
 }
 
@@ -2203,6 +2205,8 @@ const es: Dict = {
   'transit.days.monSat': 'lun–sáb, sin servicio los domingos',
   'transit.days.weekdaysOnly': 'solo entre semana',
   'transit.days.weekendOnly': 'solo fines de semana',
+  'transit.days.saturdayOnly': 'solo los sábados — sin servicio los domingos ni entre semana',
+  'transit.days.sundayOnly': 'solo los domingos — sin servicio los sábados ni entre semana',
   'transit.days.weekdaysAndSunday': 'entre semana y domingos, sin servicio los sábados',
 }
 
