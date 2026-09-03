@@ -289,7 +289,87 @@ COMMENT ON COLUMN resources.public_transit_accessible_source IS
 
 
 -- ════════════════════════════════════════════════════════════════
--- 5. RLS
+-- 5. Keep the derived flag true when a listing MOVES
+-- ════════════════════════════════════════════════════════════════
+-- The loader re-derives `public_transit_accessible` whenever the FEED
+-- changes. The other half of the problem is the listing changing: both
+-- `AdminResourceEdit` and `ProviderListingEdit` write `lat`/`lng`, so an admin
+-- correcting a geocode moves a listing out from under a flag that was derived
+-- for its old position — and nothing would revisit it until the next GTFS
+-- migration, which could be a quarter away (caught in review on PR #100).
+--
+-- Recomputing rather than clearing, because a corrected address is just as
+-- likely to be NEAR a stop as far from one, and clearing would drop the
+-- listing out of the map's "Near transit" filter until the next refresh.
+--
+-- The human-set rule from section 4 still holds absolutely: a TRUE with a NULL
+-- source is somebody's knowledge and this returns early rather than touch it.
+-- A FALSE that nothing has evaluated (also NULL source) CAN be raised, which
+-- is the same thing the loader's backfill does.
+--
+-- `SECURITY INVOKER` (the plpgsql default, left alone deliberately) means the
+-- read of `transit_stops` happens as whoever is editing. That is fine and
+-- intended — the table is public-read — and it keeps this from becoming a
+-- privilege escalation path the way a DEFINER function could.
+--
+-- Scoped by `UPDATE OF lat, lng` plus a WHEN clause, so an ordinary edit that
+-- does not move the listing costs nothing, and the loader's own backfill —
+-- which updates the flag but never the coordinates — cannot re-enter it.
+
+CREATE FUNCTION resources_refresh_transit_flag()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  near_stop BOOLEAN;
+BEGIN
+  -- A human's TRUE is never revised by anything automated.
+  IF OLD.public_transit_accessible AND OLD.public_transit_accessible_source IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.lat IS NULL OR NEW.lng IS NULL THEN
+    IF NEW.public_transit_accessible_source = 'transit_feed' THEN
+      NEW.public_transit_accessible := FALSE;
+      NEW.public_transit_accessible_source := NULL;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM transit_stops s
+    WHERE s.lat BETWEEN NEW.lat - 0.005 AND NEW.lat + 0.005
+      AND s.lng BETWEEN NEW.lng - 0.006 AND NEW.lng + 0.006
+      AND 2 * 6371000 * asin(sqrt(
+            sin(radians(s.lat - NEW.lat) / 2) ^ 2
+            + cos(radians(NEW.lat)) * cos(radians(s.lat))
+              * sin(radians(s.lng - NEW.lng) / 2) ^ 2
+          )) <= 400
+  ) INTO near_stop;
+
+  IF near_stop THEN
+    NEW.public_transit_accessible := TRUE;
+    NEW.public_transit_accessible_source := 'transit_feed';
+  ELSIF NEW.public_transit_accessible_source = 'transit_feed' THEN
+    NEW.public_transit_accessible := FALSE;
+    NEW.public_transit_accessible_source := NULL;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER resources_transit_flag_on_move
+  BEFORE UPDATE OF lat, lng ON resources
+  FOR EACH ROW
+  WHEN (NEW.lat IS DISTINCT FROM OLD.lat OR NEW.lng IS DISTINCT FROM OLD.lng)
+  EXECUTE FUNCTION resources_refresh_transit_flag();
+
+
+-- ════════════════════════════════════════════════════════════════
+-- 6. RLS
 -- ════════════════════════════════════════════════════════════════
 -- Public read, admin write — the same shape as `faq` and `blog_posts`.
 -- This is published open data from a public transit agency; there is

@@ -361,7 +361,11 @@ does not resolve to a county, where any walkable stop is still positive evidence
 from a feed (`'transit_feed'`) or a human (NULL). The seed backfills raise
 freely but **lower only rows they stamped**, so a GTFS refresh that withdraws a
 stop also withdraws the claim, while a provider's hand-set TRUE — 19 of the 29
-true rows on live — survives every refresh untouched.
+true rows on live — survives every refresh untouched. A
+`resources_transit_flag_on_move` trigger covers the other direction: the edit
+pages write `lat`/`lng`, so a corrected geocode recomputes the flag rather than
+leaving one derived for the old position. Hand-set values are returned
+untouched by both paths.
 
 Loaded from an agency's published GTFS bundle by `scripts/build-transit-sql.ts`,
 whose output is committed as a migration — so the provenance of every row is

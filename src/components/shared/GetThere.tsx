@@ -27,7 +27,14 @@ import type { Resource } from '@/types'
 function NearestStop({ resource, compact }: { resource: Resource; compact: boolean }) {
   const { t } = useI18n()
   const { data } = useQuery({
-    queryKey: ['nearest-stop', resource.id],
+    // The coordinates and city are in the key, not just the id, because they
+    // are the query's actual inputs: an admin correcting a geocode changes
+    // where this listing is without changing which listing it is, and the
+    // edit flows invalidate ['resource', id] rather than this query. Keyed on
+    // the id alone the panel would keep showing a stop, agency and distance
+    // computed for the old address for the whole hour (caught in review on
+    // PR #100).
+    queryKey: ['nearest-stop', resource.id, resource.lat, resource.lng, resource.address?.city],
     // Stop locations change on service-change dates, not by the minute.
     staleTime: 1000 * 60 * 60,
     enabled: resource.lat != null && resource.lng != null,

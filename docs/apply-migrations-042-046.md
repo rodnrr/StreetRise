@@ -124,6 +124,14 @@ kind of TRUE this column holds.
 
 Nothing is lowered on a first run, because nothing is stamped yet.
 
+The loader handles the feed changing. A `resources_transit_flag_on_move`
+trigger (migration 042) handles the *listing* changing: both `AdminResourceEdit`
+and `ProviderListingEdit` write `lat`/`lng`, so correcting a geocode would
+otherwise leave a flag derived for the old position until the next GTFS
+migration, a quarter away. It recomputes rather than clears — a corrected
+address is as likely to be near a stop as far from one — and returns early on a
+hand-set TRUE, same rule as everywhere else.
+
 The reason a *blanket* FALSE is still never written, for rows we did not
 raise:
 
@@ -246,6 +254,10 @@ FROM resources WHERE public_transit_accessible GROUP BY 1;
 SELECT count(*) FROM resources
 WHERE public_transit_accessible_source = 'transit_feed'
   AND NOT public_transit_accessible;  -- expect 0
+
+-- The move trigger exists and is scoped to coordinate changes.
+SELECT tgname, pg_get_triggerdef(oid) LIKE '%UPDATE OF lat, lng%' AS scoped
+FROM pg_trigger WHERE tgname = 'resources_transit_flag_on_move';
 
 -- The backfill must NOT have manufactured freshness. Record max(updated_at)
 -- BEFORE applying and confirm it is unchanged afterwards.
