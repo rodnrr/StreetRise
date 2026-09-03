@@ -124,6 +124,15 @@ const ELIG_REQUIREMENT_KEY: Record<string, string> = {
 }
 
 /**
+ * `ride:kind:` values that help someone become able to travel but do not carry
+ * them anywhere. Named as a set rather than tested inline because "is this
+ * actually a ride?" is a property of the kind, and a trip-planning or
+ * bus-buddy programme added later would otherwise reintroduce the bug this
+ * exists to prevent.
+ */
+const NON_RIDE_KINDS = new Set(['travel_training'])
+
+/**
  * How much a programme's lead time counts against it, given when the trip is.
  *
  * A table rather than nested conditions because the interesting cases are the
@@ -299,6 +308,19 @@ interface ScoreContext {
    * does not cover.
    */
   originCounty: string | null
+  /**
+   * Whether they supplied a starting point AT ALL, in any form.
+   *
+   * Distinct from `originCounty` because the two unknowns are different and
+   * deserve different answers. Someone who skipped the question has told us
+   * nothing, and the house rule says a missing answer costs nothing. Someone
+   * who tapped "Use my location" HAS answered — we simply cannot place the
+   * coordinates, since resolving them would need a reverse geocoder this app
+   * does not have. Treating that second case as a confirmed whole-trip match
+   * scores a one-county programme as though it had been checked against both
+   * ends (caught in review on PR #100).
+   */
+  originProvided: boolean
   t: (key: string) => string
 }
 
@@ -307,11 +329,13 @@ function labelList(keys: string[], t: (key: string) => string, lookup: Record<st
 }
 
 function scoreOption(r: Resource, ctx: ScoreContext): RideOption {
-  const { answers, destinationCounty, originCounty, t } = ctx
+  const { answers, destinationCounty, originCounty, originProvided, t } = ctx
   const reasons: string[] = []
   const cautions: string[] = []
   let score = 0
   let outOfArea = false
+  /** Covers one end of the trip but demonstrably not the other. Caps the fit. */
+  let oneEndOnly = false
 
   // ── Service area ──
   // A trip has TWO ends, and a door-to-door programme has to reach both.
@@ -338,11 +362,22 @@ function scoreOption(r: Resource, ctx: ScoreContext): RideOption {
       // and let the person judge it.
       reasons.push(t('ride.reason.servesArea').replace('{area}', areaNames))
       if (coversOrigin) score += 2
-    } else if (coversDestination && (!originCounty || coversOrigin)) {
+    } else if (coversDestination && (coversOrigin || !originProvided)) {
+      // Both ends confirmed, or no starting point was ever offered.
       score += 3
       reasons.push(t('ride.reason.servesArea').replace('{area}', areaNames))
+    } else if (coversDestination && !originCounty) {
+      // They gave a starting point we could not place — geolocation, or a town
+      // outside COUNTY_BY_CITY. Ranks between a confirmed both-ends match and a
+      // known one-end mismatch, and says plainly what was not checked. Not
+      // capped below "best": an unplaceable origin is unknown, not a mismatch,
+      // and this engine does not punish what it merely failed to resolve.
+      score += 2
+      reasons.push(t('ride.reason.servesArea').replace('{area}', areaNames))
+      cautions.push(t('ride.caution.originUnknown').replace('{area}', areaNames))
     } else if (coversDestination && crossCounty) {
       score += 1
+      oneEndOnly = true
       reasons.push(t('ride.reason.servesArea').replace('{area}', areaNames))
       cautions.push(
         t('ride.caution.originOutOfArea')
@@ -351,6 +386,7 @@ function scoreOption(r: Resource, ctx: ScoreContext): RideOption {
       )
     } else if (coversOrigin) {
       score += 1
+      oneEndOnly = true
       reasons.push(t('ride.reason.servesArea').replace('{area}', areaNames))
       cautions.push(
         t('ride.caution.destinationOutOfArea')
@@ -422,13 +458,26 @@ function scoreOption(r: Resource, ctx: ScoreContext): RideOption {
   // A phone number is the difference between an option and a leaflet.
   if (r.phone) score += 1
 
-  // Some transportation resources help a person become able to use transit
-  // but do not themselves provide or pay for the current trip. Travel training
-  // is the first such kind: HART's seeded listing explicitly says it is a
-  // training session, not a ride. A high numeric relevance score must therefore
-  // never turn it into "Closest match" for trip fulfillment. Keep it visible,
-  // cap it at "possible" for a planned trip, and at "check" for now/today.
-  const supportOnly = rideFacet(r, 'kind').includes('travel_training')
+  // Two independent caps on the top badge, both of which the numeric score
+  // alone would let a programme through.
+  //
+  // 1. A programme reaching only ONE end of the trip. A scheduled
+  //    Pinellas-to-Tampa trip matching HARTPlus's mode and disability rule
+  //    totalled 6 (+1 area, +2 mode, +3 eligibility, -1 enrollment, +1 phone)
+  //    and took the top badge — for a service that cannot collect the rider in
+  //    Pinellas at all. The caution alone was not enough: the badge is what
+  //    people read first.
+  //
+  // 2. A programme that helps someone become able to use transit but does not
+  //    provide or pay for the trip itself. Travel training is the first such
+  //    kind: HART's seeded listing says in its own description that it is a
+  //    training session, not a ride. It stays visible — it is genuinely useful
+  //    to someone who has never ridden — but it is capped at 'possible' for a
+  //    planned trip and 'check' for now/today, because the more immediate the
+  //    need, the less a course can answer it.
+  //
+  // Both caught in review on PR #100.
+  const supportOnly = rideFacet(r, 'kind').some((k) => NON_RIDE_KINDS.has(k))
 
   const fit: RideFit = outOfArea
     ? 'other_area'
@@ -436,7 +485,7 @@ function scoreOption(r: Resource, ctx: ScoreContext): RideOption {
       ? answers.when === 'scheduled' && score >= 2
         ? 'possible'
         : 'check'
-      : score >= 6
+      : score >= 6 && !oneEndOnly
         ? 'best'
         : score >= 2
           ? 'possible'
@@ -460,6 +509,12 @@ export function rankRideOptions(
     destinationCity?: string | null
     /** Free text the person typed for where they are now, if anything. */
     originText?: string | null
+    /**
+     * True when a starting point was supplied in ANY form — typed, or browser
+     * coordinates. Separate from `originText` because geolocation answers the
+     * question without yielding a city. See ScoreContext.originProvided.
+     */
+    originProvided?: boolean
     t: (key: string) => string
   },
 ): RideOption[] {
@@ -467,6 +522,7 @@ export function rankRideOptions(
     answers,
     destinationCounty: countyForCity(opts.destinationCity),
     originCounty: countyForFreeText(opts.originText),
+    originProvided: opts.originProvided ?? !!opts.originText?.trim(),
     t: opts.t,
   }
   return resources
