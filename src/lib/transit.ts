@@ -77,6 +77,7 @@ export const AGENCY_LABEL: Record<string, string> = {
   hernando:          'TheBus',
   bct:               'Broward County Transit',
   citrus_connection: 'Citrus Connection',
+  breeze:            'Breeze Transit',
   sunrail:           'SunRail',
   trirail:           'Tri-Rail',
 }
@@ -100,6 +101,7 @@ export const AGENCY_LABEL: Record<string, string> = {
 export const AGENCIES_BY_COUNTY: Record<string, string[]> = {
   hillsborough: ['hart'],
   manatee:      ['mcat'],
+  sarasota:     ['breeze'],
   miami_dade:   ['mdt'],
   pasco:        ['pasco'],
   pinellas:     ['psta'],
