@@ -1,5 +1,45 @@
 # Open Items
 
+## Session of 2026-09-03 — transportation assistance layer
+
+Shipped: `/transportation` (directory + Ride Assistance Finder), the "Get There"
+panel on the map sheet and `/resources/:id`, `src/lib/transport.ts`,
+`src/lib/rideOptions.ts`, `publicTags()`, EN/ES strings, and migration 041.
+Open items this raised:
+
+- **Migration 041 is written but NOT applied, and has unverified facts in it.**
+  Read `docs/apply-migration-041.md` before running it. The authoring session
+  had no network route to `psta.net` or `gohart.org`, so phone numbers,
+  addresses, and the "eight designated transit locations" figure for PSTA
+  Direct Connect are all uncorroborated. Every row seeds as `pending` and every
+  description tells the reader to confirm with the agency, so nothing published
+  over-claims — but do not flip a row to `verified` without an actual check.
+- **Transportation coverage is Pinellas + Hillsborough only.** Public copy says
+  Tampa Bay, Orlando and Miami. Orlando (LYNX / ACCESS LYNX) and Miami-Dade
+  (Golden Passport, STS, Go Connect) have directly equivalent programmes and are
+  not seeded. The finder is honest about it — an Orlando visitor is told these
+  programmes serve a different service area rather than being shown a false
+  match — but it is a real hole. Next transportation batch should close it.
+- **The seeded transportation rows are deliberately not on the map**
+  (`is_map_ready = FALSE`, no coordinates). So applying 041 does *not* light up
+  the `transportation` need chip on `/map`; `isUsefulOption()` will keep hiding
+  it. That is the right call for countywide programmes with no public doorway,
+  and it is a decision worth re-taking rather than a bug — see the runbook's
+  "What it does NOT do" section.
+- **`COUNTY_BY_CITY` in `rideOptions.ts` is hand-maintained.** It maps the
+  cities StreetRise lists in to their Florida county, which is what lets the
+  finder tell a Pinellas programme from a Miami trip. A city that is missing
+  yields `null`, which the matcher treats as "maybe" rather than "no", so a gap
+  costs ranking quality and never hides a programme. Worth extending whenever a
+  seed batch adds a new metro.
+- **No route planning, by design.** The finder hands the trip to Google or Apple
+  Maps rather than computing an itinerary. If StreetRise ever wants "PSTA Route
+  18 → 52, 47 minutes" in its own UI, that needs a real GTFS/routing backend and
+  is a much larger piece of work — not a tweak to `transport.ts`.
+
+---
+
+
 ## Session of 2026-09-01 — full cross-reference audit (GitHub, Supabase, main)
 
 Ran at the maintainer's request: cross-check `CLAUDE.md`/`README.md`/this file against actual `main`, all GitHub branches/PRs, and live Supabase (project `mldatfcwnmvrmxumzxyb`), since two weeks of merged work (2026-08-19 through 08-31) had never been reflected in the docs. `CLAUDE.md` and `README.md` were rewritten to match; this entry records what changed and what's still open from that pass.
@@ -135,7 +175,7 @@ exactly one error — `supabase.from('bookings') as any` at `supabase.ts:29` —
 
 ---
 
-## Next commit — internal tags are leaking onto public pages
+## Internal tags were leaking onto public pages (CLOSED 2026-09-03)
 
 `src/pages/ResourceDetailPage.tsx` lines ~307–313 render **every** tag as a
 public badge with no filtering:
@@ -186,6 +226,16 @@ silently swallow a future legitimate tag that happens to contain a colon.
 
 Also check whether these tags feed the SEO description or structured data on
 that page before shipping, so they don't leak via metadata instead.
+
+**Closed 2026-09-03**, shipped exactly as recommended above. `publicTags()` now
+lives in `src/lib/mapFilters.ts` and `ResourceDetailPage.tsx` renders
+`publicTags(resource.tags)`, dropping the block entirely when nothing survives
+the filter. `ride` was added to `INTERNAL_TAG_PREFIXES` at the same time — the
+transportation layer's `ride:kind:` / `ride:mode:` / `ride:elig:` / `ride:area:`
+/ `ride:notice:` vocabulary (migration 041) would otherwise have made this leak
+five families worse on every transportation listing. Checked and clear on the
+metadata question: `ResourceDetailPage` renders no `SeoHead` and no structured
+data, so tags were never reaching page metadata.
 
 ---
 

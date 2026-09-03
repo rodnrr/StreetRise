@@ -27,6 +27,7 @@ const CATEGORIES = [
   { labelKey: 'home.category.students',     emoji: '🎒', to: '/students' },
   { labelKey: 'home.category.mentalHealth', emoji: '💙', to: '/map?category=mental_health' },
   { labelKey: 'home.category.legalHelp',    emoji: '⚖️', to: '/legal' },
+  { labelKey: 'home.category.transportation', emoji: '🚌', to: '/transportation' },
   { labelKey: 'home.category.parksDayUse',  emoji: '🌳', to: '/map?category=outdoor_space' },
   { labelKey: 'home.category.allResources', emoji: '📍', to: '/map' },
 ]

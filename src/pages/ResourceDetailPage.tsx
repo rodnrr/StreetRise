@@ -7,7 +7,9 @@ import {
   RESOURCE_TYPE_LABEL_KEY,
   GENDER_POLICY_LABEL_KEY,
   POPULATION_FOCUS_LABEL_KEY,
+  publicTags,
 } from '@/lib/mapFilters'
+import GetThere from '@/components/shared/GetThere'
 import { useI18n } from '@/lib/i18n'
 import type { Resource } from '@/types'
 
@@ -103,6 +105,7 @@ export default function ResourceDetailPage() {
     )
   }
 
+  const visibleTags = publicTags(resource.tags)
   const hours      = resource.hours_of_operation as Record<string, { open: string; close: string; closed: boolean } | undefined>
   const showBeds   = resource.category === 'shelter' && resource.beds_total != null
   const emoji      = CATEGORY_EMOJI[resource.category] ?? '📍'
@@ -309,10 +312,18 @@ export default function ResourceDetailPage() {
         </div>
       </div>
 
-      {/* Tags */}
-      {resource.tags?.length > 0 && (
+      {/* Get There — the transportation layer. Placed directly after Contact
+          because "where is it" and "how do I reach it" are the same question
+          for someone without a car. */}
+      <GetThere resource={resource} />
+
+      {/* Tags — internal `key:value` bookkeeping (import:, access_src:, ride:, …)
+          is filtered out by publicTags(); those entries are how the pipeline and
+          the Ride Assistance Finder read a listing, not something a visitor
+          gains anything from seeing. */}
+      {visibleTags.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {resource.tags.map((tag) => (
+          {visibleTags.map((tag) => (
             <span key={tag} className="badge bg-gray-100 text-gray-600">{tag}</span>
           ))}
         </div>
