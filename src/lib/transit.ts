@@ -94,9 +94,10 @@ export const AGENCY_LABEL: Record<string, string> = {
  *
  * IMPORTANT: only add a new county/agency here in the same change that adds its
  * validated feed migration. A configured agency with no rows would make a
- * partial dataset look authoritative. Hernando is intentionally absent until
- * the county publishes a current GTFS archive; the county-hosted file checked
- * on 2026-09-03 expired in March and predates Routes 10 and 11.
+ * partial dataset look authoritative. Breeze/Sarasota is registered together
+ * with migration 055. Hernando is intentionally absent until the county
+ * publishes a current GTFS archive; the county-hosted file checked on
+ * 2026-09-03 expired in March and predates Routes 10 and 11.
  */
 export const AGENCIES_BY_COUNTY: Record<string, string[]> = {
   hillsborough: ['hart'],
