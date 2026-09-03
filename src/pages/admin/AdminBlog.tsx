@@ -1,10 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
 import { Plus, Pencil, Trash2, ChevronDown, Eye, EyeOff, ExternalLink, Wand2, Upload, Sparkles } from 'lucide-react'
 import { db, supabase } from '@/lib/supabase'
 import { useToast } from '@/lib/store'
+import {
+  BLOG_ARTICLE_TYPES,
+  BLOG_AUDIENCES,
+  STREETRISE_STABLE_FACTS,
+  audiencePrompt,
+  findSimilarBlogPost,
+  stableFactsFor,
+  type BlogArticleType,
+  type BlogAudience,
+} from '@/lib/blogEditorial'
 import type { Database } from '@/lib/database.types'
 
 type BlogPostRow = Database['public']['Tables']['blog_posts']['Row']
@@ -20,9 +30,12 @@ type PostForm = {
 
 type GenerateForm = {
   topic: string
+  article_type: BlogArticleType
+  audience: BlogAudience
   angle: string
   location: string
   facts: string
+  stable_fact_ids: string[]
   keywords: string
   author_name: string
   generate_hero: boolean
@@ -39,9 +52,12 @@ const EMPTY_FORM: PostForm = {
 
 const EMPTY_GENERATE_FORM: GenerateForm = {
   topic: '',
+  article_type: 'general',
+  audience: 'general',
   angle: '',
   location: '',
   facts: '',
+  stable_fact_ids: [],
   keywords: '',
   author_name: 'StreetRise Team',
   generate_hero: true,
@@ -183,6 +199,13 @@ export default function AdminBlog() {
     useForm<PostForm>({ defaultValues: EMPTY_FORM })
 
   const generateForm = useForm<GenerateForm>({ defaultValues: EMPTY_GENERATE_FORM })
+  const watchedTopic = generateForm.watch('topic')
+  const watchedArticleType = generateForm.watch('article_type')
+  const selectedArticleType = BLOG_ARTICLE_TYPES.find(type => type.value === watchedArticleType)
+  const similarPost = useMemo(
+    () => findSimilarBlogPost(watchedTopic, posts),
+    [watchedTopic, posts],
+  )
 
   /**
    * One form is shared by New Post, Edit and the generated draft, so every
@@ -277,6 +300,19 @@ export default function AdminBlog() {
       const token = session?.access_token
       if (!token) throw new Error('Your session has expired — sign in again.')
 
+      const manualFacts = splitLines(form.facts)
+      const reusableFacts = stableFactsFor(form.stable_fact_ids ?? [])
+      const facts = [...reusableFacts, ...manualFacts]
+      if (facts.length > 25) {
+        throw new Error(`This draft has ${facts.length} facts selected; the generator accepts at most 25.`)
+      }
+
+      const articleType = BLOG_ARTICLE_TYPES.find(type => type.value === form.article_type)
+      const editorialDirection = articleType
+        ? `Editorial format: ${articleType.label}. ${articleType.description}`
+        : ''
+      const angle = [editorialDirection, form.angle.trim()].filter(Boolean).join(' ')
+
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS)
       let response: Response
@@ -290,9 +326,10 @@ export default function AdminBlog() {
           },
           body: JSON.stringify({
             topic:        form.topic.trim(),
-            angle:        form.angle.trim() || undefined,
+            angle:        angle || undefined,
+            audience:     audiencePrompt(form.audience),
             location:     form.location.trim() || undefined,
-            facts:        splitLines(form.facts),
+            facts,
             keywords:     splitCommas(form.keywords),
             author_name:  form.author_name.trim() || undefined,
             generate_hero: form.generate_hero,
@@ -433,7 +470,8 @@ export default function AdminBlog() {
             <Sparkles size={16} className="text-primary-400" /> Generate a draft
           </h2>
           <p className="text-xs text-gray-400 mb-4">
-            Writes an unpublished draft you can edit below. Nothing goes live until you publish it.
+            Choose the format and audience, then ground any current claims below. The result is
+            always an unpublished draft until you review and publish it.
           </p>
 
           <form
@@ -447,6 +485,41 @@ export default function AdminBlog() {
                 className="input bg-gray-700 border-gray-600 text-white placeholder:text-gray-500"
                 placeholder="e.g. How to find a food pantry near you"
               />
+              {similarPost && (
+                <div className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                  A similar StreetRise article may already exist: “{similarPost.post.title}”
+                  <span className="text-amber-300/80"> · /blog/{similarPost.post.slug}</span>.
+                  You can still generate a follow-up if that is intentional.
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="label text-gray-300">Article type</label>
+                <select
+                  {...generateForm.register('article_type')}
+                  className="input bg-gray-700 border-gray-600 text-white"
+                >
+                  {BLOG_ARTICLE_TYPES.map(type => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
+                {selectedArticleType && (
+                  <p className="text-xs text-gray-500 mt-1">{selectedArticleType.description}</p>
+                )}
+              </div>
+              <div>
+                <label className="label text-gray-300">Audience</label>
+                <select
+                  {...generateForm.register('audience')}
+                  className="input bg-gray-700 border-gray-600 text-white"
+                >
+                  {BLOG_AUDIENCES.map(audience => (
+                    <option key={audience.value} value={audience.value}>{audience.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -469,15 +542,43 @@ export default function AdminBlog() {
             </div>
 
             <div>
+              <label className="label text-gray-300">Reusable StreetRise facts</label>
+              <p className="text-xs text-gray-500 mb-2">
+                Optional stable facts only. Changing claims such as cities, counts, dates, partners,
+                and availability still belong in the Facts field below.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {STREETRISE_STABLE_FACTS.map(fact => (
+                  <label
+                    key={fact.id}
+                    className="flex items-start gap-2 rounded-xl border border-gray-600 bg-gray-700/50 px-3 py-2 text-sm text-gray-200"
+                  >
+                    <input
+                      type="checkbox"
+                      value={fact.id}
+                      {...generateForm.register('stable_fact_ids')}
+                      className="mt-0.5 rounded border-gray-600 bg-gray-700"
+                    />
+                    <span>
+                      <span className="font-medium">{fact.label}</span>
+                      <span className="block text-xs text-gray-400 mt-0.5">{fact.text}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
               <label className="label text-gray-300">Facts it may state — one per line</label>
               <textarea
                 {...generateForm.register('facts')}
                 className="input bg-gray-700 border-gray-600 text-white min-h-[90px] text-sm"
-                placeholder={'StreetRise covers Tampa Bay, Orlando, and Miami.\nThe map is free and needs no sign-up.'}
+                placeholder={'The feature launched on [confirmed date].\n[Provider name] approved being named in this post.'}
               />
               <p className="text-xs text-gray-500 mt-1">
-                Counts, dates, partner names, and coverage claims must come from here — the
-                model is told not to invent them. Check them anyway before publishing.
+                Facts listed here are the factual claims the AI is allowed to rely on for current
+                announcements, numbers, partnerships, launches, and availability. The model is told
+                not to invent those details; verify every claim again before publishing.
               </p>
             </div>
 
