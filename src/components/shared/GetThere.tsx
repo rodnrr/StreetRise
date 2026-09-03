@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { Navigation, HelpCircle } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Navigation, HelpCircle, TramFront, CarFront } from 'lucide-react'
 import clsx from 'clsx'
 import {
   TRAVEL_MODES,
@@ -8,9 +9,82 @@ import {
   appleMapsDirectionsUrl,
   prefersAppleMaps,
 } from '@/lib/transport'
+import {
+  lookupNearestStop, formatWalkDistance, serviceDaysKey, AGENCY_LABEL,
+} from '@/lib/transit'
 import { useMapStore } from '@/lib/store'
 import { useI18n } from '@/lib/i18n'
 import type { Resource } from '@/types'
+
+/**
+ * The nearest-stop line.
+ *
+ * Renders one of exactly three things, and nothing is a bigger part of the
+ * design than the cases where it renders nothing at all: an expired feed or an
+ * address outside the agency data we hold both produce silence, never a guess.
+ * See src/lib/transit.ts.
+ */
+function NearestStop({ resource, compact }: { resource: Resource; compact: boolean }) {
+  const { t } = useI18n()
+  const { data } = useQuery({
+    queryKey: ['nearest-stop', resource.id],
+    // Stop locations change on service-change dates, not by the minute.
+    staleTime: 1000 * 60 * 60,
+    enabled: resource.lat != null && resource.lng != null,
+    queryFn: () => lookupNearestStop({ lat: resource.lat!, lng: resource.lng! }),
+  })
+
+  if (!data || data.kind === 'no_coverage' || data.kind === 'stale_feed') return null
+
+  const agency = AGENCY_LABEL[data.stop.agency] ?? data.stop.agency
+  const text = compact ? 'text-xs' : 'text-sm'
+
+  if (data.kind === 'distant') {
+    return (
+      <p className={clsx('flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-amber-800', text)}>
+        <CarFront size={compact ? 13 : 15} className="mt-0.5 shrink-0" />
+        <span>
+          {t('transit.distant')
+            .replace('{agency}', agency)
+            .replace('{distance}', formatWalkDistance(data.km))}
+        </span>
+      </p>
+    )
+  }
+
+  const daysKey = serviceDaysKey(data.stop)
+  return (
+    <div className={clsx('rounded-xl bg-emerald-50 px-3 py-2 text-emerald-900', text)}>
+      <p className="flex items-start gap-2">
+        <TramFront size={compact ? 13 : 15} className="mt-0.5 shrink-0" />
+        <span>
+          <span className="font-semibold">
+            {t('transit.nearestStop').replace('{distance}', formatWalkDistance(data.km))}
+          </span>{' '}
+          <span lang="en">{data.stop.stop_name}</span>
+        </span>
+      </p>
+      <p className="mt-1 pl-5 text-emerald-800/90">
+        {data.stop.route_short_names.length > 0 && (
+          <>{t('transit.routes').replace('{routes}', data.stop.route_short_names.join(', '))}</>
+        )}
+        {daysKey && <> · {t(daysKey)}</>}
+        {data.stop.weekday_first && data.stop.weekday_last && (
+          <> · {t('transit.firstLast')
+            .replace('{first}', data.stop.weekday_first)
+            .replace('{last}', data.stop.weekday_last)}</>
+        )}
+      </p>
+      {/* HART's own fare data prices the streetcar and SkyConnect at $0.00.
+          Free transport matters more here than anywhere else on the page. */}
+      {data.fareFreeRoutes.length > 0 && (
+        <p className="mt-1 pl-5 font-semibold">
+          {t('transit.fareFree').replace('{routes}', data.fareFreeRoutes.join(', '))}
+        </p>
+      )}
+    </div>
+  )
+}
 
 /**
  * "Get There" — the transportation layer's entry point on a single listing.
@@ -60,11 +134,11 @@ export default function GetThere({ resource, variant = 'card' }: Props) {
   )
 
   return (
-    <div className={compact ? 'space-y-2' : 'card'}>
+    <div className={compact ? 'space-y-2' : 'card space-y-3'}>
       <h2
         className={clsx(
           'flex items-center gap-2 font-semibold text-gray-900',
-          compact ? 'text-sm' : 'mb-3',
+          compact ? 'text-sm' : 'text-base',
         )}
       >
         <Navigation size={compact ? 14 : 16} className="text-gray-400" />
@@ -73,6 +147,12 @@ export default function GetThere({ resource, variant = 'card' }: Props) {
 
       {routable ? (
         <>
+          {/* Gated on `routable` for the same reason the map links are, and it
+              matters more here: naming the nearest cross street to a
+              confidential-address shelter would leak the location the rest of
+              this component is careful not to publish. */}
+          <NearestStop resource={resource} compact={compact} />
+
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {TRAVEL_MODES.map((m) => {
               const href = googleMapsDirectionsUrl(resource, m.mode, userLocation)
@@ -124,7 +204,7 @@ export default function GetThere({ resource, variant = 'card' }: Props) {
         to={rideHref}
         className={clsx(
           'inline-flex items-center gap-1.5 font-semibold text-primary-600 hover:text-primary-700',
-          compact ? 'text-xs' : 'mt-3 text-sm',
+          compact ? 'text-xs' : 'text-sm',
         )}
       >
         <HelpCircle size={compact ? 13 : 15} /> {t('getThere.needHelpGettingThere')}

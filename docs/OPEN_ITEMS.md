@@ -4,8 +4,9 @@
 
 Shipped: `/transportation` (directory + Ride Assistance Finder), the "Get There"
 panel on the map sheet and `/resources/:id`, `src/lib/transport.ts`,
-`src/lib/rideOptions.ts`, `publicTags()`, EN/ES strings, and migration 041.
-Open items this raised:
+`src/lib/rideOptions.ts`, `src/lib/transit.ts` (nearest bus stop from static
+GTFS), `scripts/build-transit-sql.ts`, `publicTags()`, EN/ES strings, and
+migrations 041, 042 and 043. Open items this raised:
 
 - **Migration 041 is written but NOT applied, and has unverified facts in it.**
   Read `docs/apply-migration-041.md` before running it. The authoring session
@@ -32,6 +33,29 @@ Open items this raised:
   yields `null`, which the matcher treats as "maybe" rather than "no", so a gap
   costs ranking quality and never hides a programme. Worth extending whenever a
   seed batch adds a new metro.
+- **Migrations 042/043 (transit stops) are written but NOT applied.** Runbook:
+  `docs/apply-migrations-042-043.md`. Unlike 041, the data is first-hand — read
+  straight out of HART's own published GTFS bundle — so there is nothing to
+  verify, only to apply. 043 is ~410 KB, which is an unpleasant paste on a
+  phone; worth asking whether to apply it through tooling instead.
+- **Several listings share one rounded coordinate — real geocoding bug, found
+  2026-09-03.** Red Shield Center, Trinity Cafe Nebraska, Recuperative Care
+  Program and an emergency shelter all carry `27.9614,-82.4597`; three more
+  share `28.05071,-82.451` and three share `27.93536,-82.37841`. Those are
+  distinct services at distinct addresses — Red Shield and Trinity Cafe are
+  about 2 km apart. Surfaced by matching listings against HART stop
+  coordinates, where seven of the eleven "near transit" hits turned out to be
+  in these clusters. The transit backfill only ever raises a flag and all three
+  clusters are in stop-dense central Tampa, so the flag is very likely right
+  anyway — but the coordinates are wrong and every distance measured from them
+  is wrong with them. Re-geocode from the real street addresses.
+- **The GTFS importer had a silent time-parsing bug worth remembering.** HART
+  right-aligns single-digit hours (`' 5:01:41'`), so an anchored `\d+` pattern
+  rejected them and dropped every departure before 10am — making the first bus
+  of the day look like a mid-morning one on every stop in the feed. Caught by
+  cross-checking one stop against the raw file before shipping. Any future feed
+  importer should assume this kind of formatting slop rather than trusting the
+  spec.
 - **No route planning, by design.** The finder hands the trip to Google or Apple
   Maps rather than computing an itinerary. If StreetRise ever wants "PSTA Route
   18 → 52, 47 minutes" in its own UI, that needs a real GTFS/routing backend and

@@ -136,6 +136,9 @@ src/
     transport.ts            # Travel modes + Google/Apple Maps directions deep links.
                             # No routing backend — the trip is handed to a map app.
     rideOptions.ts          # Ride Assistance Finder matching engine — see Transportation
+    transit.ts              # Nearest bus stop for a listing, from static GTFS
+                            # (migrations 042/043). Renders NOTHING on an expired
+                            # feed or outside agency coverage — see Transportation
     seo/                    # SeoHead.tsx, structuredData.ts
 
   pages/
@@ -202,6 +205,8 @@ docs/
   apply-migration-040.md    # Hand-apply runbook (040 = stale_after_days default 30 → 90)
   apply-migration-041.md    # Hand-apply runbook (041 = transportation assistance seed) —
                             # NOT APPLIED, and has unverified facts in it. Read it first.
+  apply-migrations-042-043.md # Hand-apply runbook (042 = transit tables DDL,
+                            # 043 = HART GTFS load + transit backfill) — NOT APPLIED
   auth-setup.md             # Password reset, magic link, and social sign-in: what ships in
                             # code vs. what needs dashboard configuration (all web-UI steps)
   deploy-blog-worker.md     # How the blog publisher Worker deploys — GitHub Actions workflow
@@ -218,6 +223,9 @@ docs/
 scripts/
   deploy-pages.sh           # Cloudflare Pages deploy (validates env vars)
   import-seed-candidates.ts # Seed import (needs SUPABASE_SERVICE_ROLE_KEY)
+  build-transit-sql.ts      # Static GTFS bundle → transit_stops/transit_routes SQL.
+                            # `npm run transit:sql -- <gtfs-dir> <agency>`. Output is
+                            # committed as a migration; re-run per agency feed release.
   work-exchange-agent.ts    # Re-verifies /work listings + drafts new ones into a review queue.
                             # Needs SUPABASE_SERVICE_ROLE_KEY + ANTHROPIC_API_KEY. Never publishes.
 
@@ -229,7 +237,7 @@ workers/
                             # service-role key. Covers go to the Supabase `blog-images`
                             # bucket, not R2. Reached from the AI Draft panel on /admin/blog.
 
-supabase/migrations/        # 001–041 with gaps: NO 012, 013, or 021 exist.
+supabase/migrations/        # 001–043 with gaps: NO 012, 013, or 021 exist.
                             # See Migrations section — applied to live BY HAND.
 
 public/
@@ -326,6 +334,26 @@ Migration 035 adds provenance: `external_id`, `source_url` (the public "get invo
 Review queue for `scripts/work-exchange-agent.ts` (migration 035). One row per proposed change: `kind` (`new | update | delist`), `status` (`pending | approved | rejected | applied`), the `proposed` payload as JSONB, plus `source_url`, a verbatim `evidence` quote from the page, `confidence`, and the run/model that produced it.
 
 **The agent never publishes.** It writes `last_verified_at` / `last_verify_status` on `work_exchanges` and nothing else; every content change lands here and an admin approves it at `/admin/work-exchange`. RLS is admin-only — not public (unreviewed machine output about a real charity) and not provider-readable (a provider should not see a draft about their org before a human has). Two partial unique indexes keep re-runs from duplicating an already-open proposal. Runbook: `docs/work-exchange-agent.md`.
+
+### `transit_stops` / `transit_routes`
+Static GTFS data (migrations 042/043, **not applied**). One row per stop with
+service under the currently-active calendar, carrying its coordinates, the
+routes calling there, day-type coverage, and the weekday service window; plus a
+small routes table with fares. Public-read / admin-write RLS mirroring `faq`.
+
+Loaded from an agency's published GTFS bundle by `scripts/build-transit-sql.ts`,
+whose output is committed as a migration — so the provenance of every row is
+reproducible and a feed refresh is a re-run, not hand-editing. **Only
+service_ids active on the build date are counted**, so a stop that lost its
+service in the last shake-up cannot keep making a listing look reachable.
+
+Keys are `<agency>:<id>` and every row carries `agency`, because the loaded feed
+is HART (Hillsborough only) and PSTA/LYNX/Miami-Dade number their stops from 1
+too. Adding one of those is another import run, not a schema change.
+
+Every row also carries `feed_valid_until` from the agency's `feed_info.txt`.
+Past that date `src/lib/transit.ts` renders nothing rather than last quarter's
+network — the same fail-closed instinct as the map's "Open right now" filter.
 
 ### `blog_posts`
 Backs `/blog` and `/admin/blog` (migration 029). Public-read/admin-write RLS mirroring `faq`. `body_markdown` is not yet rendered as markdown on the public page.
@@ -485,8 +513,30 @@ Miami trip. A missing city yields `null`, treated as "maybe", so a gap costs
 ranking quality and never hides a programme. Extend it when a seed batch adds a
 metro.
 
+**4. Nearest bus stop on a listing** — `src/lib/transit.ts`, rendered inside the
+Get There panel. Reads static GTFS loaded by migrations 042/043: which stop is
+closest, which routes call there, which days they run, and the weekday window.
+No realtime feed and no API key — a stop's location changes on service-change
+dates, not by the minute.
+
+The *negative* is the valuable half. Four listings on live are 7–11 miles from
+any HART stop, and telling someone without a car that before they set out
+matters more than confirming a stop is close. That negative is computed at read
+time rather than stored, so it cannot go stale against a feed that has moved on.
+
+Three cases render **nothing**, deliberately: an expired feed (`feed_valid_until`
+has passed), an address outside the agency data we hold (read as "no coverage",
+never as "no bus"), and any error. Where a stop is found but distant the copy
+says "nearest **HART** stop" — naming the agency, because we are reporting the
+limit of our data, not asserting no operator serves the address.
+
+It also surfaces something the app never said: HART's own fare data prices the
+TECO Line Streetcar and the airport SkyConnect at **$0.00**. `is_fare_free` is
+set only from an explicit 0.00 — a NULL fare is unknown, not free.
+
 **Data**: migration 041 (**not applied** — `docs/apply-migration-041.md`) seeds
-PSTA and HART programmes. Coverage is Pinellas + Hillsborough only; Orlando and
+PSTA and HART programmes. Migrations 042/043 (**not applied** —
+`docs/apply-migrations-042-043.md`) add the transit tables and HART's stops. Coverage is Pinellas + Hillsborough only; Orlando and
 Miami-Dade equivalents are unseeded. Until then `/transportation` renders an
 honest empty state, and the finder tells an Orlando visitor these programmes
 serve a different area rather than showing a false match.
@@ -581,7 +631,7 @@ Migrations live in `supabase/migrations/`, numbered 001–039 **with gaps: 012, 
 
 **Do not regenerate `src/lib/database.types.ts` from the CLI** unless you have confirmed live has every migration the code depends on — the `blog_posts` block and the two conversation read columns were hand-written to match intended state, and a regen against a lagging DB would delete them.
 
-Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage (**applied — verified live 2026-09-01**, `blog-images` bucket exists with `public=true`), 032 South Florida seed, 033/034 claim submissions + notification fields, 035 work exchange provenance + agent review queue, 036 student clothing seed + `students` population tag, 037 confidence-trigger parity, **038/039 (added 2026-08-24, PR #85) are repo-completeness re-adds only** — both are backfills that were run against live back in May/June 2026 (038 on 2026-05-25, 039 on 2026-06-18) via a now-deleted session branch and never made it into the repo; the SQL files are reproduced verbatim from live's migration history. There is nothing to "apply" for 038/039 — they already happened. **039 is genuinely idempotent** (every UPDATE is `WHERE gender_policy = 'unknown'`-guarded). **038 is not** — its last statement is an unguarded table-wide `UPDATE resources SET stale_after_days = stale_after_days`, which stamps `updated_at = now()` on every row via `resources_updated_at` (same hazard migration 037 explicitly guards against with `DISABLE/ENABLE TRIGGER` for the identical statement). Re-running 038 against live or any already-seeded database manufactures false freshness table-wide; see that migration's own header comment before ever re-running it. **041 (added 2026-09-03) seeds the first `transportation` listings — NOT APPLIED, and carries facts nobody could verify from the session that wrote it; read `docs/apply-migration-041.md` before running it.** **040 (added 2026-09-03) raises `resources.stale_after_days` from 30 to 90**, default and backfill — **applied and verified live 2026-09-03**; runbook `docs/apply-migration-040.md`. Same DISABLE/ENABLE TRIGGER idiom as 037 so the backfill didn't touch `updated_at` (confirmed: `max(updated_at)` identical before/after).
+Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage (**applied — verified live 2026-09-01**, `blog-images` bucket exists with `public=true`), 032 South Florida seed, 033/034 claim submissions + notification fields, 035 work exchange provenance + agent review queue, 036 student clothing seed + `students` population tag, 037 confidence-trigger parity, **038/039 (added 2026-08-24, PR #85) are repo-completeness re-adds only** — both are backfills that were run against live back in May/June 2026 (038 on 2026-05-25, 039 on 2026-06-18) via a now-deleted session branch and never made it into the repo; the SQL files are reproduced verbatim from live's migration history. There is nothing to "apply" for 038/039 — they already happened. **039 is genuinely idempotent** (every UPDATE is `WHERE gender_policy = 'unknown'`-guarded). **038 is not** — its last statement is an unguarded table-wide `UPDATE resources SET stale_after_days = stale_after_days`, which stamps `updated_at = now()` on every row via `resources_updated_at` (same hazard migration 037 explicitly guards against with `DISABLE/ENABLE TRIGGER` for the identical statement). Re-running 038 against live or any already-seeded database manufactures false freshness table-wide; see that migration's own header comment before ever re-running it. **042/043 (added 2026-09-03) add the transit tables and load HART's GTFS feed — NOT APPLIED; `docs/apply-migrations-042-043.md`. 042 is DDL only; 043 is ~410 KB of generated rows plus a guarded `public_transit_accessible` backfill that only ever raises the flag.** **041 (added 2026-09-03) seeds the first `transportation` listings — NOT APPLIED, and carries facts nobody could verify from the session that wrote it; read `docs/apply-migration-041.md` before running it.** **040 (added 2026-09-03) raises `resources.stale_after_days` from 30 to 90**, default and backfill — **applied and verified live 2026-09-03**; runbook `docs/apply-migration-040.md`. Same DISABLE/ENABLE TRIGGER idiom as 037 so the backfill didn't touch `updated_at` (confirmed: `max(updated_at)` identical before/after).
 
 **Live carries schema objects that no migration creates.** Two were found on PR #79: the `trg_resource_confidence` trigger + `fn_update_resource_confidence()` function (captured by migration 037) and the Christian Service Center provider row created by the OB3 import script (captured by 036 section 1b). Verifying a change against live cannot detect this class by construction — live is the environment that hides it. Before writing a migration that depends on a trigger, function, policy or row, confirm a migration actually creates it.
 

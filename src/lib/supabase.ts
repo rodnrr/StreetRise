@@ -40,6 +40,16 @@ export const db = {
   messages:         () => supabase.from('conversation_messages'),
   adminNotes:       () => supabase.from('conversation_admin_notes'),
   provider_claims:  () => supabase.from('provider_claims'),
+  // Static GTFS tables (migrations 042/043). Cast for the same reason as
+  // `bookings` above: database.types.ts is hand-maintained and does not yet
+  // describe these tables, and regenerating it against live is forbidden
+  // while live lags the repo's migrations (see CLAUDE.md). The row shapes
+  // are declared in src/lib/transit.ts instead, which is where every read
+  // of them goes through.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  transit_stops:    () => supabase.from('transit_stops') as any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  transit_routes:   () => supabase.from('transit_routes') as any,
 }
 
 export function subscribeToBedUpdates(

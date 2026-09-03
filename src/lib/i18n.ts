@@ -1105,6 +1105,18 @@ const en: Dict = {
 
   'footer.transportation': 'Transportation Help',
   'home.category.transportation': 'Transportation',
+
+  // ── Nearest transit stop (static GTFS, migrations 042/043) ──
+  'transit.nearestStop': 'Bus stop {distance} away:',
+  'transit.routes': 'Routes {routes}',
+  'transit.firstLast': 'weekdays {first}–{last}',
+  'transit.fareFree': 'Free to ride: Route {routes} — no fare.',
+  'transit.distant': 'The nearest {agency} stop is about {distance} away. This one is hard to reach without a car — check the ride assistance options below before you set out.',
+  'transit.days.everyDay': 'every day',
+  'transit.days.monSat': 'Mon–Sat, no Sunday service',
+  'transit.days.weekdaysOnly': 'weekdays only',
+  'transit.days.weekendOnly': 'weekends only',
+  'transit.days.weekdaysAndSunday': 'weekdays and Sunday, no Saturday service',
 }
 
 const es: Dict = {
@@ -2180,6 +2192,18 @@ const es: Dict = {
 
   'footer.transportation': 'Ayuda con Transporte',
   'home.category.transportation': 'Transporte',
+
+  // ── Parada de autobús más cercana (GTFS estático, migraciones 042/043) ──
+  'transit.nearestStop': 'Parada de autobús a {distance}:',
+  'transit.routes': 'Rutas {routes}',
+  'transit.firstLast': 'entre semana {first}–{last}',
+  'transit.fareFree': 'Viaje gratuito: la Ruta {routes} no cobra pasaje.',
+  'transit.distant': 'La parada de {agency} más cercana está a unos {distance}. Es difícil llegar aquí sin auto — revisa las opciones de ayuda con el viaje antes de salir.',
+  'transit.days.everyDay': 'todos los días',
+  'transit.days.monSat': 'lun–sáb, sin servicio los domingos',
+  'transit.days.weekdaysOnly': 'solo entre semana',
+  'transit.days.weekendOnly': 'solo fines de semana',
+  'transit.days.weekdaysAndSunday': 'entre semana y domingos, sin servicio los sábados',
 }
 
 export const translations: Record<Lang, Dict> = { en, es }
