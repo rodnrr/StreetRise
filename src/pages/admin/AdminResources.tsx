@@ -224,6 +224,7 @@ export default function AdminResources() {
             <div className="flex items-start justify-between gap-3 mb-2">
               <div className="flex items-start gap-3 flex-1 min-w-0">
                 <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelected(r.id)}
+                  aria-label={`Select ${r.name} for bulk freshness refresh`}
                   className="w-4 h-4 mt-1 accent-primary-600 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
