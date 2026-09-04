@@ -13,7 +13,7 @@
 // where to sleep.
 
 import { Link } from 'react-router-dom'
-import { AlertTriangle, Check, HelpCircle, Minus, Phone, Globe, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, Check, HelpCircle, Minus, Phone, Globe, ShieldAlert, WifiOff } from 'lucide-react'
 import {
   answerFor,
   freshnessFor,
@@ -317,5 +317,55 @@ export function ProgramCard({
         <FreshnessNote lastVerifiedAt={program.last_verified_at} />
       </footer>
     </article>
+  )
+}
+
+// ------------------------------------------------------------
+// Load failure
+// ------------------------------------------------------------
+
+/**
+ * Shown when a listings query FAILS, which is a different thing from a
+ * query that succeeded and found nothing.
+ *
+ * Collapsing the two is the failure mode worth guarding against here: on
+ * a Supabase outage the page would otherwise tell somebody "there is no
+ * confirmed housing in your state", which is not a degraded answer but a
+ * false one — and false in the direction that makes them stop looking.
+ * Say we could not load it, and give them the retry.
+ */
+export function LoadFailed({
+  what,
+  onRetry,
+}: {
+  what: string
+  onRetry?: () => void
+}) {
+  return (
+    <div
+      role="alert"
+      className="rounded-2xl border border-amber-300 bg-amber-50 p-5 dark:border-amber-500/40 dark:bg-amber-500/10"
+    >
+      <div className="flex items-start gap-3">
+        <WifiOff className="mt-0.5 h-6 w-6 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden="true" />
+        <div>
+          <h2 className="text-lg font-semibold text-amber-900 dark:text-amber-200">
+            We could not load {what}
+          </h2>
+          <p className="mt-1 text-base text-amber-900 dark:text-amber-200">
+            Something went wrong at our end. This does not mean there is nothing here — try again in
+            a moment.
+          </p>
+          {onRetry && (
+            <button type="button" onClick={onRetry} className="btn-secondary btn-sm mt-3">
+              Try again
+            </button>
+          )}
+          <p className="mt-3 text-base text-amber-900 dark:text-amber-200">
+            If it keeps failing, call <strong>211</strong> — free, 24 hours, anywhere in the country.
+          </p>
+        </div>
+      </div>
+    </div>
   )
 }

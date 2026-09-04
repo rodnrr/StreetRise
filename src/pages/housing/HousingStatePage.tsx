@@ -16,7 +16,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Scale, Inbox } from 'lucide-react'
 import { fetchState, fetchProgramsByState } from '@/lib/housing'
-import { ProgramCard, ScamWarningLink } from '@/components/housing/HousingBits'
+import { ProgramCard, ScamWarningLink, LoadFailed } from '@/components/housing/HousingBits'
 import SeoHead from '@/lib/seo/SeoHead'
 import { breadcrumbSchema } from '@/lib/seo/structuredData'
 import NotFoundPage from '@/pages/NotFoundPage'
@@ -64,7 +64,12 @@ export default function HousingStatePage() {
     staleTime: 1000 * 60 * 60,
   })
 
-  const { data: programs, isLoading: programsLoading } = useQuery({
+  const {
+    data: programs,
+    isLoading: programsLoading,
+    isError: programsFailed,
+    refetch: refetchPrograms,
+  } = useQuery({
     queryKey: ['housing-state-programs', code],
     queryFn: () => fetchProgramsByState(code),
     enabled: isValidShape,
@@ -117,11 +122,13 @@ export default function HousingStatePage() {
         <p className="mt-3 text-lg text-slate-700 dark:text-slate-300">
           {stateLoading || programsLoading
             ? 'Loading…'
-            : total === 0
-              ? `We do not have confirmed listings in ${name} yet.`
-              : total === 1
-                ? `1 program we have checked in ${name}.`
-                : `${total} programs we have checked in ${name}.`}
+            : programsFailed
+              ? 'We could not load the listings for this state.'
+              : total === 0
+                ? `We do not have confirmed listings in ${name} yet.`
+                : total === 1
+                  ? `1 program we have checked in ${name}.`
+                  : `${total} programs we have checked in ${name}.`}
         </p>
       </Section>
 
@@ -161,7 +168,13 @@ export default function HousingStatePage() {
           </div>
         )}
 
-        {!programsLoading && total === 0 && (
+        {!programsLoading && programsFailed && (
+          <div className="pb-12">
+            <LoadFailed what={`listings for ${name}`} onRetry={() => refetchPrograms()} />
+          </div>
+        )}
+
+        {!programsLoading && !programsFailed && total === 0 && (
           <section className="pb-12">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-800">
               <Inbox className="mx-auto h-8 w-8 text-slate-400" aria-hidden="true" />

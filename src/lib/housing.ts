@@ -52,6 +52,16 @@ const t = {
  */
 export const STALE_AFTER_DAYS = 180
 
+/**
+ * Ceiling on organizations fetched for one state page.
+ *
+ * Not a real limit today — no state is close — but an explicit cap makes
+ * the failure visible in this file rather than as listings quietly
+ * missing from a state page. If a state ever approaches it, page through
+ * step 1 with .range() rather than raising it.
+ */
+export const MAX_STATE_ORGS = 2000
+
 // ------------------------------------------------------------
 // Tri-state answers
 // ------------------------------------------------------------
@@ -265,20 +275,40 @@ export async function fetchState(code: string): Promise<HousingState | null> {
 /**
  * Every published program with a location in this state.
  *
- * Reads programs → organization → locations in one round trip. RLS does
- * the publishing gate on both sides (migration 056 §12), so this query
- * carries no is_published filter of its own — one place to get it
- * wrong instead of two.
+ * Two round trips, on purpose. The obvious single query — select every
+ * published program with its org and locations embedded, then keep the
+ * ones with an address in this state — was what this did first, and it
+ * was wrong twice over: every state page downloaded the entire national
+ * directory, and once the published set outgrows PostgREST's row cap the
+ * rows past the cap would vanish from their own state pages with no
+ * error. A directory that silently drops listings as it grows is worse
+ * than one that fails loudly.
  *
- * The state filter is applied in the browser rather than as a nested
- * PostgREST filter: an organization can have addresses in more than one
- * state, and a nested .eq() would return the org with only the matching
- * address attached, silently hiding its other offices from the org page
- * that reuses this shape.
+ * So the state predicate runs server-side, in step 1, and step 2 fetches
+ * only the programs that survived it.
+ *
+ * RLS does the publishing gate on both steps (migration 056 §12), so
+ * neither query repeats it — one place to get it wrong instead of three.
  */
 export async function fetchProgramsByState(stateCode: string): Promise<HousingProgramWithOrg[]> {
   const code = stateCode.toUpperCase()
 
+  // 1. Which organizations have an address in this state?
+  const { data: locRows, error: locErr } = await t.locations()
+    .select('organization_id')
+    .eq('state_code', code)
+    .limit(MAX_STATE_ORGS)
+
+  if (locErr) throw locErr
+
+  const orgIds = Array.from(
+    new Set(((locRows ?? []) as { organization_id: string }[]).map((l) => l.organization_id))
+  )
+  if (orgIds.length === 0) return []
+
+  // 2. Their published programs, with the org and ALL of its addresses.
+  //    All, not just this state's: an org with offices in three states is
+  //    one organization, and the org page reuses this shape.
   const { data, error } = await t.programs()
     .select(`
       *,
@@ -287,6 +317,7 @@ export async function fetchProgramsByState(stateCode: string): Promise<HousingPr
         locations:housing_locations ( * )
       )
     `)
+    .in('organization_id', orgIds)
     .order('name')
 
   if (error) throw error
@@ -295,13 +326,11 @@ export async function fetchProgramsByState(stateCode: string): Promise<HousingPr
     organization: HousingOrganization & { locations: HousingLocation[] }
   }
 
-  return ((data ?? []) as Row[])
-    .filter((row) => (row.organization?.locations ?? []).some((l) => l.state_code === code))
-    .map((row) => ({
-      ...row,
-      organization: row.organization,
-      locations: row.organization.locations ?? [],
-    }))
+  return ((data ?? []) as Row[]).map((row) => ({
+    ...row,
+    organization: row.organization,
+    locations: row.organization.locations ?? [],
+  }))
 }
 
 export async function fetchOrgBySlug(slug: string): Promise<{

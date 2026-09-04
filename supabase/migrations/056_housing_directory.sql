@@ -379,6 +379,16 @@ DECLARE
   recent_identical integer;
   recent_on_target integer;
 BEGIN
+  -- Stamp the server's clock over whatever the caller sent.
+  --
+  -- created_at has a DEFAULT, but a default only applies when the column
+  -- is omitted, and an anonymous caller can name it explicitly over the
+  -- REST API. Without this line, twenty reports inserted with a
+  -- created_at far in the future stay inside both windows below until
+  -- that date arrives — permanently blocking real corrections on that
+  -- listing. A guard whose window the attacker controls is not a guard.
+  NEW.created_at := now();
+
   SELECT count(*) INTO recent_identical
     FROM housing_reports
    WHERE report_type = NEW.report_type
@@ -501,10 +511,26 @@ CREATE POLICY housing_programs_admin_write ON housing_programs
 
 -- ── housing_sources ─────────────────────────────────────────────
 -- Attribution is shown on the org page, so the public reads it for
--- published orgs. raw_payload can hold an entire upstream record
--- including contact details we chose not to publish, so the read is
--- column-limited by the `housing_source_attribution` view below rather
--- than by this policy — the app must query the view, not the table.
+-- published orgs. But raw_payload can hold an entire upstream record,
+-- including contact details we deliberately did not publish.
+--
+-- RLS alone does not protect that column. RLS filters ROWS, not columns,
+-- and `/rest/v1/housing_sources?select=raw_payload` reaches the base
+-- table directly — "the app queries the view instead" is a convention,
+-- not an access control, and conventions do not survive contact with a
+-- URL. So the column is closed with a column-level GRANT, which the
+-- public role cannot route around.
+--
+-- Consequence worth knowing: raw_payload becomes readable only by the
+-- service role. Admins are the `authenticated` role over the API, so
+-- they cannot read it either. Nothing in the app surfaces it today
+-- (it is provenance for a human debugging an import), and the safer
+-- default is the right one here. If admin ever needs it, add a separate
+-- admin-only view rather than widening this grant.
+
+REVOKE SELECT ON housing_sources FROM anon, authenticated;
+GRANT SELECT (id, organization_id, source_name, source_url, retrieved_at, license_note)
+  ON housing_sources TO anon, authenticated;
 
 DROP POLICY IF EXISTS housing_sources_public_read ON housing_sources;
 CREATE POLICY housing_sources_public_read ON housing_sources

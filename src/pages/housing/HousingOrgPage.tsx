@@ -14,7 +14,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Building2, MapPin } from 'lucide-react'
 import { fetchOrgBySlug, formatAddress, ORG_TYPE_LABELS } from '@/lib/housing'
-import { ProgramCard, ScamWarningLink, ContactLines } from '@/components/housing/HousingBits'
+import { ProgramCard, ScamWarningLink, ContactLines, LoadFailed } from '@/components/housing/HousingBits'
 import SeoHead, { SITE_URL } from '@/lib/seo/SeoHead'
 import { breadcrumbSchema } from '@/lib/seo/structuredData'
 import NotFoundPage from '@/pages/NotFoundPage'
@@ -60,7 +60,7 @@ function orgSchema(org: HousingOrganization, locations: HousingLocation[]) {
 export default function HousingOrgPage() {
   const { slug } = useParams<{ slug: string }>()
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['housing-org', slug],
     queryFn: () => fetchOrgBySlug(slug!),
     enabled: !!slug,
@@ -72,6 +72,16 @@ export default function HousingOrgPage() {
       <Section containerSize="prose">
         <div className="skeleton h-8 w-2/3" />
         <div className="skeleton mt-4 h-64" />
+      </Section>
+    )
+  }
+
+  // A failed request is not a missing organization. Rendering 404 on an
+  // outage tells somebody the place they were sent to does not exist.
+  if (isError) {
+    return (
+      <Section containerSize="prose">
+        <LoadFailed what="this organization" onRetry={() => refetch()} />
       </Section>
     )
   }

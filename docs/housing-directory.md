@@ -117,6 +117,13 @@ In admin, "Confirmed by phone" on `/admin/housing/:id` writes one of these rows.
 name a scam landlord and carry the reporter's email, and a readable table would
 be a way to look up who reported whom.
 
+`housing_reports_guard` also overwrites `created_at` with `now()` on every
+insert. A column DEFAULT only applies when the column is omitted, and an
+anonymous caller can name it explicitly over the REST API — without the
+overwrite, twenty reports dated far in the future sit inside the guard's
+one-hour window until that date arrives and block real corrections on that
+listing permanently. A guard whose window the caller controls is not a guard.
+
 Consequence for the client: **never call `.select()` on the insert.** Supabase
 returns an empty body when the caller cannot read the row back, which surfaces
 as an error to the user on an otherwise successful write. `submitReport()` in
@@ -136,9 +143,34 @@ That covers the realistic failure mode (a script or a stuck retry loop hammering
 one listing) without a global cap that would let one abuser silence everyone
 else's reports.
 
+**Residual, and it is real:** twenty deliberate reports on one program still
+suppress further corrections *on that program* for an hour, across all report
+types — so a `scam` report can be blocked by a flood of `wrong_info`. The
+`created_at` overwrite bounds that to an hour instead of forever, which is the
+difference between a nuisance and a permanent gag, but it does not remove it.
+Only per-client limiting does, and that has to live at the edge.
+
 **Real per-IP limiting still needs a Cloudflare rate-limiting rule** in front of
 `/rest/v1/housing_reports`. Not configured. Do this before linking a public
 submission form.
+
+---
+
+## Source attribution and `raw_payload`
+
+`housing_sources.raw_payload` is closed with a **column-level GRANT**, not by
+RLS and not by the convention that the app queries the attribution view.
+
+RLS filters rows, not columns, and `/rest/v1/housing_sources?select=raw_payload`
+reaches the base table directly — "the app uses the view" is a convention, and
+conventions do not survive contact with a URL. `anon` and `authenticated` are
+granted SELECT on six named columns only; `raw_payload` is not among them, so
+both `select=raw_payload` and `select=*` return a permission error.
+
+Consequence: `raw_payload` is readable only by the service role. Admins are the
+`authenticated` role over the API, so they cannot read it either. Nothing
+surfaces it today. If admin ever needs it, add a separate admin-only view rather
+than widening the grant.
 
 ---
 

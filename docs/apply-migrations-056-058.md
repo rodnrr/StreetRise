@@ -121,6 +121,30 @@ RESET ROLE;
 DELETE FROM housing_reports;   -- clean up the test rows
 ```
 
+Also confirm the column-level grant that closes `raw_payload` — RLS does not do
+this, and the attribution view is a convention rather than an access control:
+
+```sql
+SET ROLE anon;
+SELECT raw_payload FROM housing_sources;   -- expect: ERROR permission denied
+SELECT * FROM housing_sources;             -- expect: ERROR permission denied
+SELECT source_name FROM housing_sources;   -- expect: works
+SELECT * FROM housing_source_attribution;  -- expect: works
+RESET ROLE;
+```
+
+And that a caller cannot choose its own `created_at`:
+
+```sql
+SET ROLE anon;
+INSERT INTO housing_reports (report_type, message, created_at)
+VALUES ('wrong_info', 'clock test', '3000-01-01T00:00:00Z');
+RESET ROLE;
+SELECT created_at FROM housing_reports WHERE message = 'clock test';
+-- expect: today's timestamp, NOT year 3000
+DELETE FROM housing_reports WHERE message = 'clock test';
+```
+
 **All of the above were run against a local PostgreSQL 16 on 2026-09-04 and
 passed**, along with: the two-gate publish check (publishing a program while its
 organization stays unpublished keeps it invisible; publishing the org reveals it;

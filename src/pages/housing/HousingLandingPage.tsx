@@ -17,7 +17,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Search, MapPin } from 'lucide-react'
 import { fetchStates, fetchStateCounts, stateSlug } from '@/lib/housing'
-import { ScamWarningLink } from '@/components/housing/HousingBits'
+import { ScamWarningLink, LoadFailed } from '@/components/housing/HousingBits'
 import SeoHead from '@/lib/seo/SeoHead'
 import { breadcrumbSchema } from '@/lib/seo/structuredData'
 import Section from '@/components/ui/Section'
@@ -26,7 +26,7 @@ import Container from '@/components/ui/Container'
 export default function HousingLandingPage() {
   const [query, setQuery] = useState('')
 
-  const { data: states, isLoading } = useQuery({
+  const { data: states, isLoading, isError, refetch } = useQuery({
     queryKey: ['housing-states'],
     queryFn: fetchStates,
     staleTime: 1000 * 60 * 60,
@@ -122,14 +122,20 @@ export default function HousingLandingPage() {
           </div>
         )}
 
-        {!isLoading && filtered.length === 0 && (
+        {!isLoading && isError && (
+          <div className="mt-6">
+            <LoadFailed what="the list of states" onRetry={() => refetch()} />
+          </div>
+        )}
+
+        {!isLoading && !isError && filtered.length === 0 && (
           <p className="mt-6 text-base text-slate-700 dark:text-slate-300">
             No state matches “{query}”. Check the spelling, or clear the box to see all
             states.
           </p>
         )}
 
-        {!isLoading && filtered.length > 0 && (
+        {!isLoading && !isError && filtered.length > 0 && (
           <ul className="mt-6 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
             {filtered.map((s) => {
               const n = counts?.[s.code] ?? 0

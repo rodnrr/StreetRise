@@ -678,6 +678,14 @@ so treating it as fresh would strip the staleness warning exactly when the
 listing most needs one. The log is admin-only (`notes` can carry a caller's name);
 the public sees only the date.
 
+**`housing_sources.raw_payload` is closed by a column-level GRANT, not by RLS.**
+RLS filters rows, not columns, so a public SELECT policy on the base table lets
+anon read `raw_payload` straight off `/rest/v1/housing_sources` — the
+`housing_source_attribution` view is a convention, not an access control. `anon`
+and `authenticated` hold SELECT on six named columns only; `raw_payload` ends up
+service-role-only, admins included. Add an admin-only view if that ever needs to
+change, rather than widening the grant.
+
 **`housing_reports` has no public SELECT policy, deliberately** — a report can
 name a scam landlord and carry the reporter's email. So **never call `.select()`
 on the insert**: Supabase returns an empty body when the caller cannot read the
@@ -685,8 +693,11 @@ row back, which surfaces as an error on a successful write. Copy `submitReport()
 rather than rolling a new one. Per-IP rate limiting is **not** implemented and
 cannot be done in Postgres here (every anon insert is the same role, no IP, no
 session); migration 056's trigger does duplicate suppression and a per-program
-hourly ceiling instead. Add a Cloudflare rate-limiting rule before linking a
-public submission form.
+hourly ceiling instead, and overwrites `created_at` with `now()` so a caller
+cannot future-date rows to pin the window open forever. Twenty deliberate
+reports still suppress corrections on that one program for an hour, across all
+report types — bounded, not eliminated. Add a Cloudflare rate-limiting rule
+before linking a public submission form.
 
 **Known gaps, all deliberate or blocked:**
 
