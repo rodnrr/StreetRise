@@ -10,6 +10,8 @@ import {
   publicTags,
 } from '@/lib/mapFilters'
 import GetThere from '@/components/shared/GetThere'
+import HousingEligibility from '@/components/housing/HousingEligibility'
+import { normalizeHousingEmbed, isMissingHousingRelation } from '@/lib/housing'
 import { useI18n } from '@/lib/i18n'
 import type { Resource } from '@/types'
 
@@ -67,17 +69,31 @@ export default function ResourceDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { t } = useI18n()
 
-  const { data: resource, isLoading } = useQuery<Resource | null>({
+  const { data: resource, isLoading, isError, refetch } = useQuery<Resource | null>({
     queryKey: ['resource', id],
     queryFn:  async () => {
       // `id` and `claim_status` on the joined provider drive the "claim this
       // listing" prompt below. Unclaimed providers are publicly readable
       // (providers_unclaimed_read), so this join works for anonymous visitors.
-      const { data } = await db.resources()
-        .select('*, providers(id, organization_name, website, claim_status)')
-        .eq('id', id!)
-        .single()
-      return data as unknown as Resource
+      const PROVIDER_EMBED = 'providers(id, organization_name, website, claim_status)'
+      const run = (select: string) =>
+        db.resources().select(select).eq('id', id!).single()
+
+      let { data, error } = await run(`*, ${PROVIDER_EMBED}, housing:resource_housing_details(*)`)
+      // Migrations are hand-applied while merging deploys, so this page can be
+      // live before 057 exists. Retry without the embed rather than 404ing a
+      // listing that is perfectly fine.
+      if (error && isMissingHousingRelation(error)) {
+        const retry = await run(`*, ${PROVIDER_EMBED}`)
+        data = retry.data
+        error = retry.error
+      }
+      if (error) throw error
+      const row = data as unknown as Record<string, unknown>
+      return {
+        ...(row as unknown as Resource),
+        housing: normalizeHousingEmbed(row?.housing),
+      } as Resource
     },
     enabled: !!id,
   })
@@ -92,6 +108,25 @@ export default function ResourceDetailPage() {
         {[1, 2, 3].map((i) => (
           <div key={i} className={`skeleton ${i === 1 ? 'h-48' : 'h-28'} w-full`} />
         ))}
+      </div>
+    )
+  }
+
+  // A failed request is not a missing listing. Rendering "not found" on an
+  // outage tells somebody the place they were sent to no longer exists, which
+  // is both false and the kind of false that makes them stop looking.
+  if (isError) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 pt-20 text-center" role="alert">
+        <p className="text-base font-semibold text-gray-900 dark:text-white">
+          {t('resourceDetail.loadFailed')}
+        </p>
+        <p className="mt-2 text-base text-gray-600 dark:text-slate-400">
+          {t('resourceDetail.loadFailedHint')}
+        </p>
+        <button type="button" onClick={() => refetch()} className="btn-primary mt-4">
+          {t('resourceDetail.retry')}
+        </button>
       </div>
     )
   }
@@ -315,6 +350,7 @@ export default function ResourceDetailPage() {
       {/* Get There — the transportation layer. Placed directly after Contact
           because "where is it" and "how do I reach it" are the same question
           for someone without a car. */}
+      <HousingEligibility resource={resource} />
       <GetThere resource={resource} />
 
       {/* Tags — internal `key:value` bookkeeping (import:, access_src:, ride:, …)

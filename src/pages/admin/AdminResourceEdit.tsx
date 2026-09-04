@@ -8,11 +8,12 @@ import { ArrowLeft, RefreshCw } from 'lucide-react'
 import clsx from 'clsx'
 import { db } from '@/lib/supabase'
 import { useToast } from '@/lib/store'
+import HousingDetailsFields from '@/components/housing/HousingDetailsFields'
 import { getTrustInfo, TRUST_LEVEL_CLASSES } from '@/lib/mapFilters'
 import type { Resource } from '@/types'
 
 const CATEGORIES = [
-  'shelter','food','work_exchange','mental_health','medical',
+  'shelter','housing','food','work_exchange','mental_health','medical',
   'legal','hygiene','clothing','childcare','transportation','outdoor_space','other',
 ]
 
@@ -416,6 +417,10 @@ export default function AdminResourceEdit() {
           </button>
         </div>
       </form>
+
+      {/* Same shared section the provider portal mounts — one housing editor,
+          two places it appears. */}
+      <HousingDetailsFields resourceId={id} category={watch('category')} dark />
     </div>
   )
 }

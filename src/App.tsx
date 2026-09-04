@@ -41,6 +41,12 @@ const BlogPostPage         = lazy(() => import('@/pages/blog/BlogPostPage'))
 // Category pages — all share one component, parameterized via categories.ts
 const CategoryPage         = lazy(() => import('@/pages/categories/CategoryPage'))
 
+// Housing — a curated view over canonical resources, NOT a separate directory.
+// Discovery happens through /map and /resources/:id like every other category;
+// these two routes are guidance and shortcuts. See docs/housing-architecture.md.
+const HousingLandingPage   = lazy(() => import('@/pages/housing/HousingLandingPage'))
+const HousingScamsPage     = lazy(() => import('@/pages/housing/HousingScamsPage'))
+
 // Provider claim flow (migrations 023–027 + 033)
 const ClaimIndexPage       = lazy(() => import('@/pages/claim/ClaimIndexPage'))
 const ClaimDetailPage      = lazy(() => import('@/pages/claim/ClaimDetailPage'))
@@ -120,6 +126,10 @@ export default function App() {
           {/* Blog */}
           <Route path="blog"           element={<BlogIndexPage />} />
           <Route path="blog/:slug"     element={<BlogPostPage />} />
+
+          {/* Housing */}
+          <Route path="housing"        element={<HousingLandingPage />} />
+          <Route path="housing/scams"  element={<HousingScamsPage />} />
 
           {/* Category pages — presentation-only aliases over existing /map filters,
               see src/lib/categories.ts for the slug → filter mapping. */}

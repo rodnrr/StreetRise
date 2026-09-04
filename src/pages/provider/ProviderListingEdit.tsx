@@ -7,10 +7,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Trash2 } from 'lucide-react'
 import { db } from '@/lib/supabase'
 import { useAuthStore, useToast } from '@/lib/store'
+import HousingDetailsFields from '@/components/housing/HousingDetailsFields'
 import type { Resource } from '@/types'
 
 const CATEGORIES = [
-  'shelter','food','work_exchange','mental_health','medical',
+  'shelter','housing','food','work_exchange','mental_health','medical',
   'legal','hygiene','clothing','childcare','transportation','outdoor_space','other',
 ]
 
@@ -57,7 +58,7 @@ export default function ProviderListingEdit() {
     enabled: !isNew,
   })
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } =
+  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } =
     useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { availability_status: 'unknown', walk_ins_accepted: true } })
 
   useEffect(() => {
@@ -273,6 +274,11 @@ export default function ProviderListingEdit() {
           )}
         </div>
       </form>
+
+      {/* Housing details live in their own table with their own RLS, so they
+          save separately from the listing above. Renders nothing unless the
+          category is housing. */}
+      <HousingDetailsFields resourceId={isNew ? undefined : id} category={watch('category')} />
     </div>
   )
 }

@@ -27,6 +27,7 @@ import {
   CATEGORY_SLUG_MAP,
 } from '@/lib/mapFilters'
 import { useI18n } from '@/lib/i18n'
+import { housingShortcut } from '@/lib/housing'
 import LangToggle from '@/components/shared/LangToggle'
 import type { LatLng } from '@/lib/geo'
 import type { NeedKey, QuickFilterKey } from '@/types'
@@ -151,6 +152,24 @@ export default function MapPage() {
   // Filters persist across sessions, so a deep link clears first: the linking
   // page has no way to know what the visitor left set last time.
   useEffect(() => {
+    // /housing shortcut — a saved search over canonical facets. Handled first
+    // because it is the most specific link: it sets a need chip AND its
+    // refinements together, which the generic branches below cannot express.
+    const housing = searchParams.get('housing')
+    if (housing) {
+      const shortcut = housingShortcut(housing)
+      if (shortcut) {
+        clearFilters()
+        setFilters({ need: 'housing', ...shortcut.filters })
+        return
+      }
+      // Unknown slug: fall through to the plain housing need rather than
+      // showing an unfiltered map under a "Housing" label.
+      clearFilters()
+      setFilters({ need: 'housing' })
+      return
+    }
+
     const category = searchParams.get('category')
     const quick = searchParams.get('quickFilter') as QuickFilterKey | null
     const subcategory = searchParams.get('subcategory')

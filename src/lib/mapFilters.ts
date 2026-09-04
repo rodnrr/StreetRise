@@ -17,6 +17,7 @@
 // map-ready + geocoded). Only the facet conditions moved client-side.
 
 import { db } from '@/lib/supabase'
+import { normalizeHousingEmbed, waitlistIsStale, HOUSING_EMBED, isMissingHousingRelation } from '@/lib/housing'
 import { distanceKm, type LatLng } from '@/lib/geo'
 import type { Resource, MapFilters, QuickFilterKey, ResourceCategory, NeedKey } from '@/types'
 
@@ -33,6 +34,7 @@ export const MIN_CONFIDENCE_SCORE = 20
 export const PUBLIC_RESOURCE_LIMIT = 2000
 
 export const CATEGORY_EMOJI: Record<string, string> = {
+  housing: '🏢',
   shelter:            '🏠',
   food:               '🍽️',
   work_exchange:      '🤝',
@@ -55,6 +57,7 @@ export const CATEGORY_EMOJI: Record<string, string> = {
 }
 
 export const CATEGORY_LABEL: Record<string, string> = {
+  housing: 'Housing',
   shelter:            'Shelter',
   food:               'Food',
   work_exchange:      'Work Exchange',
@@ -78,6 +81,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
 
 /** i18n.ts key for each category's translated label — use via `t(CATEGORY_LABEL_KEY[category])`. */
 export const CATEGORY_LABEL_KEY: Record<string, string> = {
+  housing: 'category.housing',
   shelter:            'category.shelter.label',
   food:               'category.food.label',
   work_exchange:      'category.work_exchange.label',
@@ -100,6 +104,14 @@ export const CATEGORY_LABEL_KEY: Record<string, string> = {
 }
 
 export const RESOURCE_TYPE_LABEL: Record<string, string> = {
+  affordable_housing: 'Affordable housing',
+  public_housing: 'Public housing',
+  subsidized_housing: 'Subsidized housing',
+  permanent_supportive_housing: 'Permanent supportive housing',
+  recovery_residence: 'Recovery residence',
+  shared_housing: 'Shared housing',
+  housing_navigation: 'Housing help',
+  voucher_program: 'Voucher program (Section 8)',
   emergency_shelter:          'Emergency Shelter',
   transitional_housing:       'Transitional Housing',
   food_pantry:                'Food Pantry',
@@ -129,6 +141,14 @@ export const RESOURCE_TYPE_LABEL: Record<string, string> = {
 
 /** i18n.ts key for each resource_type's translated label — use via `t(RESOURCE_TYPE_LABEL_KEY[type])`. */
 export const RESOURCE_TYPE_LABEL_KEY: Record<string, string> = {
+  affordable_housing: 'resourceType.affordableHousing',
+  public_housing: 'resourceType.publicHousing',
+  subsidized_housing: 'resourceType.subsidizedHousing',
+  permanent_supportive_housing: 'resourceType.permanentSupportiveHousing',
+  recovery_residence: 'resourceType.recoveryResidence',
+  shared_housing: 'resourceType.sharedHousing',
+  housing_navigation: 'resourceType.housingNavigation',
+  voucher_program: 'resourceType.voucherProgram',
   emergency_shelter:          'resourceType.emergency_shelter.label',
   transitional_housing:       'resourceType.transitional_housing.label',
   food_pantry:                'resourceType.food_pantry.label',
@@ -290,6 +310,18 @@ const inCategory = (r: Resource, cats: string[]) => cats.includes(r.category)
 const hasPopulation = (r: Resource, tag: string) => r.population_focus?.includes(tag) ?? false
 
 export const NEED_DEFS: Record<NeedKey, NeedDef> = {
+  // Housing sits next to `shelter`, not inside it. `shelter` is tonight;
+  // housing is a lease, an application, a waitlist, a voucher. Someone with a
+  // month to plan and someone with nowhere to sleep are running different
+  // searches, and one chip serving both would bury whichever is rarer.
+  housing: {
+    label: 'Housing',
+    labelKey: 'need.housing.label',
+    icon: '🏢',
+    hint: 'Places to live, vouchers, help applying',
+    hintKey: 'need.housing.hint',
+    match: (r) => inCategory(r, ['housing']),
+  },
   shelter: {
     label: 'Shelter tonight',
     labelKey: 'need.shelter.label',
@@ -454,7 +486,7 @@ export const NEED_DEFS: Record<NeedKey, NeedDef> = {
 
 /** Chip-row order: urgent survival needs first, then services, then who-it-serves. */
 export const NEED_ORDER: NeedKey[] = [
-  'shelter', 'food', 'hygiene', 'daytime',
+  'shelter', 'housing', 'food', 'hygiene', 'daytime',
   'medical', 'mental_health', 'recovery', 'legal', 'work',
   'clothing', 'transportation', 'childcare', 'outreach',
   'families', 'students', 'veterans', 'youth', 'dv', 'lgbtq',
@@ -463,6 +495,7 @@ export const NEED_ORDER: NeedKey[] = [
 /** Deep-link translation: a marketing category slug → the equivalent need chip. */
 const NEED_BY_CATEGORY: Partial<Record<string, NeedKey>> = {
   shelter: 'shelter',
+  housing: 'housing',
   food: 'food',
   hygiene: 'hygiene',
   day_space: 'daytime',
@@ -713,17 +746,49 @@ export function isOpenNow(r: Resource, now: Date): boolean {
  * `filterResources`.
  */
 export async function fetchMapResources(): Promise<Resource[]> {
-  const { data, error } = await db.resources()
-    .select('*')
-    .eq('is_active', true)
-    .in('verification_status', ['verified', 'pending'])
-    .eq('is_map_ready', true)
-    .not('lat', 'is', null)
-    .not('lng', 'is', null)
-    .limit(PUBLIC_RESOURCE_LIMIT)
+  // The housing extension rides along on the one fetch rather than costing a
+  // second round trip. Rows that are not housing embed `null`, so this adds
+  // nothing to the payload for the other ~200 listings. Keeping it here is what
+  // lets housing eligibility be an ordinary predicate in buildPredicates() and
+  // compose with every existing facet.
+  const run = (select: string) =>
+    db.resources()
+      .select(select)
+      .eq('is_active', true)
+      .in('verification_status', ['verified', 'pending'])
+      .eq('is_map_ready', true)
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .limit(PUBLIC_RESOURCE_LIMIT)
+
+  let { data, error } = await run(HOUSING_EMBED)
+
+  // Migrations are applied by hand here while merging to main deploys, so this
+  // code can be live before migration 057 has run. Falling back keeps the whole
+  // map working in that window instead of taking every category down with it.
+  if (error && isMissingHousingRelation(error)) {
+    const retry = await run('*')
+    data = retry.data
+    error = retry.error
+  }
 
   if (error) throw error
-  return (data ?? []) as unknown as Resource[]
+  return withHousing(data)
+}
+
+/**
+ * Flatten the housing embed on every row.
+ *
+ * PostgREST returns a to-one embed as an object, but falls back to an array
+ * when it cannot prove uniqueness. Normalizing once here means no caller has
+ * to care, and a shape change upstream degrades to "no housing details"
+ * rather than to a crash inside a predicate.
+ */
+function withHousing(rows: unknown): Resource[] {
+  return ((rows ?? []) as Record<string, unknown>[]).map((row) => ({
+    ...(row as unknown as Resource),
+    housing: normalizeHousingEmbed(row.housing),
+  }))
 }
 
 // ── Filtering ─────────────────────────────────────────────────────
@@ -736,7 +801,8 @@ export interface RankedResource {
 
 type PredicateKey = 'search' | 'need' | 'category' | 'resourceType' | 'subcategory'
   | 'genderPolicy' | 'populationFocus' | 'availabilityStatus' | 'radius'
-  | 'confidence' | ToggleKey
+  | 'confidence' | 'housingKinds' | 'acceptsVouchers' | 'considersRecord'
+  | 'waitlistOpen' | ToggleKey
 
 interface Predicate {
   key: PredicateKey
@@ -863,6 +929,44 @@ function buildPredicates(
     preds.push({
       key: 'populationFocus',
       test: (r) => tags.some((t) => r.population_focus?.includes(t)),
+    })
+  }
+
+  // ── Housing facets ────────────────────────────────────────────
+  // Every one of these matches on an EXPLICIT value. Unlike gender policy and
+  // population focus above — which fail open, so an untagged shelter is never
+  // hidden — an unrecorded housing answer must not satisfy an affirmative
+  // filter. The asymmetry is deliberate: failing open on "who do you serve"
+  // keeps a real bed visible, but failing open on "do you take felony records"
+  // would send somebody to a door that turns them away.
+  if (f.housingKinds?.length) {
+    const kinds = new Set(f.housingKinds)
+    preds.push({
+      key: 'housingKinds',
+      test: (r) => !!r.resource_type && kinds.has(r.resource_type),
+    })
+  }
+  if (f.acceptsVouchers) {
+    preds.push({ key: 'acceptsVouchers', test: (r) => r.housing?.accepts_vouchers === true })
+  }
+  if (f.considersRecord) {
+    preds.push({
+      key: 'considersRecord',
+      // Either an explicit yes on felony consideration, or the reentry
+      // population tag. Both are positive assertions somebody recorded.
+      test: (r) =>
+        r.housing?.accepts_felony === true ||
+        (r.population_focus?.includes('reentry') ?? false),
+    })
+  }
+  if (f.waitlistOpen) {
+    preds.push({
+      key: 'waitlistOpen',
+      // Open AND checked recently. An "open" nobody has confirmed in months is
+      // not evidence a waitlist is open today.
+      test: (r) =>
+        r.housing?.waitlist_status === 'open' &&
+        !waitlistIsStale(r.housing?.waitlist_last_checked_at),
     })
   }
 

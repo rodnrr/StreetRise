@@ -13,6 +13,7 @@ import {
 } from '@/lib/mapFilters'
 import { formatDistance } from '@/lib/geo'
 import GetThere from '@/components/shared/GetThere'
+import HousingEligibility from '@/components/housing/HousingEligibility'
 import { useI18n } from '@/lib/i18n'
 import type { Resource } from '@/types'
 
@@ -263,6 +264,9 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
               actually matter to someone without a car. The same confidential /
               phone-intake gate applies inside the component. */}
           <div className="border-t border-gray-100 pt-3">
+            {/* Housing eligibility. Renders nothing for other categories, so
+                it sits unconditionally rather than behind a branch. */}
+            <HousingEligibility resource={r} compact />
             <GetThere resource={r} variant="compact" />
           </div>
         </div>
