@@ -24,6 +24,14 @@ const MAX_BRIEF_LENGTH = 6_000
  */
 const COVER_BUCKET = 'blog-images'
 
+/**
+ * body_text is a public article field. If model-only material leaks into it,
+ * reject the draft instead of asking an admin to notice a hidden prompt or SEO
+ * note after the post has already been generated. Metadata labels can arrive
+ * either as plain lines (`Hero Prompt:`) or Markdown headings (`## Hero Prompt`).
+ */
+const BODY_CONTAMINATION_RE = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:hero(?:\s+image)?\s*(?:prompt)?|excerpt|seo\s+(?:notes?|checklist)|writing\s+notes?)\s*(?::|(?=\n|$))|\bthe hero image for this article should\b/i
+
 interface AiBinding {
   run(model: string, input: Record<string, unknown>): Promise<unknown>
 }
@@ -268,14 +276,50 @@ NON-NEGOTIABLE ACCURACY RULES:
 - If a detail is not supplied, write around it instead of guessing.
 - Never imply a booking request guarantees admission, a bed, or a service placement.
 - Do not claim every resource is real-time or verified unless that claim is explicitly supplied in the facts.
+- Never invent or alter a URL, email address, phone number, street address, date, or time.
 
-STYLE:
-- 650-1,000 words unless the topic clearly calls for a shorter announcement.
-- Strong opening, short readable paragraphs, 4-7 useful sections, and a concise call to action.
-- Plain text body only. Section headings may appear on their own line, but do not use Markdown # headings, bold markers, HTML, emojis, or fenced code.
-- Hyphen bullets are allowed when they improve scanability.
-- End naturally; do not append an SEO checklist or writing notes.
-- Excerpt should be 130-180 characters and make sense as a meta description.
+ARTICLE LENGTH:
+- Do not pad a thin brief just to reach a word count.
+- Event announcements and time-sensitive notices should usually be about 350-650 words.
+- Educational/how-to articles should usually be about 500-800 words.
+- Other posts should usually be about 400-750 words, unless the supplied facts justify more.
+- Concision is preferable to repeating the same fact in different words.
+
+MARKDOWN FORMAT — body_text MUST use this supported subset:
+- Do not include an H1 or repeat the article title; the website renders the title separately.
+- Use 3-5 descriptive ## section headings. Use ### only when a real subsection improves navigation.
+- Keep paragraphs short: usually 1-3 sentences.
+- Use **bold** selectively for important dates, times, locations, actions, warnings, or key takeaways.
+- Use *italics* sparingly for light emphasis only.
+- Use - bullet lists for event details, requirements, resources, quick facts, or scannable takeaways.
+- Use numbered lists only for genuinely sequential instructions.
+- Use > blockquotes only for a supplied quotation or a genuinely useful callout; never fabricate a quote.
+- You may use --- as a divider only when it genuinely improves a long article.
+- Do not output HTML, emojis, tables, fenced code, or Markdown images in body_text.
+
+LINKS AND CONTACT INFORMATION:
+- Every supplied URL used in the article must be written as a descriptive Markdown link, for example [Register for the event](https://example.org/register), not as a bare URL.
+- A raw URL should never be used as its own link label when a human-readable label is possible.
+- Every supplied email address used in the article should be a Markdown mailto link, for example [volunteer@example.org](mailto:volunteer@example.org).
+- Do not invent a URL, link target, email address, or link destination.
+- Prefer one strong link placement. A registration/action link may appear once in a details section and once in the final CTA, but do not repeat it throughout the article.
+
+EDITORIAL QUALITY:
+- Every section must add new information. Do not create sections that merely paraphrase an earlier section.
+- Do not repeat the same date, address, phone number, registration link, feature, or factual claim unless repetition is necessary for the final CTA.
+- For an event, consolidate logistics into one compact ## Event Details section instead of repeating them throughout the post.
+- Avoid filler and generic throat-clearing such as “community resources play a vital role,” “in today’s world,” or definitions of obvious concepts unless the brief specifically calls for education on that concept.
+- Do not explain verification, service navigation, homelessness, resource discovery, or StreetRise merely to increase article length; include them only when relevant to the requested angle.
+- Vary sentence structure and paragraph openings. Avoid repetitive transitions such as “This event,” “These resources,” or “By understanding” in consecutive paragraphs.
+- Open with the most useful or interesting fact, not a generic introduction.
+- End with one concise, practical call to action.
+- Do not add an author signature, tagline, copyright line, or “StreetRise Team” sign-off inside body_text; the website can render consistent branding separately.
+
+OUTPUT HYGIENE:
+- body_text must contain only the article body in Markdown.
+- Never put the title, excerpt, hero prompt, image-generation directions, SEO checklist, keywords, writing notes, or model commentary into body_text.
+- hero_prompt belongs only in hero_prompt. excerpt belongs only in excerpt.
+- Excerpt should be 130-180 characters and work as a standalone meta description without repeating the full title.
 
 HERO IMAGE:
 Create a detailed visual prompt for a 3:2 editorial hero photo. Match the established StreetRise look: cinematic natural light, dark navy/teal visual accents, warm human-centered documentary photography, polished nonprofit-tech editorial quality. The image must be respectful and dignified. Do not request any words, logos, captions, watermarks, UI text, or readable signage inside the generated image; the website supplies the article title separately.
@@ -332,6 +376,19 @@ function parseGeneratedDraft(result: unknown): GeneratedDraft {
     throw new Error('The generated draft was incomplete. Please try again with a more specific brief.')
   }
 
+  if (BODY_CONTAMINATION_RE.test(bodyText)) {
+    throw new Error('The writing model mixed article content with generation metadata. Please try again.')
+  }
+
+  const sectionCount = (bodyText.match(/^##\s+\S.+$/gm) ?? []).length
+  if (sectionCount < 2) {
+    throw new Error('The writing model did not return a structured Markdown article. Please try again.')
+  }
+
+  if (/^#\s+/m.test(bodyText)) {
+    throw new Error('The writing model repeated the article title as an H1. Please try again.')
+  }
+
   return { title, excerpt, body_text: bodyText, hero_prompt: heroPrompt }
 }
 
@@ -340,12 +397,12 @@ async function generateDraft(input: GenerateRequest, env: Env): Promise<Generate
     messages: [
       {
         role: 'system',
-        content: 'You are the StreetRise editorial assistant. Follow the provided accuracy rules exactly.',
+        content: 'You are the StreetRise editorial assistant. Write clean, human-readable Markdown and follow the factual-grounding rules exactly.',
       },
       { role: 'user', content: buildWriterPrompt(input) },
     ],
     max_tokens: 3200,
-    temperature: 0.55,
+    temperature: 0.45,
     response_format: {
       type: 'json_schema',
       json_schema: BLOG_SCHEMA,

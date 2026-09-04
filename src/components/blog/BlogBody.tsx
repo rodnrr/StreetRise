@@ -5,6 +5,12 @@ type Block =
   | { type: 'ul' | 'ol'; items: string[] }
   | { type: 'hr' }
 
+type MarkdownLink = {
+  label: string
+  href: string
+  end: number
+}
+
 const MARKDOWN_BLOCK_RE = /^(#{2,3}\s|[-*]\s|\d+\.\s|>\s|---\s*$)/m
 const LINK_VALIDATION_BASE = new URL('https://streetrise.invalid/blog/post')
 
@@ -31,6 +37,51 @@ function safeHref(value: string): string | null {
   }
 }
 
+/**
+ * Parse a Markdown link beginning at `start` without truncating destinations
+ * that contain balanced parentheses, e.g. `[docs](https://x.test/a_(b))`.
+ * Escaped parentheses are treated as literal characters.
+ */
+function markdownLinkAt(text: string, start: number): MarkdownLink | null {
+  if (text[start] !== '[') return null
+
+  const labelEnd = text.indexOf('](', start + 1)
+  if (labelEnd === -1) return null
+
+  const label = text.slice(start + 1, labelEnd)
+  if (!label) return null
+
+  const hrefStart = labelEnd + 2
+  let depth = 1
+  let escaped = false
+
+  for (let index = hrefStart; index < text.length; index += 1) {
+    const char = text[index]
+
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (char === '\\') {
+      escaped = true
+      continue
+    }
+    if (char === '(') {
+      depth += 1
+      continue
+    }
+    if (char === ')') {
+      depth -= 1
+      if (depth === 0) {
+        const href = text.slice(hrefStart, index).trim()
+        return href ? { label, href, end: index + 1 } : null
+      }
+    }
+  }
+
+  return null
+}
+
 /** Turn authored hard breaks into explicit React <br> nodes. */
 function renderTextWithBreaks(text: string, keyPrefix: string): ReactNode[] {
   const lines = text.split('\n')
@@ -46,65 +97,88 @@ function renderTextWithBreaks(text: string, keyPrefix: string): ReactNode[] {
 
 function renderInline(text: string, keyPrefix = 'inline'): ReactNode[] {
   const tokens: ReactNode[] = []
-  const pattern = /(\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*)/g
   let cursor = 0
-  let match: RegExpExecArray | null
+  let plainStart = 0
 
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > cursor) {
-      tokens.push(
-        ...renderTextWithBreaks(
-          text.slice(cursor, match.index),
-          `${keyPrefix}-text-${cursor}`,
-        ),
-      )
-    }
-
-    if (match[2] && match[3]) {
-      const href = safeHref(match[3])
-      if (href) {
-        const external = /^https?:\/\//i.test(href)
-        tokens.push(
-          <a
-            key={`${keyPrefix}-link-${match.index}`}
-            href={href}
-            target={external ? '_blank' : undefined}
-            rel={external ? 'noopener noreferrer' : undefined}
-            className="font-medium text-primary-700 underline decoration-primary-300 decoration-2 underline-offset-2 transition-colors hover:text-primary-900 dark:text-primary-300 dark:decoration-primary-700 dark:hover:text-primary-200"
-          >
-            {renderTextWithBreaks(match[2], `${keyPrefix}-link-${match.index}-label`)}
-          </a>,
-        )
-      } else {
-        tokens.push(
-          ...renderTextWithBreaks(match[2], `${keyPrefix}-invalid-link-${match.index}`),
-        )
-      }
-    } else if (match[4]) {
-      tokens.push(
-        <strong
-          key={`${keyPrefix}-strong-${match.index}`}
-          className="font-semibold text-slate-900 dark:text-white"
-        >
-          {renderTextWithBreaks(match[4], `${keyPrefix}-strong-${match.index}-text`)}
-        </strong>,
-      )
-    } else if (match[5]) {
-      tokens.push(
-        <em key={`${keyPrefix}-em-${match.index}`}>
-          {renderTextWithBreaks(match[5], `${keyPrefix}-em-${match.index}-text`)}
-        </em>,
-      )
-    }
-
-    cursor = pattern.lastIndex
-  }
-
-  if (cursor < text.length) {
+  const flushPlain = (end: number) => {
+    if (end <= plainStart) return
     tokens.push(
-      ...renderTextWithBreaks(text.slice(cursor), `${keyPrefix}-text-${cursor}`),
+      ...renderTextWithBreaks(
+        text.slice(plainStart, end),
+        `${keyPrefix}-text-${plainStart}`,
+      ),
     )
   }
+
+  while (cursor < text.length) {
+    if (text[cursor] === '[') {
+      const link = markdownLinkAt(text, cursor)
+      if (link) {
+        flushPlain(cursor)
+        const href = safeHref(link.href)
+        if (href) {
+          const external = /^https?:\/\//i.test(href)
+          tokens.push(
+            <a
+              key={`${keyPrefix}-link-${cursor}`}
+              href={href}
+              target={external ? '_blank' : undefined}
+              rel={external ? 'noopener noreferrer' : undefined}
+              className="font-medium text-primary-700 underline decoration-primary-300 decoration-2 underline-offset-2 transition-colors hover:text-primary-900 dark:text-primary-300 dark:decoration-primary-700 dark:hover:text-primary-200"
+            >
+              {renderTextWithBreaks(link.label, `${keyPrefix}-link-${cursor}-label`)}
+            </a>,
+          )
+        } else {
+          tokens.push(
+            ...renderTextWithBreaks(link.label, `${keyPrefix}-invalid-link-${cursor}`),
+          )
+        }
+        cursor = link.end
+        plainStart = cursor
+        continue
+      }
+    }
+
+    if (text.startsWith('**', cursor)) {
+      const end = text.indexOf('**', cursor + 2)
+      if (end !== -1) {
+        flushPlain(cursor)
+        const value = text.slice(cursor + 2, end)
+        tokens.push(
+          <strong
+            key={`${keyPrefix}-strong-${cursor}`}
+            className="font-semibold text-slate-900 dark:text-white"
+          >
+            {renderTextWithBreaks(value, `${keyPrefix}-strong-${cursor}-text`)}
+          </strong>,
+        )
+        cursor = end + 2
+        plainStart = cursor
+        continue
+      }
+    }
+
+    if (text[cursor] === '*') {
+      const end = text.indexOf('*', cursor + 1)
+      if (end !== -1) {
+        flushPlain(cursor)
+        const value = text.slice(cursor + 1, end)
+        tokens.push(
+          <em key={`${keyPrefix}-em-${cursor}`}>
+            {renderTextWithBreaks(value, `${keyPrefix}-em-${cursor}-text`)}
+          </em>,
+        )
+        cursor = end + 1
+        plainStart = cursor
+        continue
+      }
+    }
+
+    cursor += 1
+  }
+
+  flushPlain(text.length)
   return tokens
 }
 
