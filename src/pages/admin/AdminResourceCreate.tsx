@@ -4,10 +4,11 @@ import { useNavigate } from 'react-router-dom'
 import { db } from '@/lib/supabase'
 import { useToast } from '@/lib/store'
 import { Plus } from 'lucide-react'
-import type { ResourceCategory } from '@/types'
+import type { ResourceCategory, ResourceAccessType } from '@/types'
 
 const CATEGORIES: { value: ResourceCategory; label: string }[] = [
   { value: 'shelter', label: 'Shelter' },
+  { value: 'housing', label: 'Housing' },
   { value: 'food', label: 'Food' },
   { value: 'medical', label: 'Medical' },
   { value: 'mental_health', label: 'Mental Health' },
@@ -26,6 +27,36 @@ const CATEGORIES: { value: ResourceCategory; label: string }[] = [
   { value: 'other', label: 'Other' },
 ]
 
+/**
+ * Access types that must never produce a map pin — either because there is no
+ * front door, or because the pin has not been confirmed yet. Only used for
+ * is_map_ready here; see AdminResourceEdit for why the two questions are kept
+ * apart elsewhere.
+ */
+const NEVER_MAP_READY = ['phone_intake', 'web_intake', 'confidential_address', 'not_map_ready']
+
+const ACCESS_TYPES = [
+  { value: 'onsite', label: 'On-site — people come to this address' },
+  { value: 'phone_intake', label: 'Phone intake — no walk-in address' },
+  { value: 'web_intake', label: 'Online intake — no walk-in address' },
+  { value: 'confidential_address', label: 'Confidential address — do not publish' },
+  { value: 'not_map_ready', label: 'Not ready for the map' },
+]
+
+/** Every value the live resources_resource_type_check accepts (migration 057). */
+const RESOURCE_TYPE_OPTIONS = [
+  'emergency_shelter','transitional_housing','food_pantry','hot_meal',
+  'shower_facility','restroom_access','day_use_park','warming_cooling_center',
+  'domestic_violence_shelter','veteran_housing','youth_shelter','work_exchange',
+  'crisis_hotline','job_training','legal_services','medical_clinic',
+  'mental_health_clinic','substance_recovery_program','clothing_closet',
+  'hygiene_supplies','laundry_facility','childcare_services',
+  'transportation_assistance','outreach_program',
+  'affordable_housing','public_housing','subsidized_housing',
+  'permanent_supportive_housing','recovery_residence','shared_housing',
+  'housing_navigation','voucher_program','other',
+]
+
 const AVAILABILITY_STATUS = [
   { value: 'available', label: 'Available' },
   { value: 'limited', label: 'Limited' },
@@ -38,6 +69,8 @@ interface ResourceForm {
   name: string
   description: string
   category: ResourceCategory
+  resource_type: string
+  access_type: string
   street: string
   city: string
   state: string
@@ -63,6 +96,8 @@ export default function AdminResourceCreate() {
     name: '',
     description: '',
     category: 'other',
+    resource_type: '',
+    access_type: 'onsite',
     street: '',
     city: '',
     state: 'FL',
@@ -112,7 +147,12 @@ export default function AdminResourceCreate() {
         beds_available: form.beds_available ?? null,
         is_active: true,
         verification_status: 'verified',
-        is_map_ready: hasCoords,
+        resource_type: form.resource_type || null,
+        access_type: form.access_type as ResourceAccessType,
+        // Both conditions: a walk-in listing still needs coordinates to be
+        // map-ready, and a phone/web-intake listing is never map-ready even if
+        // someone typed an office address in.
+        is_map_ready: hasCoords && !NEVER_MAP_READY.includes(form.access_type),
       })
 
       if (error) throw error
@@ -128,6 +168,8 @@ export default function AdminResourceCreate() {
           name: '',
           description: '',
           category: 'other',
+          resource_type: '',
+          access_type: 'onsite',
           street: '',
           city: '',
           state: 'FL',
@@ -216,6 +258,35 @@ export default function AdminResourceCreate() {
             {CATEGORIES.map(cat => (
               <option key={cat.value} value={cat.value}>{cat.label}</option>
             ))}
+          </select>
+        </div>
+
+        {/* Type and access. Without these the normal "Add Resource" flow could
+            not produce a usable housing listing at all: no housing type means
+            no /housing shortcut matches it, and no access type means a voucher
+            programme has to be given an invented street address. */}
+        <div className="mb-6">
+          <label className="label">Type</label>
+          <select
+            value={form.resource_type}
+            onChange={e => setForm({ ...form, resource_type: e.target.value })}
+            className="input w-full"
+          >
+            <option value="">Not specified</option>
+            {RESOURCE_TYPE_OPTIONS.map(v => (
+              <option key={v} value={v}>{v.replace(/_/g, ' ')}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mb-6">
+          <label className="label">How people reach this</label>
+          <select
+            value={form.access_type}
+            onChange={e => setForm({ ...form, access_type: e.target.value })}
+            className="input w-full"
+          >
+            {ACCESS_TYPES.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
           </select>
         </div>
 

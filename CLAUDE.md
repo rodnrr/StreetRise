@@ -136,6 +136,11 @@ src/
     transport.ts            # Travel modes + Google/Apple Maps directions deep links.
                             # No routing backend — the trip is handed to a map app.
     rideOptions.ts          # Ride Assistance Finder matching engine — see Transportation
+    housing.ts              # Housing helpers: answerFor() (the ONLY place a
+                            # nullable eligibility boolean becomes words),
+                            # the /housing shortcuts as MapFilters, waitlist
+                            # freshness, and the PostgREST embed fallback
+    reports.ts              # submitResourceReport() — generalized corrections
     transit.ts              # Nearest bus stop for a listing, from static GTFS
                             # (migrations 042/043). Renders NOTHING on an expired
                             # feed or outside agency coverage — see Transportation
@@ -217,6 +222,10 @@ docs/
   deploy-blog-worker.md     # How the blog publisher Worker deploys — GitHub Actions workflow
                             # is now the primary path (see Deployment); dashboard steps are the fallback
   student-resources-outreach.md  # Partnership leads deliberately NOT on the public map
+  housing-architecture.md   # Why housing is a resources category, not a directory:
+                            # what was reused, extended and discarded from PR #107
+  apply-migrations-056-057.md # Hand-apply runbook (056-057 = housing) — NOT APPLIED.
+                            # 056 must run ALONE before 057.
   work-exchange-agent.md    # What the agent does, how to run it, review workflow
   data-dictionary.md
   import-seed-candidates.md
@@ -242,7 +251,7 @@ workers/
                             # service-role key. Covers go to the Supabase `blog-images`
                             # bucket, not R2. Reached from the AI Draft panel on /admin/blog.
 
-supabase/migrations/        # 001–048 with gaps: NO 012, 013, or 021 exist.
+supabase/migrations/        # 001–057 with gaps: NO 012, 013, or 021 exist.
                             # See Migrations section — applied to live BY HAND.
 
 public/
@@ -277,11 +286,13 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/about`, `/contact`, `/partner-with-us`, `/privacy`, `/terms`, `/accessibility`, `/community-voices` | marketing pages | Lazy. `/community-voices` is deliberately `noindex` and excluded from `public/sitemap.xml` until it has real content — confirmed 2026-09-01, see Known Open Items. `/privacy` and `/terms` are full rewrites as of 2026-08-26 with an unresolved attorney-review question — see Known Open Items |
 | `/blog`, `/blog/:slug` | blog pages | Lazy; backed by `blog_posts` |
 | `/food-pantries`, `/shelters`, `/medical`, `/employment`, `/hygiene`, `/showers`, `/legal`, `/veterans`, `/youth`, `/families`, `/students` | `CategoryPage` | Presentation-only aliases over existing `/map` filters via `lib/categories.ts` — never introduce new category values here |
+| `/housing` | `HousingLandingPage` | Lazy; curated view over canonical resources — shortcuts deep-link into `/map`. **No housing database.** See Housing |
+| `/housing/scams` | `HousingScamsPage` | Lazy; static EN/ES safety guidance, no legal claims |
 | `/404` | `NotFoundPage` | Wildcard `*` redirects here |
 | `/portal/*` | Provider portal | Auth-gated; dashboard, onboarding, listings, bookings, messages, work |
 | `/admin/*` | Admin portal | Auth-gated; dashboard, providers, resources (+new), bookings, work-exchange, messages, faq, blog |
 
-**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/claim`, `/work`, `/transportation`, `/donate`, `/faq`, the 11 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, `/portal/*`, `/admin/*`, or individual `/claim/:id` pages.
+**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/claim`, `/work`, `/transportation`, `/donate`, `/faq`, the 11 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, `/portal/*`, `/admin/*`, or individual `/claim/:id` pages. Housing adds exactly **two** URLs — `/housing` and `/housing/scams`. Per-city/per-state housing pages are deliberately absent and must not be added until there is verified inventory behind them.
 **robots.txt disallows:** `/portal/`, `/admin/`
 
 ---
@@ -609,6 +620,79 @@ than showing a false match.
 
 ---
 
+## Housing (`/housing`) — a category, not a directory
+
+Added 2026-09-04. Migrations **056–057** (*not applied to live* — runbook
+`docs/apply-migrations-056-057.md`). Design note: `docs/housing-architecture.md`.
+
+**Housing is a `resources` category.** There is no housing organization table
+(that is `providers`) and no housing program table (that is `resources`). This
+replaces the standalone-directory design in PR #107, which was **closed without
+merging on 2026-09-04**. That branch numbered its files 056–058 for entirely
+different SQL, so it must never be applied alongside these; it remains readable
+only as a reference implementation.
+
+**What was added:**
+- `resource_category` gains `housing` (056, alone in its transaction — an enum
+  label cannot be *used* in the transaction that adds it).
+- Eight housing `resource_type` values, incl. `voucher_program`. The existing
+  `transitional_housing` / `emergency_shelter` / `veteran_housing` /
+  `youth_shelter` / `domestic_violence_shelter` are **reused, not duplicated**.
+- `resource_housing_details` — 1:1 extension keyed on `resource_id` (PK = FK).
+- `resource_evidence` and `resource_reports` — **generalized across every
+  category**, not housing-only. StreetRise had no corrections mechanism at all,
+  so it was built once for everything.
+
+**Voucher assistance ≠ voucher acceptance.** The Housing Choice Voucher
+programme somebody applies to is a *resource* (`resource_type =
+'voucher_program'`, usually with no walk-in address). Housing that *takes* a
+voucher is a *property* of that resource
+(`resource_housing_details.accepts_vouchers`). Two different searches; keep them
+apart.
+
+**`null` is unknown, never "no".** Every eligibility boolean on
+`resource_housing_details` is nullable with **no DEFAULT**, and must stay that
+way — a `DEFAULT FALSE` would publish every unasked question as a confirmed
+refusal. The conversion to words happens in exactly one place: `answerFor()` in
+`src/lib/housing.ts`. Unknown renders amber as "Not stated — call to ask", and
+**never satisfies an affirmative filter** — note this is the opposite of the
+gender-policy/population-focus rule, which fails *open*. The asymmetry is
+deliberate: failing open on "who do you serve" keeps a real bed visible; failing
+open on "do you take felony records" sends someone to a door that turns them
+away.
+
+**Filters compose, they do not replace.** Housing is a `NEED_DEFS` entry plus
+`housingKinds` / `acceptsVouchers` / `considersRecord` / `waitlistOpen`
+predicates in `mapFilters.ts`, over the same single fetch. `/housing`'s
+shortcuts are saved searches expressed as ordinary `MapFilters`, deep-linked as
+`/map?housing=<slug>`.
+
+**The embed has a deliberate fallback.** `fetchMapResources`,
+`fetchCategoryResources` and `ResourceDetailPage` request
+`housing:resource_housing_details(*)` and retry without it on
+`isMissingHousingRelation(error)`. That exists because migrations are applied by
+hand while merging to `main` deploys — without it, shipping this code before
+057 would take the **entire map** down, not just housing.
+
+**Waitlists.** `waitlist_status` is never rendered without
+`waitlist_last_checked_at`, and an "open" older than `WAITLIST_TRUST_DAYS` (30)
+is reported as unconfirmed rather than repeated as fact.
+
+**`resource_reports` has no public SELECT policy** — a report can name a scam
+landlord and carries the reporter's email. So **never call `.select()` on the
+insert**; copy `submitResourceReport()` in `src/lib/reports.ts`. The guard
+trigger stamps `created_at` server-side and takes a transaction-scoped advisory
+lock per target before counting, so concurrent inserts cannot race past the
+ceiling (verified: 40 parallel inserts → exactly 20 rows). Per-IP limiting is
+still impossible in Postgres here and needs a Cloudflare rule before any public
+submission form is linked.
+
+**No housing data is seeded, deliberately.** Listings enter through the normal
+provider/admin resource flow. Do not seed candidate rows to make `/housing` look
+populated.
+
+---
+
 ## Supabase Client & Data Access
 
 ```ts
@@ -698,6 +782,8 @@ Migrations live in `supabase/migrations/`, numbered 001–039 **with gaps: 012, 
 **Do not regenerate `src/lib/database.types.ts` from the CLI** unless you have confirmed live has every migration the code depends on — the `blog_posts` block and the two conversation read columns were hand-written to match intended state, and a regen against a lagging DB would delete them.
 
 Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage (**applied — verified live 2026-09-01**, `blog-images` bucket exists with `public=true`), 032 South Florida seed, 033/034 claim submissions + notification fields, 035 work exchange provenance + agent review queue, 036 student clothing seed + `students` population tag, 037 confidence-trigger parity, **038/039 (added 2026-08-24, PR #85) are repo-completeness re-adds only** — both are backfills that were run against live back in May/June 2026 (038 on 2026-05-25, 039 on 2026-06-18) via a now-deleted session branch and never made it into the repo; the SQL files are reproduced verbatim from live's migration history. There is nothing to "apply" for 038/039 — they already happened. **039 is genuinely idempotent** (every UPDATE is `WHERE gender_policy = 'unknown'`-guarded). **038 is not** — its last statement is an unguarded table-wide `UPDATE resources SET stale_after_days = stale_after_days`, which stamps `updated_at = now()` on every row via `resources_updated_at` (same hazard migration 037 explicitly guards against with `DISABLE/ENABLE TRIGGER` for the identical statement). Re-running 038 against live or any already-seeded database manufactures false freshness table-wide; see that migration's own header comment before ever re-running it. **041–048 (added 2026-09-03) are ALL APPLIED to live, on 2026-09-03, by the maintainer** — re-verified from a later session by reading live, not by trusting `schema_migrations`: 11,091 transit stops, 184 routes, 4 distinct feed fingerprints, 35 `public_transit_accessible` rows stamped `transit_feed`, and 6 `transportation` resources all `pending` and off-map. Runbooks: `docs/apply-migration-041.md` (041 + 047) and `docs/apply-migrations-042-046.md` (042–046 + 048). 042 is DDL only; 043 (HART/Hillsborough, 2,245 stops), 044 (MCAT/Manatee, 928), 045 (Miami-Dade, 6,973) and 046 (GoPasco/Pasco, 945) are generated rows, each ending with the same guarded `public_transit_accessible` backfill that only ever raises the flag; 045 is ~1.4 MB. **047 and 048 are corrections to 041 and 042, and neither runbook worked without them.** 047 fixes 041's seeded facts against the agencies' own pages: PSTA Access and MOD are `(727) 540-1888`, not the `(727) 540-1900` that 041 seeds on all six rows; every `website` becomes a programme deep link; HARTPlus reservations are the day before (a session's "one to three days" correction was itself wrong — the maintainer's original brief was right); eligibility determination is within 21 days, not "at least" 21. **Never run 041 without 047** — 041 alone publishes a wrong phone number on two listings. 048 replaces 042's admin `FOR ALL` policy on each transit table with write-only admin policies so a single public SELECT path remains, clearing the `multiple_permissive_policies` advisor warning. Both are idempotent. **One re-run is still outstanding: 045 was regenerated after it was applied** (dropping routes that neither board nor alight at a stop), so `mdt:7836` still credits MIAALP and `mdt:9656` still credits 301 on live. Re-running 045 in full corrects both and is safe — the upsert restamps every Miami-Dade row with the new fingerprint `03abfad9b9e5`, so the trailing fingerprint-keyed `DELETE` matches nothing, neither stop moves, and the backfill runs with `resources_updated_at` disabled.** **040 (added 2026-09-03) raises `resources.stale_after_days` from 30 to 90**, default and backfill — **applied and verified live 2026-09-03**; runbook `docs/apply-migration-040.md`. Same DISABLE/ENABLE TRIGGER idiom as 037 so the backfill didn't touch `updated_at` (confirmed: `max(updated_at)` identical before/after).
+
+**056–057 (added 2026-09-04) make housing a resource category and are NOT applied to live** — runbook `docs/apply-migrations-056-057.md`. 056 adds the `housing` enum label and **must run alone**, because Postgres forbids using a new enum label in the transaction that adds it. 057 widens `resources_resource_type_check` (a widening cannot reject an existing row), then creates `resource_housing_details`, `resource_evidence` and `resource_reports` with RLS on each. Both are additive and idempotent; neither backfills, so neither stamps `updated_at`. **Deploy order does not matter** — the app retries its housing embed without the extension when 057 is absent (`isMissingHousingRelation`), so shipping the code first degrades to "no housing details" rather than taking the map down. ⚠️ PR #107's abandoned branch also numbers files 056–058 for a different design — it was closed without merging on 2026-09-04, so the collision is resolved, but never apply that branch's SQL.
 
 **Live carries schema objects that no migration creates.** Two were found on PR #79: the `trg_resource_confidence` trigger + `fn_update_resource_confidence()` function (captured by migration 037) and the Christian Service Center provider row created by the OB3 import script (captured by 036 section 1b). Verifying a change against live cannot detect this class by construction — live is the environment that hides it. Before writing a migration that depends on a trigger, function, policy or row, confirm a migration actually creates it.
 

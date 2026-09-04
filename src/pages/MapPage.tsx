@@ -27,6 +27,7 @@ import {
   CATEGORY_SLUG_MAP,
 } from '@/lib/mapFilters'
 import { useI18n } from '@/lib/i18n'
+import { housingShortcut } from '@/lib/housing'
 import LangToggle from '@/components/shared/LangToggle'
 import type { LatLng } from '@/lib/geo'
 import type { NeedKey, QuickFilterKey } from '@/types'
@@ -151,6 +152,24 @@ export default function MapPage() {
   // Filters persist across sessions, so a deep link clears first: the linking
   // page has no way to know what the visitor left set last time.
   useEffect(() => {
+    // /housing shortcut — a saved search over canonical facets. Handled first
+    // because it is the most specific link: it sets a need chip AND its
+    // refinements together, which the generic branches below cannot express.
+    const housing = searchParams.get('housing')
+    if (housing) {
+      const shortcut = housingShortcut(housing)
+      if (shortcut) {
+        clearFilters()
+        setFilters({ need: 'housing', ...shortcut.filters })
+        return
+      }
+      // Unknown slug: fall through to the plain housing need rather than
+      // showing an unfiltered map under a "Housing" label.
+      clearFilters()
+      setFilters({ need: 'housing' })
+      return
+    }
+
     const category = searchParams.get('category')
     const quick = searchParams.get('quickFilter') as QuickFilterKey | null
     const subcategory = searchParams.get('subcategory')
@@ -301,10 +320,23 @@ export default function MapPage() {
 
   const pickNeed = useCallback((key: NeedKey) => {
     setSelectedId(null)
+    // The housing facets have to be cleared alongside the need, not merged
+    // into it. A /housing shortcut writes housingKinds (or acceptsVouchers,
+    // or considersRecord) into the PERSISTED filter set; without this, tapping
+    // Food afterwards leaves `need=food` ANDed with housing-only resource
+    // types and returns nothing, with no visible chip explaining why. These
+    // are not offered as removable refinements in the drawer, so the visitor
+    // has no way to undo them by hand either.
+    const clearHousing = {
+      housingKinds: undefined,
+      acceptsVouchers: undefined,
+      considersRecord: undefined,
+      waitlistOpen: undefined,
+    }
     setFilters(
       filters.need === key
-        ? { need: undefined, category: undefined, quickFilter: undefined }
-        : { need: key, category: undefined, quickFilter: undefined },
+        ? { need: undefined, category: undefined, quickFilter: undefined, ...clearHousing }
+        : { need: key, category: undefined, quickFilter: undefined, ...clearHousing },
     )
   }, [filters.need, setFilters, setSelectedId])
 

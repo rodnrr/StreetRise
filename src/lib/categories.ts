@@ -10,6 +10,7 @@
 // against the `resources` table before relying on them for real content.
 
 import { db } from '@/lib/supabase'
+import { normalizeHousingEmbed, HOUSING_EMBED, isMissingHousingRelation } from '@/lib/housing'
 import type { ResourceCategory, QuickFilterKey, Resource } from '@/types'
 
 export type CategoryPageMode = 'live' | 'static'
@@ -196,8 +197,14 @@ export function getCategoryPage(slug: string): CategoryPageConfig | undefined {
  * can't accidentally clip results or change the live map's own behavior.
  */
 export async function fetchCategoryResources(mapLink: CategoryMapLink): Promise<Resource[]> {
+  // Same embed as fetchMapResources, so a category page and the map it links
+  // into produce the identical Resource shape. Without it, a card rendered here
+  // would silently lose its housing eligibility block. `select` is a parameter
+  // so the whole query can be replayed without the embed if migration 057 has
+  // not been applied yet — see isMissingHousingRelation.
+  const build = (select: string) => {
   let query = db.resources()
-    .select('*')
+    .select(select)
     // Same public visibility predicate the map uses (fetchMapResources).
     // This previously read `verification_status = 'verified'` only, which
     // silently gave a category page a smaller world than the map it links
@@ -240,9 +247,21 @@ export async function fetchCategoryResources(mapLink: CategoryMapLink): Promise<
     query = query.contains('population_focus', ['veterans'])
   }
 
-  const { data, error } = await query.order('updated_at', { ascending: false })
+    return query.order('updated_at', { ascending: false })
+  }
+
+  let { data, error } = await build(HOUSING_EMBED)
+  if (error && isMissingHousingRelation(error)) {
+    const retry = await build('*')
+    data = retry.data
+    error = retry.error
+  }
   if (error) throw error
-  return (data ?? []) as unknown as Resource[]
+
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
+    ...(row as unknown as Resource),
+    housing: normalizeHousingEmbed(row.housing),
+  }))
 }
 
 /** Builds the /map search-string equivalent of a CategoryMapLink, for CTA links. */

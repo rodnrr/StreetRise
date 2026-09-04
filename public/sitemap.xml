@@ -146,4 +146,25 @@
     <priority>0.3</priority>
   </url>
 
+  <!-- Housing. Exactly two URLs, deliberately.
+
+       /housing is a curated view over canonical resources and /housing/scams
+       is standalone guidance — both have real content today. Per-city or
+       per-state housing pages are NOT listed and should not be added until
+       there is verified inventory behind them: a sitemap full of empty
+       geography pages is thin programmatic SEO, it spends crawl budget on
+       pages that answer nothing, and it promises a visitor listings that do
+       not exist. SEO follows product usefulness here, not the other way
+       round. -->
+  <url>
+    <loc>https://app.streetrise.org/housing</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://app.streetrise.org/housing/scams</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
 </urlset>

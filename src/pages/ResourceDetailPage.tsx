@@ -10,7 +10,10 @@ import {
   publicTags,
 } from '@/lib/mapFilters'
 import GetThere from '@/components/shared/GetThere'
+import HousingEligibility from '@/components/housing/HousingEligibility'
+import { normalizeHousingEmbed, isMissingHousingRelation } from '@/lib/housing'
 import { useI18n } from '@/lib/i18n'
+import { isNonWalkIn } from '@/lib/transport'
 import type { Resource } from '@/types'
 
 function VerificationBadge({ status }: { status: string }) {
@@ -67,17 +70,45 @@ export default function ResourceDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { t } = useI18n()
 
-  const { data: resource, isLoading } = useQuery<Resource | null>({
+  const { data: resource, isLoading, isError, refetch } = useQuery<Resource | null>({
     queryKey: ['resource', id],
     queryFn:  async () => {
       // `id` and `claim_status` on the joined provider drive the "claim this
       // listing" prompt below. Unclaimed providers are publicly readable
       // (providers_unclaimed_read), so this join works for anonymous visitors.
-      const { data } = await db.resources()
-        .select('*, providers(id, organization_name, website, claim_status)')
-        .eq('id', id!)
-        .single()
-      return data as unknown as Resource
+      const PROVIDER_EMBED = 'providers(id, organization_name, website, claim_status)'
+      // maybeSingle, NOT single: PostgREST's .single() raises PGRST116 when it
+      // matches no row, so an unknown or withdrawn id would arrive here as an
+      // "error" and hit the retryable failure screen below — the not-found
+      // branch would be unreachable. maybeSingle returns data = null instead,
+      // which keeps "this listing is gone" and "we could not load it" as the
+      // two different things they are.
+      const run = (select: string) =>
+        db.resources().select(select).eq('id', id!).maybeSingle()
+
+      let { data, error } = await run(`*, ${PROVIDER_EMBED}, housing:resource_housing_details(*)`)
+      // Migrations are hand-applied while merging deploys, so this page can be
+      // live before 057 exists. Retry without the embed rather than 404ing a
+      // listing that is perfectly fine.
+      if (error && isMissingHousingRelation(error)) {
+        const retry = await run(`*, ${PROVIDER_EMBED}`)
+        data = retry.data
+        error = retry.error
+      }
+      if (error) throw error
+
+      // Return null, do NOT fall through to the spread. `{ ...null }` is legal
+      // and evaluates to `{}`, so spreading a missing row here produced a
+      // TRUTHY `{ housing: null }` — the not-found branch below became
+      // unreachable and the render crashed on `resource.address`. An unknown or
+      // withdrawn id is a normal request, not an exception.
+      if (!data) return null
+
+      const row = data as unknown as Record<string, unknown>
+      return {
+        ...(row as unknown as Resource),
+        housing: normalizeHousingEmbed(row.housing),
+      } as Resource
     },
     enabled: !!id,
   })
@@ -96,6 +127,25 @@ export default function ResourceDetailPage() {
     )
   }
 
+  // A failed request is not a missing listing. Rendering "not found" on an
+  // outage tells somebody the place they were sent to no longer exists, which
+  // is both false and the kind of false that makes them stop looking.
+  if (isError) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 pt-20 text-center" role="alert">
+        <p className="text-base font-semibold text-gray-900 dark:text-white">
+          {t('resourceDetail.loadFailed')}
+        </p>
+        <p className="mt-2 text-base text-gray-600 dark:text-slate-400">
+          {t('resourceDetail.loadFailedHint')}
+        </p>
+        <button type="button" onClick={() => refetch()} className="btn-primary mt-4">
+          {t('resourceDetail.retry')}
+        </button>
+      </div>
+    )
+  }
+
   if (!resource) {
     return (
       <div className="max-w-2xl mx-auto px-4 pt-20 text-center">
@@ -110,10 +160,18 @@ export default function ResourceDetailPage() {
   const showBeds   = resource.category === 'shelter' && resource.beds_total != null
   const emoji      = CATEGORY_EMOJI[resource.category] ?? '📍'
 
-  // Confidential address logic (DV shelters, etc.)
-  const isConfidential = resource.access_type === 'confidential_address' || resource.access_type === 'phone_intake'
-  const isDVResource   = resource.population_focus?.includes('domestic_violence')
-  const hideAddress    = isDVResource && isConfidential
+  // Confidential address logic.
+  //
+  // Keyed on access_type ALONE. It used to also require the
+  // domestic_violence population tag, which meant a listing whose access_type
+  // said "confidential" still published its street address unless someone had
+  // remembered to tag it — the protection depended on a second, unrelated
+  // field being right. That was latent while access_type could only be set in
+  // SQL; it stopped being acceptable the moment the listing editors started
+  // offering "Confidential address — do not publish" as a dropdown option,
+  // because that label is a promise this render has to keep.
+  const isConfidential = isNonWalkIn(resource)
+  const hideAddress    = isConfidential
 
   // Facility items
   const facilities: { show: boolean; emoji: string; labelKey: string }[] = [
@@ -315,6 +373,7 @@ export default function ResourceDetailPage() {
       {/* Get There — the transportation layer. Placed directly after Contact
           because "where is it" and "how do I reach it" are the same question
           for someone without a car. */}
+      <HousingEligibility resource={resource} />
       <GetThere resource={resource} />
 
       {/* Tags — internal `key:value` bookkeeping (import:, access_src:, ride:, …)

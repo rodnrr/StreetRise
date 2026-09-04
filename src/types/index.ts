@@ -6,6 +6,12 @@
 
 export type ResourceCategory =
   | 'shelter'
+  // Housing answers "where do I live" — a lease, an application, a waitlist,
+  // a voucher. `shelter` answers "where do I sleep tonight". Deliberately
+  // separate: someone looking for an apartment they can afford and someone
+  // looking for a bed tonight are not running the same search, and collapsing
+  // them buries one under the other. (Migration 056.)
+  | 'housing'
   | 'food'
   | 'work_exchange'
   | 'employment'
@@ -50,6 +56,28 @@ export type ResourceType =
   | 'childcare_services'
   | 'transportation_assistance'
   | 'outreach_program'
+  // ── Housing (migration 057) ──
+  // `transitional_housing`, `emergency_shelter`, `veteran_housing`,
+  // `youth_shelter` and `domestic_violence_shelter` above are reused for
+  // housing rather than duplicated under housing-ish names — splitting the
+  // same real-world thing across two values would break existing filters.
+  | 'affordable_housing'
+  | 'public_housing'
+  | 'subsidized_housing'
+  | 'permanent_supportive_housing'
+  | 'recovery_residence'
+  | 'shared_housing'
+  | 'housing_navigation'
+  /**
+   * Housing Choice Voucher (Section 8) ASSISTANCE — the programme somebody
+   * applies to, usually run by a housing authority with no walk-in door.
+   * This is a service, not a building.
+   *
+   * Do not confuse with `ResourceHousingDetails.accepts_vouchers`, which is a
+   * property of housing that TAKES a voucher. Keeping the two apart is what
+   * lets "help me get a voucher" and "who takes my voucher" be two searches.
+   */
+  | 'voucher_program'
   | 'other'
 
 export type GenderPolicy =
@@ -115,6 +143,57 @@ export interface Address {
   state: string
   zip: string
   country?: string
+}
+
+/** Waitlist state. `null` on the row means waitlists do not apply here. */
+export type WaitlistStatus = 'open' | 'closed' | 'temporarily_closed' | 'unknown'
+
+/**
+ * Housing-specific 1:1 extension of a resource (migration 057).
+ *
+ * Every eligibility boolean is `boolean | null`, and **null means unknown,
+ * never "no"**. Rendering an unknown as a negative turns a missing data point
+ * into a closed door. The conversion to words happens in exactly one place —
+ * `answerFor()` in `src/lib/housing.ts`. Do not narrow these to `boolean`.
+ */
+export interface ResourceHousingDetails {
+  resource_id: string
+
+  // ── Criminal-record eligibility. Tri-state. ──
+  accepts_felony: boolean | null
+  accepts_violent_offense: boolean | null
+  accepts_sex_offense: boolean | null
+
+  /** Voucher ACCEPTANCE. Voucher assistance is `resource_type = 'voucher_program'`. */
+  accepts_vouchers: boolean | null
+
+  // ── House rules. Tri-state. ──
+  requires_sobriety: boolean | null
+  has_curfew: boolean | null
+
+  // ── Programme character. Tri-state. ──
+  income_restricted: boolean | null
+  is_subsidized: boolean | null
+  is_public_housing: boolean | null
+
+  // ── Cost. null = unknown, never free; 0 is a real and different answer. ──
+  minimum_monthly_cost_cents: number | null
+  maximum_monthly_cost_cents: number | null
+  deposit_cents: number | null
+  max_stay_days: number | null
+
+  // ── Intake ──
+  application_url: string | null
+  intake_phone: string | null
+  eligibility_notes: string | null
+
+  // ── Waitlist. Never render the status without its check date. ──
+  waitlist_status: WaitlistStatus | null
+  waitlist_last_checked_at: string | null
+
+  housing_details_last_checked_at: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Resource {
@@ -189,6 +268,15 @@ export interface Resource {
 
   created_at: string
   updated_at: string
+
+  /**
+   * Housing extension, embedded by the resource fetches for
+   * `category = 'housing'` rows. `null`/absent on every other category.
+   *
+   * Kept off the base table so the map's single fetch of the whole public set
+   * does not carry sixteen housing columns for every food pantry.
+   */
+  housing?: ResourceHousingDetails | null
 }
 
 export interface HoursOfOperation {
@@ -487,7 +575,7 @@ export interface FaqItem {
  * drawer category be set at once with one silently overriding the other.
  */
 export type NeedKey =
-  | 'shelter' | 'food' | 'hygiene' | 'daytime' | 'medical' | 'mental_health'
+  | 'shelter' | 'housing' | 'food' | 'hygiene' | 'daytime' | 'medical' | 'mental_health'
   | 'recovery' | 'legal' | 'work' | 'clothing' | 'transportation' | 'childcare'
   | 'outreach' | 'families' | 'students' | 'veterans' | 'dv' | 'youth' | 'lgbtq'
 
@@ -506,6 +594,28 @@ export interface MapFilters {
   // Eligibility
   genderPolicy?: GenderPolicy[]
   populationFocus?: string[]
+
+  // ── Housing facets (migration 057) ──
+  // Ordinary facets on the ordinary pipeline: they compose with distance,
+  // gender policy, population focus and open-now rather than replacing them.
+  /** `resource_type` is one of these. Used by the /housing shortcuts. */
+  housingKinds?: string[]
+  /**
+   * Housing that ACCEPTS a Housing Choice Voucher.
+   * Distinct from `housingKinds: ['voucher_program']`, which is the programme
+   * that ISSUES one. Matches only an explicit `true` — an unrecorded value is
+   * unknown and must never satisfy an affirmative filter.
+   */
+  acceptsVouchers?: boolean
+  /**
+   * "Second chance": housing that explicitly considers a criminal record, or
+   * is tagged for reentry. Both are positive assertions — unknown does not
+   * qualify, because sending someone to a door that turns them away is the
+   * error this whole feature exists to avoid.
+   */
+  considersRecord?: boolean
+  /** Waitlist confirmed open, and confirmed recently. */
+  waitlistOpen?: boolean
 
   // Access
   /** Open at the moment of viewing, evaluated in the resource's timezone. */
