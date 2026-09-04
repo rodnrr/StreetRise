@@ -238,15 +238,24 @@ async function verifyAdmin(token: string, env: Env): Promise<AdminCheck> {
       body: '{}',
     })
   } catch {
+    // DNS, TLS or connection failure — no HTTP response at all. Left to throw
+    // it would escape handleGenerate's try block entirely and surface as an
+    // opaque 500 with no CORS headers, which the panel reads as "the Worker is
+    // unreachable" when the Worker is fine and Supabase is not.
     return { status: 'unavailable', upstream: 0, unreachable: true }
   }
 
   if (response.status === 401) return { status: 'expired' }
+  // 403 is PostgREST refusing the token itself; anything else that is not ok
+  // (429, 5xx, a gateway error) says nothing about who the caller is.
   if (response.status === 403) return { status: 'denied' }
   if (!response.ok) return { status: 'unavailable', upstream: response.status }
   try {
     return (await response.json()) === true ? { status: 'ok' } : { status: 'denied' }
   } catch {
+    // A 2xx carrying something that is not JSON — a proxy or error page in
+    // front of Supabase. Reporting the status alone would read as "returned
+    // 200", which sends the reader looking in the wrong place.
     return { status: 'unavailable', upstream: response.status, unreadable: true }
   }
 }
@@ -425,6 +434,9 @@ async function generateHeroImage(
   form.append('width', '1536')
   form.append('height', '1024')
 
+  // FormData does not expose its serialized body or boundary; passing it to a
+  // Response constructor produces both, which is what the multipart binding
+  // needs. `steps` is fixed at 4 on this distilled model and is not sent.
   const serialized = new Response(form)
   const contentType = serialized.headers.get('content-type')
   if (!serialized.body || !contentType) throw new Error('Could not prepare the image request.')
@@ -465,6 +477,11 @@ async function generateHeroImage(
   }
 }
 
+/**
+ * Best-effort cleanup for a cover whose draft never landed. A failure here is
+ * swallowed on purpose: the caller is already handling a more important error,
+ * and a leftover object is a smaller problem than masking it.
+ */
 async function deleteCover(key: string, token: string, env: Env): Promise<void> {
   try {
     await fetch(`${cleanBaseUrl(env.SUPABASE_URL)}/storage/v1/object/${COVER_BUCKET}/${key}`, {
@@ -475,7 +492,7 @@ async function deleteCover(key: string, token: string, env: Env): Promise<void> 
       },
     })
   } catch {
-    /* best-effort cleanup */
+    /* nothing useful to do — the draft error is what the admin needs to see */
   }
 }
 
@@ -572,6 +589,7 @@ async function handleGenerate(request: Request, env: Env, origin?: string): Prom
         coverImageUrl = hero.url
         heroKey = hero.key
       } catch (error) {
+        // A missing cover is recoverable in /admin/blog; a lost draft is not.
         heroError = error instanceof Error ? error.message : 'Hero image generation failed.'
       }
     }
@@ -580,6 +598,8 @@ async function handleGenerate(request: Request, env: Env, origin?: string): Prom
     try {
       post = await insertDraft(draft, input, slug, coverImageUrl, token, env)
     } catch (error) {
+      // The cover is already in the bucket at this point and nothing will ever
+      // reference it, so each retry would leave another public orphan behind.
       if (heroKey) await deleteCover(heroKey, token, env)
       throw error
     }
@@ -621,6 +641,8 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     const requestOrigin = request.headers.get('origin') ?? ''
+    // Comma-separated so a Pages preview or a local dev server can be added
+    // without a code change.
     const allowed = (env.ALLOWED_ORIGIN || 'https://app.streetrise.org')
       .split(',')
       .map(value => value.trim())
