@@ -16,7 +16,8 @@
     "worker:blog:typecheck": "tsc -p workers/blog-publisher/tsconfig.json",
     "worker:blog:dev": "wrangler dev --config workers/blog-publisher/wrangler.jsonc",
     "worker:blog:deploy": "wrangler deploy --config workers/blog-publisher/wrangler.jsonc",
-    "transit:sql": "tsx scripts/build-transit-sql.ts"
+    "transit:sql": "tsx scripts/build-transit-sql.ts",
+    "housing:sitemap": "npx tsx scripts/build-housing-sitemap.ts"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",

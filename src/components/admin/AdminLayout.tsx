@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Outlet, NavLink, Navigate, Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Building2, MapPin, CalendarDays, HelpCircle, LogOut,
-  ShieldAlert, MessageSquare, Newspaper, Menu, X, ExternalLink, Briefcase,
+  ShieldAlert, MessageSquare, Newspaper, Menu, X, ExternalLink, Briefcase, Home,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuthStore } from '@/lib/store'
@@ -43,6 +43,11 @@ const NAV_GROUPS: { label: string | null; links: NavLinkDef[] }[] = [
   {
     label: 'Content',
     links: [
+      // Second-chance housing directory (migrations 056-058). Content
+      // rather than Moderation: nothing arrives here on its own, so
+      // there is no inbound queue to badge - a row exists because an
+      // admin typed it, and stays unpublished until one verifies it.
+      { to: '/admin/housing', label: 'Housing', icon: Home },
       { to: '/admin/blog', label: 'Blog', icon: Newspaper },
       { to: '/admin/faq',  label: 'FAQ',  icon: HelpCircle },
     ],

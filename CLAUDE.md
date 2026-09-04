@@ -68,6 +68,7 @@ npm run preview      # Preview production build locally
 npm run deploy       # scripts/deploy-pages.sh → wrangler pages deploy dist
 npm run import:seed  # Run scripts/import-seed-candidates.ts via tsx
 npm run agent:work   # Work exchange agent (scripts/work-exchange-agent.ts) — dry run unless --apply
+npm run housing:sitemap       # Regenerate published /housing/org URLs in public/sitemap.xml
 npm run worker:blog:typecheck  # Type-check the blog publisher Worker (also runs in CI)
 npm run worker:blog:dev        # wrangler dev for the Worker
 npm run worker:blog:deploy     # wrangler deploy for the Worker
@@ -136,6 +137,9 @@ src/
     transport.ts            # Travel modes + Google/Apple Maps directions deep links.
                             # No routing backend — the trip is handed to a map app.
     rideOptions.ts          # Ride Assistance Finder matching engine — see Transportation
+    housing.ts              # Second-chance housing directory data layer (/housing).
+                            # Owns answerFor() — the ONLY place a nullable
+                            # boolean becomes words — and freshnessFor().
     transit.ts              # Nearest bus stop for a listing, from static GTFS
                             # (migrations 042/043). Renders NOTHING on an expired
                             # feed or outside agency coverage — see Transportation
@@ -154,6 +158,8 @@ src/
     NotFoundPage.tsx        # 404 fallback
     ProviderLandingPage.tsx # Public provider onboarding pitch (/provider/onboarding)
 
+    housing/                # HousingLandingPage, HousingStatePage, HousingOrgPage,
+                            # HousingScamsPage — second-chance housing directory
     marketing/              # AboutPage, ContactPage, PartnersPage, PrivacyPage,
                             # TermsPage, AccessibilityPage, CommunityVoicesPage
     blog/                   # BlogIndexPage, BlogPostPage (markdown NOT yet rendered)
@@ -176,6 +182,9 @@ src/
       AdminFaq.tsx
       AdminBlog.tsx           # Blog CRUD
       AdminWorkExchange.tsx   # Review queue for the work exchange agent
+      AdminHousing.tsx        # Housing directory org list + publish toggles
+      AdminHousingEdit.tsx    # Org + locations + programs; tri-state selects
+                              # default to "Not stated"
 
   components/
     shared/                 # RootLayout (nav, footer, Get Help Now CTA, mobile tab bar),
@@ -217,6 +226,10 @@ docs/
   deploy-blog-worker.md     # How the blog publisher Worker deploys — GitHub Actions workflow
                             # is now the primary path (see Deployment); dashboard steps are the fallback
   student-resources-outreach.md  # Partnership leads deliberately NOT on the public map
+  housing-directory.md      # /housing: why standalone tables, the two rules,
+                            # publishing gates, verification, known gaps
+  apply-migrations-056-058.md # Hand-apply runbook (056-058 = housing directory) —
+                            # NOT APPLIED; includes the call-and-publish checklist
   work-exchange-agent.md    # What the agent does, how to run it, review workflow
   data-dictionary.md
   import-seed-candidates.md
@@ -231,6 +244,9 @@ scripts/
   build-transit-sql.ts      # Static GTFS bundle → transit_stops/transit_routes SQL.
                             # `npm run transit:sql -- <gtfs-dir> <agency>`. Output is
                             # committed as a migration; re-run per agency feed release.
+  build-housing-sitemap.ts  # Regenerates published /housing/org URLs in sitemap.xml.
+                            # Uses the ANON key on purpose (sees only what the
+                            # public sees); refuses the service-role key.
   work-exchange-agent.ts    # Re-verifies /work listings + drafts new ones into a review queue.
                             # Needs SUPABASE_SERVICE_ROLE_KEY + ANTHROPIC_API_KEY. Never publishes.
 
@@ -242,7 +258,7 @@ workers/
                             # service-role key. Covers go to the Supabase `blog-images`
                             # bucket, not R2. Reached from the AI Draft panel on /admin/blog.
 
-supabase/migrations/        # 001–048 with gaps: NO 012, 013, or 021 exist.
+supabase/migrations/        # 001–058 with gaps: NO 012, 013, or 021 exist.
                             # See Migrations section — applied to live BY HAND.
 
 public/
@@ -277,11 +293,15 @@ All public routes render inside `RootLayout` (header + footer hidden on `/map`).
 | `/about`, `/contact`, `/partner-with-us`, `/privacy`, `/terms`, `/accessibility`, `/community-voices` | marketing pages | Lazy. `/community-voices` is deliberately `noindex` and excluded from `public/sitemap.xml` until it has real content — confirmed 2026-09-01, see Known Open Items. `/privacy` and `/terms` are full rewrites as of 2026-08-26 with an unresolved attorney-review question — see Known Open Items |
 | `/blog`, `/blog/:slug` | blog pages | Lazy; backed by `blog_posts` |
 | `/food-pantries`, `/shelters`, `/medical`, `/employment`, `/hygiene`, `/showers`, `/legal`, `/veterans`, `/youth`, `/families`, `/students` | `CategoryPage` | Presentation-only aliases over existing `/map` filters via `lib/categories.ts` — never introduce new category values here |
+| `/housing` | `HousingLandingPage` | Lazy; second-chance housing directory landing + state picker. Own tables, **not** a `CategoryPage` — see Second-Chance Housing Directory |
+| `/housing/scams` | `HousingScamsPage` | Lazy; static content, linked from every listing page |
+| `/housing/org/:slug` | `HousingOrgPage` | Lazy; org detail + JSON-LD |
+| `/housing/:state` | `HousingStatePage` | Lazy; two-letter state code. **Primary SEO surface** |
 | `/404` | `NotFoundPage` | Wildcard `*` redirects here |
 | `/portal/*` | Provider portal | Auth-gated; dashboard, onboarding, listings, bookings, messages, work |
 | `/admin/*` | Admin portal | Auth-gated; dashboard, providers, resources (+new), bookings, work-exchange, messages, faq, blog |
 
-**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/claim`, `/work`, `/transportation`, `/donate`, `/faq`, the 11 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`. It must never include `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, `/portal/*`, `/admin/*`, or individual `/claim/:id` pages.
+**`public/sitemap.xml` includes:** `/`, `/map`, `/provider/onboarding`, `/claim`, `/work`, `/transportation`, `/donate`, `/faq`, the 11 category pages, `/about`, `/contact`, `/partner-with-us`, `/blog`, `/privacy`, `/terms`, `/accessibility`, plus `/housing`, `/housing/scams` and all **51** `/housing/:state` pages (static; listed whether or not the state has listings). Published `/housing/org/:slug` URLs are generated between the `HOUSING_ORG_URLS` markers by `npm run housing:sitemap` — never hand-edited. It must never include `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, `/portal/*`, `/admin/*`, or individual `/claim/:id` pages.
 **robots.txt disallows:** `/portal/`, `/admin/`
 
 ---
@@ -609,6 +629,92 @@ than showing a false match.
 
 ---
 
+## Second-Chance Housing Directory (`/housing`)
+
+A national directory of housing that will consider people with criminal records.
+Phase 1 added 2026-09-04: migrations **056–058** (*not yet applied to live* —
+runbook `docs/apply-migrations-056-058.md`), pages in `src/pages/housing/`, data
+layer `src/lib/housing.ts`, admin at `/admin/housing`. Full notes:
+`docs/housing-directory.md`.
+
+**Standalone tables, not `resources`/`providers`.** `housing_states`,
+`housing_organizations`, `housing_locations`, `housing_programs`,
+`housing_sources`, `housing_verifications`, `housing_reports`. The shapes rhyme
+with the map's tables, which makes the reuse tempting and wrong: `resources` is
+Florida-only, point-located and gated on `is_map_ready` + non-null lat/lng, while
+this is national and state-first — a statewide reentry nonprofit with no walk-in
+address is a first-class row here and invisible there. The record fields
+(`accepts_felony`, `accepts_violent_offense`, `accepts_sex_offense`) also have no
+home on `resources`, and `resources` serves live traffic. The duplication this
+creates for an org that is both a provider and a housing organization is a known,
+accepted cost.
+
+**Two rules that must not drift:**
+
+- **`null` is "unknown", never "no".** Every record and house-rule boolean on
+  `housing_programs` is nullable and renders as "Not stated — call to ask", in
+  amber, visibly distinct from a "no". Rendering an unknown as a negative turns a
+  missing data point into a closed door and gets someone turned away at an intake
+  desk over a field nobody asked about. The conversion happens in exactly one
+  place — `answerFor()` in `src/lib/housing.ts`. **Never add `DEFAULT FALSE` to
+  any of those columns.** `housing_states.has_housing_ban_the_box` is nullable for
+  the same reason (a deliberate departure from the build spec's plain `bool`).
+- **Staleness is disclosed, never hidden.** `STALE_AFTER_DAYS = 180`; past that a
+  listing keeps its place and gains a warning rather than being filtered out.
+  Hiding an old listing looks like tidiness and behaves like deleting somebody's
+  last option. A never-verified program says so rather than falling back to
+  `created_at`.
+
+**Publishing is two gates, both enforced in RLS** (not the client):
+`housing_organizations.is_published` AND `housing_programs.is_published`. Both
+default false. Un-publishing an org takes every program under it down in one
+action. Nothing publishes automatically.
+
+**Verification:** `housing_verifications` is an append-only log;
+`housing_programs.last_verified_at` is the denormalized latest, kept by the
+`housing_verifications_sync` trigger. **Only `outcome = 'confirmed'` advances the
+clock** — an `unreachable` or `closed` outcome means we know *less* than before,
+so treating it as fresh would strip the staleness warning exactly when the
+listing most needs one. The log is admin-only (`notes` can carry a caller's name);
+the public sees only the date.
+
+**`housing_reports` has no public SELECT policy, deliberately** — a report can
+name a scam landlord and carry the reporter's email. So **never call `.select()`
+on the insert**: Supabase returns an empty body when the caller cannot read the
+row back, which surfaces as an error on a successful write. Copy `submitReport()`
+rather than rolling a new one. Per-IP rate limiting is **not** implemented and
+cannot be done in Postgres here (every anon insert is the same role, no IP, no
+session); migration 056's trigger does duplicate suppression and a per-program
+hourly ceiling instead. Add a Cloudflare rate-limiting rule before linking a
+public submission form.
+
+**Known gaps, all deliberate or blocked:**
+
+- **No server rendering.** Built inside the Vite SPA at the maintainer's explicit
+  direction after the tradeoff was raised, so `/housing/:state` renders blank
+  without JavaScript. The build spec asked for no-JS browse; this does not meet
+  it. Fixing it means prerendering these routes or moving `/housing` to its own
+  Next.js app.
+- **No state is populated.** Migration 058 seeds five real Florida organizations
+  **all unpublished with every contact field NULL** — the authoring session's
+  egress proxy allowed only GitHub and package registries, so no org website was
+  reachable and every candidate address/phone came from third-party aggregators.
+  A wrong address in this directory is a bus fare somebody did not have. The
+  runbook has the call-and-publish checklist.
+- **Florida's `record_lookback_summary` is unreviewed legal copy** — drafted from
+  FCRA §1681c(a)(2)/(a)(5) and Florida CS/HB 1417 (Ch. 2023-140) by an AI session,
+  not by an attorney. Same category as the `/privacy` and `/terms` item above.
+- **Not in Phase 1:** `/housing/:state/:city`, `/housing/rights`,
+  `/housing/submit`, `/housing/directories`, ingest, map view, user accounts.
+  `housing_reports` and `submitReport()` exist ahead of `/housing/submit` because
+  the table and its RLS were Phase 1 item 1.
+- **`/housing/rights` will need a HUD fact-check** before it is written: HUD OGC's
+  April 2016 guidance (blanket criminal-record bans can violate the FHA via
+  disparate impact) may have been modified by a 2025-09-25 OGC memorandum the
+  authoring session could not read.
+
+---
+
 ## Supabase Client & Data Access
 
 ```ts
@@ -698,6 +804,8 @@ Migrations live in `supabase/migrations/`, numbered 001–039 **with gaps: 012, 
 **Do not regenerate `src/lib/database.types.ts` from the CLI** unless you have confirmed live has every migration the code depends on — the `blog_posts` block and the two conversation read columns were hand-written to match intended state, and a regen against a lagging DB would delete them.
 
 Later migrations (past the 001–011 core): 014/015/018/030 conversations system, 016 stable external IDs + dedup, 017/020/022/028 seed batches (Central Florida, work exchanges), 019 availability backfill, 023–027 provider claim flow + RLS hardening, 029 blog, 031 blog image storage (**applied — verified live 2026-09-01**, `blog-images` bucket exists with `public=true`), 032 South Florida seed, 033/034 claim submissions + notification fields, 035 work exchange provenance + agent review queue, 036 student clothing seed + `students` population tag, 037 confidence-trigger parity, **038/039 (added 2026-08-24, PR #85) are repo-completeness re-adds only** — both are backfills that were run against live back in May/June 2026 (038 on 2026-05-25, 039 on 2026-06-18) via a now-deleted session branch and never made it into the repo; the SQL files are reproduced verbatim from live's migration history. There is nothing to "apply" for 038/039 — they already happened. **039 is genuinely idempotent** (every UPDATE is `WHERE gender_policy = 'unknown'`-guarded). **038 is not** — its last statement is an unguarded table-wide `UPDATE resources SET stale_after_days = stale_after_days`, which stamps `updated_at = now()` on every row via `resources_updated_at` (same hazard migration 037 explicitly guards against with `DISABLE/ENABLE TRIGGER` for the identical statement). Re-running 038 against live or any already-seeded database manufactures false freshness table-wide; see that migration's own header comment before ever re-running it. **041–048 (added 2026-09-03) are ALL APPLIED to live, on 2026-09-03, by the maintainer** — re-verified from a later session by reading live, not by trusting `schema_migrations`: 11,091 transit stops, 184 routes, 4 distinct feed fingerprints, 35 `public_transit_accessible` rows stamped `transit_feed`, and 6 `transportation` resources all `pending` and off-map. Runbooks: `docs/apply-migration-041.md` (041 + 047) and `docs/apply-migrations-042-046.md` (042–046 + 048). 042 is DDL only; 043 (HART/Hillsborough, 2,245 stops), 044 (MCAT/Manatee, 928), 045 (Miami-Dade, 6,973) and 046 (GoPasco/Pasco, 945) are generated rows, each ending with the same guarded `public_transit_accessible` backfill that only ever raises the flag; 045 is ~1.4 MB. **047 and 048 are corrections to 041 and 042, and neither runbook worked without them.** 047 fixes 041's seeded facts against the agencies' own pages: PSTA Access and MOD are `(727) 540-1888`, not the `(727) 540-1900` that 041 seeds on all six rows; every `website` becomes a programme deep link; HARTPlus reservations are the day before (a session's "one to three days" correction was itself wrong — the maintainer's original brief was right); eligibility determination is within 21 days, not "at least" 21. **Never run 041 without 047** — 041 alone publishes a wrong phone number on two listings. 048 replaces 042's admin `FOR ALL` policy on each transit table with write-only admin policies so a single public SELECT path remains, clearing the `multiple_permissive_policies` advisor warning. Both are idempotent. **One re-run is still outstanding: 045 was regenerated after it was applied** (dropping routes that neither board nor alight at a stop), so `mdt:7836` still credits MIAALP and `mdt:9656` still credits 301 on live. Re-running 045 in full corrects both and is safe — the upsert restamps every Miami-Dade row with the new fingerprint `03abfad9b9e5`, so the trailing fingerprint-keyed `DELETE` matches nothing, neither stop moves, and the backfill runs with `resources_updated_at` disabled.** **040 (added 2026-09-03) raises `resources.stale_after_days` from 30 to 90**, default and backfill — **applied and verified live 2026-09-03**; runbook `docs/apply-migration-040.md`. Same DISABLE/ENABLE TRIGGER idiom as 037 so the backfill didn't touch `updated_at` (confirmed: `max(updated_at)` identical before/after).
+
+**056–058 (added 2026-09-04) are the second-chance housing directory and are NOT applied to live** — runbook `docs/apply-migrations-056-058.md`. 056 is create-only (7 tables, 7 enums, 2 trigger functions, RLS on every table, 1 `security_invoker` view) and touches no existing table, so it cannot interact with the outstanding 037/045 items; 057 seeds 51 state reference rows; 058 sets Florida's lookback summary and seeds 5 organizations **all `is_published = false` with contact fields NULL**. All three are idempotent. Verify by counting `housing_*` tables with `relrowsecurity = true` AND at least one policy each — an RLS-enabled table with zero policies is the `resource_import_staging` full-lockout failure mode, not a working default.
 
 **Live carries schema objects that no migration creates.** Two were found on PR #79: the `trg_resource_confidence` trigger + `fn_update_resource_confidence()` function (captured by migration 037) and the Christian Service Center provider row created by the OB3 import script (captured by 036 section 1b). Verifying a change against live cannot detect this class by construction — live is the environment that hides it. Before writing a migration that depends on a trigger, function, policy or row, confirm a migration actually creates it.
 

@@ -41,6 +41,12 @@ const BlogPostPage         = lazy(() => import('@/pages/blog/BlogPostPage'))
 // Category pages — all share one component, parameterized via categories.ts
 const CategoryPage         = lazy(() => import('@/pages/categories/CategoryPage'))
 
+// Second-chance housing directory (migrations 056–058)
+const HousingLandingPage   = lazy(() => import('@/pages/housing/HousingLandingPage'))
+const HousingStatePage     = lazy(() => import('@/pages/housing/HousingStatePage'))
+const HousingOrgPage       = lazy(() => import('@/pages/housing/HousingOrgPage'))
+const HousingScamsPage     = lazy(() => import('@/pages/housing/HousingScamsPage'))
+
 // Provider claim flow (migrations 023–027 + 033)
 const ClaimIndexPage       = lazy(() => import('@/pages/claim/ClaimIndexPage'))
 const ClaimDetailPage      = lazy(() => import('@/pages/claim/ClaimDetailPage'))
@@ -68,6 +74,8 @@ const AdminWorkExchange    = lazy(() => import('@/pages/admin/AdminWorkExchange'
 const AdminChat            = lazy(() => import('@/pages/admin/AdminChat'))
 const AdminFaq             = lazy(() => import('@/pages/admin/AdminFaq'))
 const AdminBlog            = lazy(() => import('@/pages/admin/AdminBlog'))
+const AdminHousing         = lazy(() => import('@/pages/admin/AdminHousing'))
+const AdminHousingEdit     = lazy(() => import('@/pages/admin/AdminHousingEdit'))
 
 const Loading = () => {
   const { t } = useI18n()
@@ -121,6 +129,15 @@ export default function App() {
           <Route path="blog"           element={<BlogIndexPage />} />
           <Route path="blog/:slug"     element={<BlogPostPage />} />
 
+          {/* Second-chance housing directory. Its own tables and its own
+              state-first shape — NOT a CategoryPage and not backed by
+              `resources`; see migration 056's header for why. `:state` is a
+              two-letter code, validated in the page. */}
+          <Route path="housing"              element={<HousingLandingPage />} />
+          <Route path="housing/scams"        element={<HousingScamsPage />} />
+          <Route path="housing/org/:slug"    element={<HousingOrgPage />} />
+          <Route path="housing/:state"       element={<HousingStatePage />} />
+
           {/* Category pages — presentation-only aliases over existing /map filters,
               see src/lib/categories.ts for the slug → filter mapping. */}
           <Route path="food-pantries" element={<CategoryPage slug="food-pantries" />} />
@@ -168,6 +185,9 @@ export default function App() {
           <Route path="messages"         element={<AdminChat />} />
           <Route path="faq"              element={<AdminFaq />} />
           <Route path="blog"             element={<AdminBlog />} />
+          <Route path="housing"          element={<AdminHousing />} />
+          <Route path="housing/new"      element={<AdminHousingEdit />} />
+          <Route path="housing/:id"      element={<AdminHousingEdit />} />
         </Route>
       </Routes>
     </Suspense>

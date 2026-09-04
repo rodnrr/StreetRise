@@ -552,3 +552,129 @@ export interface ToastMessage {
   message?: string
   duration?: number
 }
+
+// ============================================================
+// Second-Chance Housing Directory  (migrations 056–058, /housing)
+// ============================================================
+//
+// Standalone from Resource/Provider on purpose — see migration 056's
+// header for why. The types that matter most here are the tri-state
+// booleans: `boolean | null`, where null means "nobody has told us",
+// never "no". Do not narrow them to `boolean`.
+
+export type HousingOrgType =
+  | 'transitional_housing'
+  | 'sober_living'
+  | 'reentry_nonprofit'
+  | 'housing_authority'
+  | 'landlord'
+  | 'legal_aid'
+  | 'shelter'
+
+export type HousingType =
+  | 'transitional'
+  | 'recovery_residence'
+  | 'permanent_supportive'
+  | 'rental_unit'
+  | 'shared_housing'
+  | 'emergency_shelter'
+
+export type HousingGenderServed = 'any' | 'men' | 'women' | 'other'
+
+export type HousingVerificationMethod = 'phone' | 'email' | 'website' | 'partner'
+export type HousingVerificationOutcome = 'confirmed' | 'changed' | 'closed' | 'unreachable'
+
+export type HousingReportType = 'closed' | 'wrong_info' | 'scam' | 'new_listing'
+export type HousingReportStatus = 'new' | 'reviewed' | 'actioned' | 'dismissed'
+
+export interface HousingState {
+  code: string
+  name: string
+  /** null = not researched yet. The page hides the block rather than faking one. */
+  record_lookback_summary: string | null
+  /** Tri-state, same rule as the program booleans: null = unknown. */
+  has_housing_ban_the_box: boolean | null
+  notes: string | null
+  updated_at: string
+}
+
+export interface HousingOrganization {
+  id: string
+  slug: string
+  name: string
+  org_type: HousingOrgType
+  website: string | null
+  phone: string | null
+  email: string | null
+  description: string | null
+  is_published: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface HousingLocation {
+  id: string
+  organization_id: string
+  address_line1: string | null
+  address_line2: string | null
+  city: string | null
+  state_code: string | null
+  postal_code: string | null
+  lat: number | null
+  lng: number | null
+  is_primary: boolean
+}
+
+export interface HousingProgram {
+  id: string
+  organization_id: string
+  name: string
+  housing_type: HousingType
+  gender_served: HousingGenderServed | null
+
+  // ── Tri-state. null = not stated. NEVER render as "no". ──
+  accepts_felony: boolean | null
+  accepts_violent_offense: boolean | null
+  accepts_sex_offense: boolean | null
+  accepts_vouchers: boolean | null
+  requires_sobriety: boolean | null
+  has_curfew: boolean | null
+
+  monthly_cost_cents: number | null
+  deposit_cents: number | null
+  max_stay_days: number | null
+  beds_total: number | null
+
+  application_url: string | null
+  intake_phone: string | null
+  notes: string | null
+
+  is_published: boolean
+  /** null = never verified. Say so; do not fall back to created_at. */
+  last_verified_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Column-limited view — excludes raw_payload. See migration 056 §13. */
+export interface HousingSourceAttribution {
+  id: string
+  organization_id: string
+  source_name: string
+  source_url: string | null
+  retrieved_at: string
+  license_note: string | null
+}
+
+/** A program joined to its organization and that org's addresses. */
+export interface HousingProgramWithOrg extends HousingProgram {
+  organization: HousingOrganization
+  locations: HousingLocation[]
+}
+
+export interface HousingReportInput {
+  program_id: string | null
+  report_type: HousingReportType
+  message: string
+  contact_email: string | null
+}
