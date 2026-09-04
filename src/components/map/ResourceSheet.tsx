@@ -15,6 +15,7 @@ import { formatDistance } from '@/lib/geo'
 import GetThere from '@/components/shared/GetThere'
 import HousingEligibility from '@/components/housing/HousingEligibility'
 import { useI18n } from '@/lib/i18n'
+import { isNonWalkIn } from '@/lib/transport'
 import type { Resource } from '@/types'
 
 const STATUS_BADGE: Record<string, string> = {
@@ -120,9 +121,11 @@ export default function ResourceSheet({ resource: r, distanceKm, onClose }: Prop
   }, [onClose])
 
   const emoji = CATEGORY_EMOJI[r.category] ?? '📍'
-  const isConfidential = r.access_type === 'confidential_address' || r.access_type === 'phone_intake'
-  const isDV = r.population_focus?.includes('domestic_violence')
-  const hideAddress = isDV && isConfidential
+  // access_type alone — see the same note in ResourceDetailPage. Requiring the
+  // DV tag as well meant a "do not publish" address was published whenever
+  // that tag was missing.
+  const isConfidential = isNonWalkIn(r)
+  const hideAddress = isConfidential
   const hours = (r.hours_of_operation as { summary?: string } | null)?.summary
   const showBeds = r.category === 'shelter' && r.beds_total != null
   const facilities = FACILITIES.filter((f) => r[f.key])

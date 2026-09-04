@@ -152,8 +152,21 @@ export default function HousingDetailsFields({
     enabled,
   })
 
+  // Reset whenever the query resolves, INCLUDING when it resolves to no row.
+  //
+  // Returning early on a null left the previous resource's values in the form.
+  // With the editor mounted across a route change from one listing to another,
+  // navigating to a housing listing that has no details row yet would show —
+  // and, since the query reports success and re-enables Save, let somebody
+  // save — the FIRST listing's eligibility, costs and waitlist onto the
+  // second. `resourceId` is in the dependency list for the same reason: the
+  // clear has to happen on the switch, not only when new data lands.
   useEffect(() => {
-    if (!data) return
+    if (!data) {
+      setForm(BLANK)
+      setReconfirmWaitlist(false)
+      return
+    }
     setForm({
       accepts_felony: data.accepts_felony,
       accepts_violent_offense: data.accepts_violent_offense,
@@ -174,7 +187,7 @@ export default function HousingDetailsFields({
       waitlist_status: data.waitlist_status ?? '',
       waitlist_last_checked_at: data.waitlist_last_checked_at,
     })
-  }, [data])
+  }, [data, resourceId])
 
   const save = useMutation({
     mutationFn: async () => {

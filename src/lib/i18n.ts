@@ -1172,6 +1172,7 @@ const en: Dict = {
   'housing.filter.waitlist': 'Waitlist open',
   'housing.cost.monthly': 'Monthly cost',
   'housing.cost.deposit': 'Deposit',
+  'housing.maxStay': 'Longest stay',
 
   'housing.waitlist.open': 'Waitlist open.',
   'housing.waitlist.closed': 'Waitlist closed.',
@@ -2391,6 +2392,7 @@ const es: Dict = {
   'housing.filter.waitlist': 'Lista de espera abierta',
   'housing.cost.monthly': 'Costo mensual',
   'housing.cost.deposit': 'Depósito',
+  'housing.maxStay': 'Estancia máxima',
 
   'housing.waitlist.open': 'Lista de espera abierta.',
   'housing.waitlist.closed': 'Lista de espera cerrada.',

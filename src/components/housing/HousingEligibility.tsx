@@ -22,6 +22,8 @@ import {
   waitlistAgeDays,
   waitlistIsStale,
   WAITLIST_LABEL_KEY,
+  safeExternalUrl,
+  formatStay,
 } from '@/lib/housing'
 import type { Resource, ResourceHousingDetails } from '@/types'
 
@@ -116,6 +118,9 @@ export default function HousingEligibility({
 
   const cost = formatCostRange(h.minimum_monthly_cost_cents, h.maximum_monthly_cost_cents)
   const deposit = formatMoney(h.deposit_cents)
+  const stay = formatStay(h.max_stay_days)
+  // Validated before it reaches an href — see safeExternalUrl.
+  const applyUrl = safeExternalUrl(h.application_url)
 
   return (
     <section className="mt-4">
@@ -142,7 +147,7 @@ export default function HousingEligibility({
         </>
       )}
 
-      {(cost || deposit) && (
+      {(cost || deposit || stay) && (
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-base">
           {cost && (
             <div>
@@ -154,6 +159,14 @@ export default function HousingEligibility({
             <div>
               <dt className="text-slate-600 dark:text-slate-400">{t('housing.cost.deposit')}</dt>
               <dd className="font-semibold text-slate-900 dark:text-white">{deposit}</dd>
+            </div>
+          )}
+          {/* A 30- or 90-day limit can decide whether a place is worth applying
+              to at all. It was being stored and never shown. */}
+          {stay && (
+            <div>
+              <dt className="text-slate-600 dark:text-slate-400">{t('housing.maxStay')}</dt>
+              <dd className="font-semibold text-slate-900 dark:text-white">{stay}</dd>
             </div>
           )}
         </dl>
@@ -169,7 +182,7 @@ export default function HousingEligibility({
           a voucher programme or a navigation service usually publishes a
           separate application line. Storing these without ever showing them
           would leave a visitor calling the wrong number. */}
-      {!compact && (h.intake_phone || h.application_url) && (
+      {!compact && (h.intake_phone || applyUrl) && (
         <ul className="mt-3 space-y-2">
           {h.intake_phone && (
             <li className="flex items-center gap-2">
@@ -182,11 +195,11 @@ export default function HousingEligibility({
               </a>
             </li>
           )}
-          {h.application_url && (
+          {applyUrl && (
             <li className="flex items-center gap-2">
               <ExternalLink className="h-5 w-5 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
               <a
-                href={h.application_url}
+                href={applyUrl}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
                 className="text-base font-semibold text-primary-600 underline hover:text-primary-700 dark:text-primary-400"

@@ -122,8 +122,58 @@ export function isHousing(r: Resource): boolean {
 }
 
 // ------------------------------------------------------------
+// Link safety
+// ------------------------------------------------------------
+
+/**
+ * Return the URL only if it is safe to put in an href, otherwise null.
+ *
+ * `application_url` is free text saved by a provider through an editor, not a
+ * validating HTML form, and it is rendered straight into an anchor. React
+ * 18.3 only *warns* about a `javascript:` href — it does not block it — so
+ * without this a compromised or malicious provider account could store a link
+ * that executes script in StreetRise's own origin the moment a visitor taps
+ * "Apply online". An allowlist of schemes is the fix; a blocklist is not,
+ * because `data:` and `vbscript:` are equally unwelcome and the next one has
+ * not been invented yet.
+ *
+ * A bare `example.org/apply` is accepted and upgraded to https, because a
+ * provider typing their own address without a scheme is the common case and
+ * dropping the link entirely would punish them for it.
+ */
+export function safeExternalUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const value = raw.trim()
+  if (!value) return null
+
+  const candidate = /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`
+
+  try {
+    const url = new URL(candidate)
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+// ------------------------------------------------------------
 // Money and stay length
 // ------------------------------------------------------------
+
+/**
+ * How long somebody can stay, in words.
+ *
+ * Only meaningful for time-limited programmes — a null on permanent housing is
+ * correct, not missing.
+ */
+export function formatStay(days: number | null | undefined): string | null {
+  if (!days) return null
+  if (days < 31) return `${days} days`
+  if (days < 365) return `about ${Math.round(days / 30)} months`
+  const years = days / 365
+  return years === 1 ? 'about 1 year' : `about ${Math.round(years)} years`
+}
 
 /**
  * Rent, as a range when we hold one.

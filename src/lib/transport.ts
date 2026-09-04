@@ -69,8 +69,27 @@ export function destinationParam(r: Resource): string | null {
  * door that cannot help them, and for DV listings it is a safety problem.
  * Mirrors the existing gate in ResourceSheet.
  */
+/**
+ * Access types whose stored address is not somewhere the public may turn up.
+ *
+ * One list, used for BOTH hiding the address and suppressing directions, so
+ * the two cannot drift apart. `web_intake` is included: an online-intake
+ * programme may well keep its office coordinates, and offering turn-by-turn
+ * directions to a back office that does not receive visitors is a wasted trip.
+ */
+export const NON_WALK_IN_ACCESS: readonly string[] = [
+  'confidential_address',
+  'phone_intake',
+  'web_intake',
+  'not_map_ready',
+]
+
+export function isNonWalkIn(r: Pick<Resource, 'access_type'>): boolean {
+  return NON_WALK_IN_ACCESS.includes(r.access_type)
+}
+
 export function canRouteTo(r: Resource): boolean {
-  if (r.access_type === 'confidential_address' || r.access_type === 'phone_intake') return false
+  if (isNonWalkIn(r)) return false
   return destinationParam(r) !== null
 }
 

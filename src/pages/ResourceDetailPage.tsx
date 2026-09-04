@@ -13,6 +13,7 @@ import GetThere from '@/components/shared/GetThere'
 import HousingEligibility from '@/components/housing/HousingEligibility'
 import { normalizeHousingEmbed, isMissingHousingRelation } from '@/lib/housing'
 import { useI18n } from '@/lib/i18n'
+import { isNonWalkIn } from '@/lib/transport'
 import type { Resource } from '@/types'
 
 function VerificationBadge({ status }: { status: string }) {
@@ -159,10 +160,18 @@ export default function ResourceDetailPage() {
   const showBeds   = resource.category === 'shelter' && resource.beds_total != null
   const emoji      = CATEGORY_EMOJI[resource.category] ?? '📍'
 
-  // Confidential address logic (DV shelters, etc.)
-  const isConfidential = resource.access_type === 'confidential_address' || resource.access_type === 'phone_intake'
-  const isDVResource   = resource.population_focus?.includes('domestic_violence')
-  const hideAddress    = isDVResource && isConfidential
+  // Confidential address logic.
+  //
+  // Keyed on access_type ALONE. It used to also require the
+  // domestic_violence population tag, which meant a listing whose access_type
+  // said "confidential" still published its street address unless someone had
+  // remembered to tag it — the protection depended on a second, unrelated
+  // field being right. That was latent while access_type could only be set in
+  // SQL; it stopped being acceptable the moment the listing editors started
+  // offering "Confidential address — do not publish" as a dropdown option,
+  // because that label is a promise this render has to keep.
+  const isConfidential = isNonWalkIn(resource)
+  const hideAddress    = isConfidential
 
   // Facility items
   const facilities: { show: boolean; emoji: string; labelKey: string }[] = [
