@@ -147,9 +147,18 @@ export default function ProviderListingEdit() {
         category:            data.category as Resource['category'],
         resource_type:       data.resource_type || null,
         access_type:         (data.access_type || 'onsite') as Resource['access_type'],
-        // A listing with no front door must never be map-ready, or it would
-        // demand coordinates it has no honest way to supply.
-        is_map_ready:        !NON_WALK_IN_ACCESS.includes(data.access_type || 'onsite'),
+        // Map readiness is only ever forced DOWN here, never up.
+        //
+        // A non-walk-in listing must not be map-ready. But the reverse does not
+        // follow: is_map_ready is an independent admin gate, and migration 017
+        // deliberately imports rows as false while carrying city-centroid
+        // coordinates, pending someone confirming the real address. Deriving
+        // `true` from access_type would have flipped those to map-ready on any
+        // unrelated edit — publishing an unverified pin at a city centre
+        // because somebody fixed a typo in the description.
+        is_map_ready:        NON_WALK_IN_ACCESS.includes(data.access_type || 'onsite')
+                               ? false
+                               : existing?.is_map_ready ?? true,
         phone:               data.phone || null,
         email:               data.email || null,
         website:             data.website || null,

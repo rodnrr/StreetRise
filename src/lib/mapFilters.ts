@@ -264,6 +264,8 @@ export const QUICK_FILTER_ORDER: QuickFilterKey[] = [
 
 // Maps URL slugs from homepage links to canonical ResourceCategory values
 export const CATEGORY_SLUG_MAP: Record<string, ResourceCategory> = {
+  housing: 'housing',
+  'affordable-housing': 'housing',
   shelter:           'shelter',
   food:              'food',
   work_exchange:     'work_exchange',
@@ -1283,6 +1285,14 @@ export function filterSignature(filters: MapFilters, searchQuery = ''): string {
     [...(f.populationFocus ?? [])].sort().join('+'),
     f.availabilityStatus ?? '',
     f.radius ?? '',
+    // Housing facets change which results are displayed, so they have to move
+    // the viewport like every other refinement does. Leaving them out meant
+    // switching between housing searches updated the list and the markers
+    // while the map stayed pointed somewhere else.
+    (f.housingKinds ?? []).slice().sort().join('+'),
+    f.acceptsVouchers ? 'v' : '',
+    f.considersRecord ? 'r' : '',
+    f.waitlistOpen ? 'w' : '',
     // Sorted by definition order, so the string doesn't depend on click order.
     TOGGLE_DEFS.filter((d) => f[d.key]).map((d) => d.key).join('+'),
   ].join('|')
