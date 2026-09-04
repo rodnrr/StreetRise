@@ -236,6 +236,33 @@ export function waitlistAgeDays(
 /** Past this, an "open" waitlist is reported as unconfirmed rather than open. */
 export const WAITLIST_TRUST_DAYS = 30
 
+/**
+ * Past this many days, the housing-specific answers carry a staleness note.
+ *
+ * Matches the resources default (migration 040) so housing is not held to a
+ * stricter or looser bar than the rest of the platform.
+ */
+export const HOUSING_DETAILS_TRUST_DAYS = 90
+
+/**
+ * Age of the housing-specific claims, in days, or null if never checked.
+ *
+ * This is a SEPARATE clock from the listing's own `last_verified_at`, and that
+ * is the whole reason the column exists: a provider can fix a phone number
+ * today while the rent, the record eligibility and the house rules have not
+ * been looked at in two years. Showing the parent listing's freshness next to
+ * those answers would vouch for something nobody checked.
+ */
+export function housingDetailsAgeDays(
+  checkedAt: string | null | undefined,
+  now: Date = new Date(),
+): number | null {
+  if (!checkedAt) return null
+  const then = new Date(checkedAt)
+  if (Number.isNaN(then.getTime())) return null
+  return Math.max(0, Math.floor((now.getTime() - then.getTime()) / 86_400_000))
+}
+
 export function waitlistIsStale(
   checkedAt: string | null | undefined,
   now: Date = new Date()
@@ -247,6 +274,25 @@ export function waitlistIsStale(
 // ------------------------------------------------------------
 // Fetching housing
 // ------------------------------------------------------------
+
+/**
+ * What /housing's list actually needs — and nothing more.
+ *
+ * Deliberately NOT `Resource`. There is no street address and there are no
+ * coordinates on this shape, because the query that produces it never selects
+ * them: a confidential-address listing must not ship its location to the
+ * browser even if the component would not have drawn it.
+ */
+export interface HousingListItem {
+  id: string
+  name: string
+  resource_type: string | null
+  access_type: string
+  population_focus: string[]
+  city: string | null
+  state: string | null
+  housing: ResourceHousingDetails | null
+}
 
 /**
  * Every publicly visible housing resource, INCLUDING the ones with no
@@ -270,7 +316,34 @@ export function waitlistIsStale(
  * Located listings still appear on the map as normal. This is an additional
  * path, not a replacement.
  */
-export async function fetchHousingResources(): Promise<Resource[]> {
+export async function fetchHousingResources(): Promise<HousingListItem[]> {
+  // EXPLICIT projection, not `*`.
+  //
+  // This query deliberately drops the map-readiness gate, which means it now
+  // reaches rows the public set never used to include — among them
+  // `confidential_address` listings, whose whole point is that their location
+  // must not be published. Hiding a field in the component does nothing about
+  // it being in the network response; anyone can open devtools.
+  //
+  // So the street and the coordinates are never selected at all. The list only
+  // ever needed the city and state, and those are pulled out of the address
+  // JSONB server-side rather than shipping the whole object. What is not sent
+  // cannot leak.
+  //
+  // Consequence: this returns HousingListItem, not Resource. That is on
+  // purpose — a narrower type makes it a compile error for a future caller to
+  // reach for a field this query does not fetch.
+  const COLUMNS = [
+    'id',
+    'name',
+    'category',
+    'resource_type',
+    'access_type',
+    'population_focus',
+    'city:address->>city',
+    'state:address->>state',
+  ].join(', ')
+
   const run = (select: string) =>
     db.resources()
       .select(select)
@@ -279,16 +352,22 @@ export async function fetchHousingResources(): Promise<Resource[]> {
       .eq('category', 'housing')
       .order('name')
 
-  let { data, error } = await run(HOUSING_EMBED)
+  let { data, error } = await run(`${COLUMNS}, housing:resource_housing_details(*)`)
   if (error && isMissingHousingRelation(error)) {
-    const retry = await run('*')
+    const retry = await run(COLUMNS)
     data = retry.data
     error = retry.error
   }
   if (error) throw error
 
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
-    ...(row as unknown as Resource),
+    id: String(row.id),
+    name: String(row.name),
+    resource_type: (row.resource_type as string | null) ?? null,
+    access_type: String(row.access_type),
+    population_focus: (row.population_focus as string[] | null) ?? [],
+    city: (row.city as string | null) ?? null,
+    state: (row.state as string | null) ?? null,
     housing: normalizeHousingEmbed(row.housing),
   }))
 }
@@ -301,7 +380,10 @@ export async function fetchHousingResources(): Promise<Resource[]> {
  * eligibility answer never qualifies a listing into a "voucher friendly" or
  * "second chance" result set it has not earned.
  */
-export function matchesShortcut(r: Resource, s: HousingShortcut): boolean {
+export function matchesShortcut(
+  r: Pick<HousingListItem, 'resource_type' | 'population_focus' | 'housing'>,
+  s: HousingShortcut,
+): boolean {
   const f = s.filters
   if (f.housingKinds?.length) {
     if (!r.resource_type || !f.housingKinds.includes(r.resource_type)) return false

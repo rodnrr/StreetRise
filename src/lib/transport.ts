@@ -81,8 +81,15 @@ export const NON_WALK_IN_ACCESS: readonly string[] = [
   'confidential_address',
   'phone_intake',
   'web_intake',
-  'not_map_ready',
 ]
+
+// `not_map_ready` is deliberately NOT in that list. It means "the pin has not
+// been confirmed yet" — migration 017 uses it for real walk-in locations
+// imported with city-centroid coordinates, pending someone checking the
+// address. Those places have a front door and people can go to them. Treating
+// the flag as "no public location" would hide a genuine address and suppress
+// directions to a shelter that is expecting visitors, which is the opposite of
+// what the flag is for.
 
 export function isNonWalkIn(r: Pick<Resource, 'access_type'>): boolean {
   return NON_WALK_IN_ACCESS.includes(r.access_type)

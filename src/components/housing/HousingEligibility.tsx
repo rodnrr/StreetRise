@@ -24,6 +24,8 @@ import {
   WAITLIST_LABEL_KEY,
   safeExternalUrl,
   formatStay,
+  housingDetailsAgeDays,
+  HOUSING_DETAILS_TRUST_DAYS,
 } from '@/lib/housing'
 import type { Resource, ResourceHousingDetails } from '@/types'
 
@@ -127,6 +129,35 @@ export default function HousingEligibility({
       <h3 className="text-base font-semibold text-slate-900 dark:text-white">
         {t('housing.eligibility.heading')}
       </h3>
+
+      {/* Freshness of THESE answers, not of the listing.
+          The parent listing's last_verified_at says nothing about when the
+          rent or the record eligibility was last checked — a provider can fix
+          a phone number today and leave two-year-old house rules in place.
+          Showing the listing's date here would vouch for something nobody
+          looked at. */}
+      {(() => {
+        const age = housingDetailsAgeDays(h.housing_details_last_checked_at)
+        if (age === null) {
+          return (
+            <p className="mt-1 text-base text-amber-700 dark:text-amber-400">
+              {t('housing.details.neverChecked')}
+            </p>
+          )
+        }
+        if (age > HOUSING_DETAILS_TRUST_DAYS) {
+          return (
+            <p className="mt-1 text-base text-amber-700 dark:text-amber-400">
+              {t('housing.details.stale').replace('{days}', String(age))}
+            </p>
+          )
+        }
+        return (
+          <p className="mt-1 text-base text-slate-600 dark:text-slate-400">
+            {t('housing.details.checked').replace('{days}', String(age))}
+          </p>
+        )
+      })()}
 
       <ul className="mt-1">
         {RECORD_QUESTIONS.map((q) => (

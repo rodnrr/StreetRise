@@ -1149,6 +1149,9 @@ const en: Dict = {
   'resourceDetail.loadFailedHint': 'Something went wrong at our end — this does not mean the place is gone. Try again in a moment.',
   'resourceDetail.retry': 'Try again',
   'housing.eligibility.heading': 'Who they will consider',
+  'housing.details.checked': 'These housing answers were checked {days} days ago.',
+  'housing.details.stale': 'These housing answers were last checked {days} days ago — call to confirm before you go.',
+  'housing.details.neverChecked': 'We have not checked these housing answers. Call to confirm before you go.',
   'housing.eligibility.none': 'We have not recorded the housing details for this listing yet. Call to ask.',
   'housing.rules.heading': 'House rules',
 
@@ -2369,6 +2372,9 @@ const es: Dict = {
   'resourceDetail.loadFailedHint': 'Algo falló de nuestro lado — esto no significa que el lugar ya no exista. Intente de nuevo en un momento.',
   'resourceDetail.retry': 'Intentar de nuevo',
   'housing.eligibility.heading': 'A quién pueden considerar',
+  'housing.details.checked': 'Estas respuestas sobre la vivienda se verificaron hace {days} días.',
+  'housing.details.stale': 'Estas respuestas se verificaron por última vez hace {days} días — llame para confirmar antes de ir.',
+  'housing.details.neverChecked': 'No hemos verificado estas respuestas. Llame para confirmar antes de ir.',
   'housing.eligibility.none': 'Todavía no tenemos los detalles de vivienda de este lugar. Llame para preguntar.',
   'housing.rules.heading': 'Reglas de la casa',
 

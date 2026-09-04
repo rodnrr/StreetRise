@@ -27,8 +27,13 @@ const CATEGORIES: { value: ResourceCategory; label: string }[] = [
   { value: 'other', label: 'Other' },
 ]
 
-/** See the same list in AdminResourceEdit — a listing with no front door. */
-const NON_WALK_IN_ACCESS = ['phone_intake', 'web_intake', 'confidential_address', 'not_map_ready']
+/**
+ * Access types that must never produce a map pin — either because there is no
+ * front door, or because the pin has not been confirmed yet. Only used for
+ * is_map_ready here; see AdminResourceEdit for why the two questions are kept
+ * apart elsewhere.
+ */
+const NEVER_MAP_READY = ['phone_intake', 'web_intake', 'confidential_address', 'not_map_ready']
 
 const ACCESS_TYPES = [
   { value: 'onsite', label: 'On-site — people come to this address' },
@@ -147,7 +152,7 @@ export default function AdminResourceCreate() {
         // Both conditions: a walk-in listing still needs coordinates to be
         // map-ready, and a phone/web-intake listing is never map-ready even if
         // someone typed an office address in.
-        is_map_ready: hasCoords && !NON_WALK_IN_ACCESS.includes(form.access_type),
+        is_map_ready: hasCoords && !NEVER_MAP_READY.includes(form.access_type),
       })
 
       if (error) throw error

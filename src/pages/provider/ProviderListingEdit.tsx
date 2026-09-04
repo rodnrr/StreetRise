@@ -8,6 +8,7 @@ import { ArrowLeft, Trash2 } from 'lucide-react'
 import { db } from '@/lib/supabase'
 import { useAuthStore, useToast } from '@/lib/store'
 import HousingDetailsFields from '@/components/housing/HousingDetailsFields'
+import { NON_WALK_IN_ACCESS } from '@/lib/transport'
 import { RESOURCE_TYPE_LABEL } from '@/lib/mapFilters'
 import type { Resource } from '@/types'
 
@@ -20,7 +21,19 @@ import type { Resource } from '@/types'
  * a street address for them forces an operator to invent one — which is how a
  * directory ends up sending somebody to a building that is not there.
  */
-const NON_WALK_IN_ACCESS = ['phone_intake', 'web_intake', 'confidential_address', 'not_map_ready']
+/**
+ * Two different questions, deliberately two different lists.
+ *
+ * NON_WALK_IN_ACCESS (imported, shared with the public renderers) answers
+ * "is there a front door?" — it decides whether an address is required here
+ * and whether the address and directions are shown publicly.
+ *
+ * NEVER_MAP_READY additionally includes `not_map_ready`, which is a different
+ * claim: the place is real and people can go to it, but its pin has not been
+ * confirmed. Such a listing still needs its address; it just must not appear
+ * on the map yet.
+ */
+const NEVER_MAP_READY = [...NON_WALK_IN_ACCESS, 'not_map_ready']
 
 const ACCESS_TYPES = [
   { value: 'onsite', label: 'On-site — people come to this address' },
@@ -156,7 +169,7 @@ export default function ProviderListingEdit() {
         // `true` from access_type would have flipped those to map-ready on any
         // unrelated edit — publishing an unverified pin at a city centre
         // because somebody fixed a typo in the description.
-        is_map_ready:        NON_WALK_IN_ACCESS.includes(data.access_type || 'onsite')
+        is_map_ready:        NEVER_MAP_READY.includes(data.access_type || 'onsite')
                                ? false
                                : existing?.is_map_ready ?? true,
         phone:               data.phone || null,

@@ -157,7 +157,7 @@ export default function HousingLandingPage() {
                     <p className="text-base font-semibold text-slate-900 dark:text-white">{r.name}</p>
                     <p className="mt-1 text-base text-slate-600 dark:text-slate-400">
                       {r.resource_type ? t(RESOURCE_TYPE_LABEL_KEY[r.resource_type] ?? r.resource_type) : null}
-                      {r.address?.city ? ` · ${r.address.city}${r.address.state ? `, ${r.address.state}` : ''}` : null}
+                      {r.city ? ` · ${r.city}${r.state ? `, ${r.state}` : ''}` : null}
                     </p>
                     {/* Keyed on access_type, NOT on missing coordinates.
                         Those are different facts: a listing awaiting geocoding
