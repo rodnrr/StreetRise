@@ -42,23 +42,30 @@ export const db = {
   provider_claims:  () => supabase.from('provider_claims'),
   // Static GTFS tables (migrations 042/043). Cast for the same reason as
   // `bookings` above: database.types.ts is hand-maintained and does not yet
-  // describe these tables, and regenerating it against live is forbidden
-  // while live lags the repo's migrations (see CLAUDE.md). The row shapes
-  // are declared in src/lib/transit.ts instead, which is where every read
-  // of them goes through.
+  // describe these tables. The row shapes are declared in src/lib/transit.ts,
+  // which is where every read of them goes through.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   transit_stops:    () => supabase.from('transit_stops') as any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   transit_routes:   () => supabase.from('transit_routes') as any,
   /**
-   * Nearest-neighbour stop lookup (migration 042). An RPC rather than a
-   * table read because ordering by distance has to happen where all the
-   * candidate rows are — see the function's own comment in that migration.
+   * Original one-agency nearest-neighbour lookup from migration 042. Kept for
+   * backwards compatibility while deployed clients roll forward.
    */
   nearestTransitStop: (lat: number, lng: number, radiusKm: number, agency: string | null) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any).rpc('nearest_transit_stop', {
       in_lat: lat, in_lng: lng, in_radius_km: radiusKm, in_agency: agency,
+    }),
+  /**
+   * Multi-agency nearest-neighbour lookup (migration 049). Counties can be
+   * served by more than one system — e.g. local bus plus regional rail — so
+   * the caller passes every authoritative agency for that county.
+   */
+  nearestTransitStopMulti: (lat: number, lng: number, radiusKm: number, agencies: string[] | null) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).rpc('nearest_transit_stop_multi', {
+      in_lat: lat, in_lng: lng, in_radius_km: radiusKm, in_agencies: agencies,
     }),
 }
 

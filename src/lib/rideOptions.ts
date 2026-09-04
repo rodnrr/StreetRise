@@ -209,7 +209,8 @@ const COUNTY_BY_CITY: Record<string, string> = {
   hudson: 'pasco', 'wesley chapel': 'pasco', 'zephyrhills': 'pasco',
   brooksville: 'hernando', 'spring hill': 'hernando',
   bradenton: 'manatee', palmetto: 'manatee',
-  sarasota: 'sarasota', venice: 'sarasota',
+  sarasota: 'sarasota', venice: 'sarasota', 'north port': 'sarasota',
+  nokomis: 'sarasota', osprey: 'sarasota', 'siesta key': 'sarasota', laurel: 'sarasota',
   lakeland: 'polk', 'winter haven': 'polk', bartow: 'polk', mulberry: 'polk',
   'haines city': 'polk', 'lake wales': 'polk',
   // Orange / Osceola / Seminole
