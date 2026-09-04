@@ -76,8 +76,14 @@ export default function ResourceDetailPage() {
       // listing" prompt below. Unclaimed providers are publicly readable
       // (providers_unclaimed_read), so this join works for anonymous visitors.
       const PROVIDER_EMBED = 'providers(id, organization_name, website, claim_status)'
+      // maybeSingle, NOT single: PostgREST's .single() raises PGRST116 when it
+      // matches no row, so an unknown or withdrawn id would arrive here as an
+      // "error" and hit the retryable failure screen below — the not-found
+      // branch would be unreachable. maybeSingle returns data = null instead,
+      // which keeps "this listing is gone" and "we could not load it" as the
+      // two different things they are.
       const run = (select: string) =>
-        db.resources().select(select).eq('id', id!).single()
+        db.resources().select(select).eq('id', id!).maybeSingle()
 
       let { data, error } = await run(`*, ${PROVIDER_EMBED}, housing:resource_housing_details(*)`)
       // Migrations are hand-applied while merging deploys, so this page can be

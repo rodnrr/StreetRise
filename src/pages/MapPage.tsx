@@ -320,10 +320,23 @@ export default function MapPage() {
 
   const pickNeed = useCallback((key: NeedKey) => {
     setSelectedId(null)
+    // The housing facets have to be cleared alongside the need, not merged
+    // into it. A /housing shortcut writes housingKinds (or acceptsVouchers,
+    // or considersRecord) into the PERSISTED filter set; without this, tapping
+    // Food afterwards leaves `need=food` ANDed with housing-only resource
+    // types and returns nothing, with no visible chip explaining why. These
+    // are not offered as removable refinements in the drawer, so the visitor
+    // has no way to undo them by hand either.
+    const clearHousing = {
+      housingKinds: undefined,
+      acceptsVouchers: undefined,
+      considersRecord: undefined,
+      waitlistOpen: undefined,
+    }
     setFilters(
       filters.need === key
-        ? { need: undefined, category: undefined, quickFilter: undefined }
-        : { need: key, category: undefined, quickFilter: undefined },
+        ? { need: undefined, category: undefined, quickFilter: undefined, ...clearHousing }
+        : { need: key, category: undefined, quickFilter: undefined, ...clearHousing },
     )
   }, [filters.need, setFilters, setSelectedId])
 

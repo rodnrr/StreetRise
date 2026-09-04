@@ -8,7 +8,22 @@ import { ArrowLeft, Trash2 } from 'lucide-react'
 import { db } from '@/lib/supabase'
 import { useAuthStore, useToast } from '@/lib/store'
 import HousingDetailsFields from '@/components/housing/HousingDetailsFields'
+import { RESOURCE_TYPE_LABEL } from '@/lib/mapFilters'
 import type { Resource } from '@/types'
+
+/** Every value the live resources_resource_type_check accepts (migration 057). */
+const RESOURCE_TYPE_OPTIONS = [
+  'emergency_shelter','transitional_housing','food_pantry','hot_meal',
+  'shower_facility','restroom_access','day_use_park','warming_cooling_center',
+  'domestic_violence_shelter','veteran_housing','youth_shelter','work_exchange',
+  'crisis_hotline','job_training','legal_services','medical_clinic',
+  'mental_health_clinic','substance_recovery_program','clothing_closet',
+  'hygiene_supplies','laundry_facility','childcare_services',
+  'transportation_assistance','outreach_program',
+  'affordable_housing','public_housing','subsidized_housing',
+  'permanent_supportive_housing','recovery_residence','shared_housing',
+  'housing_navigation','voucher_program','other',
+]
 
 const CATEGORIES = [
   'shelter','housing','food','work_exchange','mental_health','medical',
@@ -19,6 +34,7 @@ const schema = z.object({
   name:                z.string().min(2, 'Name required'),
   description:         z.string().min(10, 'Please write a brief description'),
   category:            z.enum(CATEGORIES as [string, ...string[]]),
+  resource_type:       z.string().optional(),
   phone:               z.string().optional(),
   email:               z.string().email().optional().or(z.literal('')),
   website:             z.string().url().optional().or(z.literal('')),
@@ -67,6 +83,7 @@ export default function ProviderListingEdit() {
         name:                existing.name,
         description:         existing.description,
         category:            existing.category,
+        resource_type:       existing.resource_type ?? '',
         phone:               existing.phone ?? '',
         email:               existing.email ?? '',
         website:             existing.website ?? '',
@@ -95,6 +112,7 @@ export default function ProviderListingEdit() {
         name:                data.name,
         description:         data.description,
         category:            data.category as Resource['category'],
+        resource_type:       data.resource_type || null,
         phone:               data.phone || null,
         email:               data.email || null,
         website:             data.website || null,
@@ -182,6 +200,20 @@ export default function ProviderListingEdit() {
             <select {...register('category')} className={errors.category ? 'input-error' : 'input'}>
               <option value="">Select category…</option>
               {CATEGORIES.map(c => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
+            </select>
+          </div>
+          {/* Resource type. Neither form exposed this before, so every listing
+              created through the UI carried resource_type = NULL. Tolerable for
+              a pantry, where the category carries the meaning — not for housing,
+              where the /housing shortcuts filter on exactly this column, so an
+              affordable-housing listing with no type matches none of them. */}
+          <div>
+            <label className="label">Type</label>
+            <select {...register('resource_type')} className="input">
+              <option value="">Not specified</option>
+              {RESOURCE_TYPE_OPTIONS.map(v => (
+                <option key={v} value={v}>{RESOURCE_TYPE_LABEL[v] ?? v.replace(/_/g, ' ')}</option>
+              ))}
             </select>
           </div>
           <div>

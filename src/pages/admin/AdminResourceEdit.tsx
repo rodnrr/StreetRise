@@ -9,8 +9,23 @@ import clsx from 'clsx'
 import { db } from '@/lib/supabase'
 import { useToast } from '@/lib/store'
 import HousingDetailsFields from '@/components/housing/HousingDetailsFields'
+import { RESOURCE_TYPE_LABEL } from '@/lib/mapFilters'
 import { getTrustInfo, TRUST_LEVEL_CLASSES } from '@/lib/mapFilters'
 import type { Resource } from '@/types'
+
+/** Every value the live resources_resource_type_check accepts (migration 057). */
+const RESOURCE_TYPE_OPTIONS = [
+  'emergency_shelter','transitional_housing','food_pantry','hot_meal',
+  'shower_facility','restroom_access','day_use_park','warming_cooling_center',
+  'domestic_violence_shelter','veteran_housing','youth_shelter','work_exchange',
+  'crisis_hotline','job_training','legal_services','medical_clinic',
+  'mental_health_clinic','substance_recovery_program','clothing_closet',
+  'hygiene_supplies','laundry_facility','childcare_services',
+  'transportation_assistance','outreach_program',
+  'affordable_housing','public_housing','subsidized_housing',
+  'permanent_supportive_housing','recovery_residence','shared_housing',
+  'housing_navigation','voucher_program','other',
+]
 
 const CATEGORIES = [
   'shelter','housing','food','work_exchange','mental_health','medical',
@@ -23,6 +38,7 @@ const schema = z.object({
   name:                z.string().min(2),
   description:         z.string().min(5),
   category:            z.enum(CATEGORIES as [string, ...string[]]),
+  resource_type:       z.string().optional(),
   verification_status: z.enum(['pending','verified','rejected','suspended']),
   availability_status: z.enum(['available','limited','full','unknown','closed']),
   is_active:           z.boolean(),
@@ -85,6 +101,7 @@ export default function AdminResourceEdit() {
       name:                resource.name,
       description:         resource.description,
       category:            resource.category,
+      resource_type:       resource.resource_type ?? '',
       verification_status: resource.verification_status,
       availability_status: resource.availability_status,
       is_active:           resource.is_active,
@@ -133,6 +150,7 @@ export default function AdminResourceEdit() {
         name:                data.name,
         description:         data.description,
         category:            data.category as Resource['category'],
+        resource_type:       data.resource_type || null,
         verification_status: data.verification_status as Resource['verification_status'],
         availability_status: data.availability_status as Resource['availability_status'],
         is_active:           data.is_active,
@@ -267,6 +285,20 @@ export default function AdminResourceEdit() {
             <label className="label text-gray-300">Category *</label>
             <select {...register('category')} className="input bg-gray-700 border-gray-600 text-white">
               {CATEGORIES.map(c => <option key={c} value={c}>{c.replace(/_/g,' ')}</option>)}
+            </select>
+          </div>
+          {/* Resource type. Neither form exposed this before, so every listing
+              created through the UI carried resource_type = NULL. Tolerable for
+              a pantry, where the category carries the meaning — not for housing,
+              where the /housing shortcuts filter on exactly this column, so an
+              affordable-housing listing with no type matches none of them. */}
+          <div>
+            <label className="label text-gray-300">Type</label>
+            <select {...register('resource_type')} className="input bg-gray-700 border-gray-600 text-white">
+              <option value="">Not specified</option>
+              {RESOURCE_TYPE_OPTIONS.map(v => (
+                <option key={v} value={v}>{RESOURCE_TYPE_LABEL[v] ?? v.replace(/_/g, ' ')}</option>
+              ))}
             </select>
           </div>
           <div>

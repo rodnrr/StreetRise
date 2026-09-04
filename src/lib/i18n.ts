@@ -1165,6 +1165,7 @@ const en: Dict = {
   'housing.curfew.yes': 'Has a curfew',
   'housing.curfew.no': 'No curfew',
 
+  'housing.applyOnline': 'Apply online',
   'housing.cost.monthly': 'Monthly cost',
   'housing.cost.deposit': 'Deposit',
 
@@ -1181,6 +1182,10 @@ const en: Dict = {
   'housing.page.noAccount': 'No account needed. We do not save what you search for.',
   'housing.page.shortcutsHeading': 'What are you looking for?',
   'housing.page.allHousing': 'See all housing',
+  'housing.page.viewOnMap': 'View these on the map',
+  'housing.page.noResults': 'Nothing matches that yet. Try another option, or call 211.',
+  'housing.page.noWalkIn': 'Phone or online intake — no walk-in address',
+  'housing.page.loadFailed': 'We could not load housing listings.',
   'housing.page.emptyNote': 'StreetRise is adding housing listings market by market, and only publishes what has been checked. If you find nothing here yet, call 211 — free, 24 hours, anywhere in the country.',
   'housing.page.voucherHeading': 'Two different things called "Section 8"',
   'housing.page.voucherBody': 'Getting a voucher and finding somewhere that takes one are separate steps. If you do not have a voucher yet, start with the housing authority. If you already have one, look for places that accept it.',
@@ -2375,6 +2380,7 @@ const es: Dict = {
   'housing.curfew.yes': 'Tiene hora de queda',
   'housing.curfew.no': 'Sin hora de queda',
 
+  'housing.applyOnline': 'Solicitar en línea',
   'housing.cost.monthly': 'Costo mensual',
   'housing.cost.deposit': 'Depósito',
 
@@ -2391,6 +2397,10 @@ const es: Dict = {
   'housing.page.noAccount': 'No necesita cuenta. No guardamos lo que usted busca.',
   'housing.page.shortcutsHeading': '¿Qué está buscando?',
   'housing.page.allHousing': 'Ver toda la vivienda',
+  'housing.page.viewOnMap': 'Ver estos en el mapa',
+  'housing.page.noResults': 'Todavía no hay nada que coincida. Pruebe otra opción o llame al 211.',
+  'housing.page.noWalkIn': 'Admisión por teléfono o en línea — sin dirección para visitar',
+  'housing.page.loadFailed': 'No pudimos cargar la vivienda.',
   'housing.page.emptyNote': 'StreetRise agrega vivienda mercado por mercado y solo publica lo que ha verificado. Si aún no encuentra nada aquí, llame al 211 — gratis, 24 horas, en todo el país.',
   'housing.page.voucherHeading': 'Dos cosas distintas que llaman "Sección 8"',
   'housing.page.voucherBody': 'Conseguir un vale y encontrar un lugar que lo acepte son pasos separados. Si todavía no tiene un vale, empiece por la autoridad de vivienda. Si ya tiene uno, busque lugares que lo acepten.',

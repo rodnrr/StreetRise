@@ -17,6 +17,7 @@
 //                     facet instead of replacing them.
 //   3. normalizeHousingEmbed() — flattens PostgREST's embed shape.
 
+import { db } from '@/lib/supabase'
 import type {
   Resource,
   ResourceHousingDetails,
@@ -191,6 +192,81 @@ export function waitlistIsStale(
 ): boolean {
   const age = waitlistAgeDays(checkedAt, now)
   return age === null || age > WAITLIST_TRUST_DAYS
+}
+
+// ------------------------------------------------------------
+// Fetching housing
+// ------------------------------------------------------------
+
+/**
+ * Every publicly visible housing resource, INCLUDING the ones with no
+ * coordinates.
+ *
+ * This exists because `fetchMapResources()` requires `is_map_ready = true` and
+ * non-null lat/lng — correct for a map, wrong for housing. A Housing Choice
+ * Voucher programme is a phone-and-paperwork service run out of a housing
+ * authority office; a housing navigation service is a caseworker on a phone
+ * line; a domestic-violence transitional house has a confidential address on
+ * purpose. None of them can be given coordinates honestly, and all of them are
+ * exactly what somebody searching for housing needs to find.
+ *
+ * Without this, `/housing` delegating all discovery to `/map` would mean those
+ * listings had no public browse path at all — they would exist in the database
+ * and be unreachable. That is the same trap `/transportation` had to avoid, and
+ * `fetchRideAssistance()` in rideOptions.ts is the precedent this follows:
+ * keep the whole public visibility predicate, drop only the coordinate
+ * requirement.
+ *
+ * Located listings still appear on the map as normal. This is an additional
+ * path, not a replacement.
+ */
+export async function fetchHousingResources(): Promise<Resource[]> {
+  const run = (select: string) =>
+    db.resources()
+      .select(select)
+      .eq('is_active', true)
+      .in('verification_status', ['verified', 'pending'])
+      .eq('category', 'housing')
+      .order('name')
+
+  let { data, error } = await run(HOUSING_EMBED)
+  if (error && isMissingHousingRelation(error)) {
+    const retry = await run('*')
+    data = retry.data
+    error = retry.error
+  }
+  if (error) throw error
+
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
+    ...(row as unknown as Resource),
+    housing: normalizeHousingEmbed(row.housing),
+  }))
+}
+
+/**
+ * Does this resource satisfy a shortcut's facets?
+ *
+ * Deliberately reuses the same semantics as the map predicates in
+ * mapFilters.ts: an affirmative facet needs an EXPLICIT true, so an unrecorded
+ * eligibility answer never qualifies a listing into a "voucher friendly" or
+ * "second chance" result set it has not earned.
+ */
+export function matchesShortcut(r: Resource, s: HousingShortcut): boolean {
+  const f = s.filters
+  if (f.housingKinds?.length) {
+    if (!r.resource_type || !f.housingKinds.includes(r.resource_type)) return false
+  }
+  if (f.acceptsVouchers && r.housing?.accepts_vouchers !== true) return false
+  if (f.considersRecord) {
+    const considers =
+      r.housing?.accepts_felony === true ||
+      (r.population_focus?.includes('reentry') ?? false)
+    if (!considers) return false
+  }
+  if (f.populationFocus?.length) {
+    if (!f.populationFocus.some((t) => r.population_focus?.includes(t))) return false
+  }
+  return true
 }
 
 // ------------------------------------------------------------

@@ -11,7 +11,7 @@
 // no. So unknown gets its own colour, its own icon, and a sentence with an
 // instruction in it.
 
-import { Check, HelpCircle, Minus, AlertTriangle, Clock } from 'lucide-react'
+import { Check, HelpCircle, Minus, AlertTriangle, Clock, Phone, ExternalLink } from 'lucide-react'
 import { useI18n } from '@/lib/i18n'
 import {
   answerFor,
@@ -163,6 +163,39 @@ export default function HousingEligibility({
 
       {!compact && h.eligibility_notes && (
         <p className="mt-3 text-base text-slate-700 dark:text-slate-300">{h.eligibility_notes}</p>
+      )}
+
+      {/* Housing intake is often NOT the listing's main phone or website —
+          a voucher programme or a navigation service usually publishes a
+          separate application line. Storing these without ever showing them
+          would leave a visitor calling the wrong number. */}
+      {!compact && (h.intake_phone || h.application_url) && (
+        <ul className="mt-3 space-y-2">
+          {h.intake_phone && (
+            <li className="flex items-center gap-2">
+              <Phone className="h-5 w-5 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+              <a
+                href={`tel:${h.intake_phone.replace(/[^0-9+]/g, '')}`}
+                className="text-base font-semibold text-primary-600 underline hover:text-primary-700 dark:text-primary-400"
+              >
+                {h.intake_phone}
+              </a>
+            </li>
+          )}
+          {h.application_url && (
+            <li className="flex items-center gap-2">
+              <ExternalLink className="h-5 w-5 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+              <a
+                href={h.application_url}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className="text-base font-semibold text-primary-600 underline hover:text-primary-700 dark:text-primary-400"
+              >
+                {t('housing.applyOnline')}
+              </a>
+            </li>
+          )}
+        </ul>
       )}
     </section>
   )

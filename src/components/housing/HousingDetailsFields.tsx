@@ -130,7 +130,7 @@ export default function HousingDetailsFields({
 
   const enabled = category === 'housing' && !!resourceId
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['housing-details', resourceId],
     queryFn: async () => {
       const { data, error } = await table().select('*').eq('resource_id', resourceId).maybeSingle()
@@ -318,14 +318,20 @@ export default function HousingDetailsFields({
           onChange={(e) => setForm({ ...form, eligibility_notes: e.target.value })} />
       </div>
 
+      {/* Disabled until the existing row has loaded.
+          `form` starts as BLANK and is only populated from the query result, so
+          a save that lands first would upsert nulls over every eligibility,
+          cost and waitlist value already recorded — silently converting a
+          filled-in listing back to "not stated". Losing a provider's data to a
+          fast click is not an acceptable failure mode here. */}
       <button
         type="button"
         className="btn-primary inline-flex items-center gap-2"
         onClick={() => save.mutate()}
-        disabled={save.isPending}
+        disabled={save.isPending || isLoading}
       >
         <Save className="h-4 w-4" aria-hidden="true" />
-        {save.isPending ? 'Saving…' : 'Save housing details'}
+        {isLoading ? 'Loading…' : save.isPending ? 'Saving…' : 'Save housing details'}
       </button>
     </section>
   )

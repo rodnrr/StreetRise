@@ -12,9 +12,17 @@
 // through the normal provider or admin flow and it appears in these searches
 // immediately, with no housing-specific publishing step.
 
-import { Link } from 'react-router-dom'
-import { ArrowRight, Phone } from 'lucide-react'
-import { HOUSING_SHORTCUTS, shortcutMapHref } from '@/lib/housing'
+import { Link, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { ArrowRight, Phone, MapPin, Inbox } from 'lucide-react'
+import {
+  HOUSING_SHORTCUTS,
+  shortcutMapHref,
+  housingShortcut,
+  fetchHousingResources,
+  matchesShortcut,
+} from '@/lib/housing'
+import { RESOURCE_TYPE_LABEL_KEY } from '@/lib/mapFilters'
 import { useI18n } from '@/lib/i18n'
 import SeoHead from '@/lib/seo/SeoHead'
 import { breadcrumbSchema } from '@/lib/seo/structuredData'
@@ -24,6 +32,21 @@ import ScamWarningLink from '@/components/housing/ScamWarningLink'
 
 export default function HousingLandingPage() {
   const { t } = useI18n()
+  const [params, setParams] = useSearchParams()
+  const activeSlug = params.get('view')
+  const active = activeSlug ? housingShortcut(activeSlug) : undefined
+
+  // Housing resources INCLUDING the ones with no coordinates. /map cannot show
+  // those — it requires is_map_ready and lat/lng — so a voucher programme or a
+  // navigation service would have no browse path at all if this page only
+  // linked out to the map. See fetchHousingResources().
+  const { data: all, isLoading, isError, refetch } = useQuery({
+    queryKey: ['housing-resources'],
+    queryFn: fetchHousingResources,
+    staleTime: 1000 * 60 * 5,
+  })
+
+  const results = (all ?? []).filter((r) => (active ? matchesShortcut(r, active) : true))
 
   return (
     <div className="bg-white dark:bg-slate-900">
@@ -60,9 +83,15 @@ export default function HousingLandingPage() {
         <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {HOUSING_SHORTCUTS.map((s) => (
             <li key={s.slug}>
-              <Link
-                to={shortcutMapHref(s)}
-                className="flex h-full items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 hover:border-primary-600 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+              <button
+                type="button"
+                onClick={() => setParams(activeSlug === s.slug ? {} : { view: s.slug })}
+                aria-pressed={activeSlug === s.slug}
+                className={`flex h-full w-full items-start gap-3 rounded-xl border p-4 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 ${
+                  activeSlug === s.slug
+                    ? 'border-primary-600 bg-primary-50 dark:bg-slate-800'
+                    : 'border-slate-200 bg-white hover:border-primary-600 hover:bg-primary-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800'
+                }`}
               >
                 <span className="text-2xl" aria-hidden="true">{s.icon}</span>
                 <span>
@@ -73,20 +102,77 @@ export default function HousingLandingPage() {
                     {t(s.descriptionKey)}
                   </span>
                 </span>
-              </Link>
+              </button>
             </li>
           ))}
         </ul>
 
         <p className="mt-6">
           <Link
-            to="/map?category=housing"
+            to={active ? shortcutMapHref(active) : '/map?category=housing'}
             className="inline-flex items-center gap-1 text-base font-semibold text-primary-600 underline hover:text-primary-700 dark:text-primary-400"
           >
-            {t('housing.page.allHousing')}
+            {t('housing.page.viewOnMap')}
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </p>
+
+        {/* Results. Rendered here rather than only on /map because listings
+            with no coordinates cannot appear there at all. */}
+        <div className="mt-8">
+          {isLoading && (
+            <div className="space-y-3">
+              {[0, 1, 2].map((i) => <div key={i} className="skeleton h-24" />)}
+            </div>
+          )}
+
+          {!isLoading && isError && (
+            <div role="alert" className="rounded-xl bg-amber-50 p-4 dark:bg-amber-500/10">
+              <p className="text-base font-semibold text-amber-900 dark:text-amber-200">
+                {t('housing.page.loadFailed')}
+              </p>
+              <button type="button" onClick={() => refetch()} className="btn-secondary btn-sm mt-3">
+                {t('resourceDetail.retry')}
+              </button>
+            </div>
+          )}
+
+          {!isLoading && !isError && results.length === 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 text-center dark:border-slate-700 dark:bg-slate-900">
+              <Inbox className="mx-auto h-7 w-7 text-slate-400" aria-hidden="true" />
+              <p className="mt-2 text-base text-slate-700 dark:text-slate-300">
+                {t('housing.page.noResults')}
+              </p>
+            </div>
+          )}
+
+          {!isLoading && !isError && results.length > 0 && (
+            <ul className="space-y-3">
+              {results.map((r) => (
+                <li key={r.id}>
+                  <Link
+                    to={`/resources/${r.id}`}
+                    className="block rounded-xl border border-slate-200 bg-white p-4 hover:border-primary-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 dark:border-slate-700 dark:bg-slate-900"
+                  >
+                    <p className="text-base font-semibold text-slate-900 dark:text-white">{r.name}</p>
+                    <p className="mt-1 text-base text-slate-600 dark:text-slate-400">
+                      {r.resource_type ? t(RESOURCE_TYPE_LABEL_KEY[r.resource_type] ?? r.resource_type) : null}
+                      {r.address?.city ? ` · ${r.address.city}${r.address.state ? `, ${r.address.state}` : ''}` : null}
+                    </p>
+                    {/* Says out loud that there is no walk-in door, rather than
+                        leaving somebody to guess an address exists. */}
+                    {(!r.lat || !r.lng) && (
+                      <p className="mt-1 flex items-center gap-1 text-base text-slate-500 dark:text-slate-400">
+                        <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {t('housing.page.noWalkIn')}
+                      </p>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </Section>
 
       {/* The distinction this whole feature turns on. Someone who does not have
