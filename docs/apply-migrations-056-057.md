@@ -3,10 +3,11 @@
 **Status: NOT APPLIED to live.** Written 2026-09-04. Nothing here has been run
 against project `mldatfcwnmvrmxumzxyb`.
 
-> ⚠️ **Numbering collision with PR #107.** That superseded branch also has files
-> numbered 056–058, for the abandoned standalone-directory design. They are
-> different files. Apply only the ones on this branch, and close #107 rather
-> than merging it.
+> ⚠️ **Numbering collision with PR #107 — resolved.** That superseded branch also
+> has files numbered 056–058, for the abandoned standalone-directory design. They
+> are different files. #107 was **closed without merging on 2026-09-04**, so
+> nothing will apply them by accident — but if you are reading that branch, do not
+> run its SQL. Apply only the files on this branch.
 
 | File | Contents | Risk |
 |---|---|---|

@@ -8,11 +8,11 @@ Written before the code, as the work log for this change.
 This replaces the approach in **PR #107**, which built a parallel
 `housing_organizations` → `housing_programs` → `housing_locations` universe with its
 own publishing gates, its own verification log, its own reports table and its own
-routes. That PR is kept open as a reference implementation. None of its migrations
-(056–058 in that branch) were applied to production, so nothing here has to preserve
-them as established schema. The numbers 056/057 are reused on this branch for
-different files — if both branches were ever applied, that would collide, which is
-another reason #107 should be closed rather than merged.
+routes. None of its migrations (056–058 in that branch) were applied to production,
+so nothing here has to preserve them as established schema. The numbers 056/057 are
+reused on this branch for different files — applying both would collide, which is
+part of why **#107 was closed without merging on 2026-09-04**. Its branch remains
+readable as a reference implementation; its SQL must never be applied.
 
 ---
 
