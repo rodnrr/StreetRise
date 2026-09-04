@@ -11,6 +11,25 @@ import HousingDetailsFields from '@/components/housing/HousingDetailsFields'
 import { RESOURCE_TYPE_LABEL } from '@/lib/mapFilters'
 import type { Resource } from '@/types'
 
+/**
+ * Access types that have no public front door.
+ *
+ * A resource with one of these is not a place you walk into: a voucher
+ * programme run out of a housing authority office, a navigation service on a
+ * phone line, a DV shelter whose address is confidential on purpose. Requiring
+ * a street address for them forces an operator to invent one — which is how a
+ * directory ends up sending somebody to a building that is not there.
+ */
+const NON_WALK_IN_ACCESS = ['phone_intake', 'web_intake', 'confidential_address', 'not_map_ready']
+
+const ACCESS_TYPES = [
+  { value: 'onsite', label: 'On-site — people come to this address' },
+  { value: 'phone_intake', label: 'Phone intake — no walk-in address' },
+  { value: 'web_intake', label: 'Online intake — no walk-in address' },
+  { value: 'confidential_address', label: 'Confidential address — do not publish' },
+  { value: 'not_map_ready', label: 'Not ready for the map' },
+]
+
 /** Every value the live resources_resource_type_check accepts (migration 057). */
 const RESOURCE_TYPE_OPTIONS = [
   'emergency_shelter','transitional_housing','food_pantry','hot_meal',
@@ -35,13 +54,14 @@ const schema = z.object({
   description:         z.string().min(10, 'Please write a brief description'),
   category:            z.enum(CATEGORIES as [string, ...string[]]),
   resource_type:       z.string().optional(),
+  access_type:         z.string().optional(),
   phone:               z.string().optional(),
   email:               z.string().email().optional().or(z.literal('')),
   website:             z.string().url().optional().or(z.literal('')),
-  street:              z.string().min(3, 'Street address required'),
+  street:              z.string().optional().or(z.literal('')),
   city:                z.string().min(2, 'City required'),
   state:               z.string().length(2, '2-letter state code'),
-  zip:                 z.string().min(5, 'ZIP required'),
+  zip:                 z.string().optional().or(z.literal('')),
   lat:                 z.coerce.number().min(-90).max(90).optional().nullable(),
   lng:                 z.coerce.number().min(-180).max(180).optional().nullable(),
   walk_ins_accepted:   z.boolean().default(true),
@@ -53,6 +73,18 @@ const schema = z.object({
   languages_spoken:    z.string().optional(), // comma-separated
   tags:                z.string().optional(),
 })
+  // The street address is required only for a walk-in listing. Making it
+  // unconditional is what would force an operator to invent one for a voucher
+  // programme or a confidential-address shelter.
+  .superRefine((v, ctx) => {
+    const walkIn = !NON_WALK_IN_ACCESS.includes(v.access_type || 'onsite')
+    if (walkIn && (!v.street || v.street.trim().length < 3)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['street'], message: 'Street address required for a walk-in location' })
+    }
+    if (walkIn && (!v.zip || v.zip.trim().length < 5)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['zip'], message: 'ZIP required for a walk-in location' })
+    }
+  })
 
 type FormData = z.infer<typeof schema>
 
@@ -84,6 +116,7 @@ export default function ProviderListingEdit() {
         description:         existing.description,
         category:            existing.category,
         resource_type:       existing.resource_type ?? '',
+        access_type:         existing.access_type ?? 'onsite',
         phone:               existing.phone ?? '',
         email:               existing.email ?? '',
         website:             existing.website ?? '',
@@ -113,10 +146,14 @@ export default function ProviderListingEdit() {
         description:         data.description,
         category:            data.category as Resource['category'],
         resource_type:       data.resource_type || null,
+        access_type:         (data.access_type || 'onsite') as Resource['access_type'],
+        // A listing with no front door must never be map-ready, or it would
+        // demand coordinates it has no honest way to supply.
+        is_map_ready:        !NON_WALK_IN_ACCESS.includes(data.access_type || 'onsite'),
         phone:               data.phone || null,
         email:               data.email || null,
         website:             data.website || null,
-        address:             { street: data.street, city: data.city, state: data.state, zip: data.zip },
+        address:             { street: data.street ?? '', city: data.city, state: data.state, zip: data.zip ?? '' },
         lat:                 data.lat,
         lng:                 data.lng,
         walk_ins_accepted:   data.walk_ins_accepted,
@@ -214,6 +251,17 @@ export default function ProviderListingEdit() {
               {RESOURCE_TYPE_OPTIONS.map(v => (
                 <option key={v} value={v}>{RESOURCE_TYPE_LABEL[v] ?? v.replace(/_/g, ' ')}</option>
               ))}
+            </select>
+          </div>
+          {/* Access type. This is what lets a voucher programme or a
+              confidential-address shelter be entered honestly: pick a
+              non-walk-in type and the street address stops being required,
+              and the row is saved as not map-ready rather than demanding
+              coordinates it has no way to supply. */}
+          <div>
+            <label htmlFor="access_type" className="label">How people reach this</label>
+            <select id="access_type" {...register('access_type')} className="input">
+              {ACCESS_TYPES.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
             </select>
           </div>
           <div>

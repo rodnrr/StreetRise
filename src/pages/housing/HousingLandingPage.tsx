@@ -159,9 +159,14 @@ export default function HousingLandingPage() {
                       {r.resource_type ? t(RESOURCE_TYPE_LABEL_KEY[r.resource_type] ?? r.resource_type) : null}
                       {r.address?.city ? ` · ${r.address.city}${r.address.state ? `, ${r.address.state}` : ''}` : null}
                     </p>
-                    {/* Says out loud that there is no walk-in door, rather than
-                        leaving somebody to guess an address exists. */}
-                    {(!r.lat || !r.lng) && (
+                    {/* Keyed on access_type, NOT on missing coordinates.
+                        Those are different facts: a listing awaiting geocoding
+                        has no lat/lng and a perfectly real front door, while a
+                        phone-intake programme can keep its office coordinates.
+                        Testing the coordinates would label real addresses as
+                        "no walk-in" and stay silent on some that genuinely
+                        are. */}
+                    {['phone_intake', 'web_intake', 'confidential_address'].includes(r.access_type) && (
                       <p className="mt-1 flex items-center gap-1 text-base text-slate-500 dark:text-slate-400">
                         <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
                         {t('housing.page.noWalkIn')}

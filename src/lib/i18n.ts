@@ -1166,6 +1166,10 @@ const en: Dict = {
   'housing.curfew.no': 'No curfew',
 
   'housing.applyOnline': 'Apply online',
+  'housing.filter.kinds': 'Housing type',
+  'housing.filter.vouchers': 'Takes vouchers',
+  'housing.filter.record': 'Considers a record',
+  'housing.filter.waitlist': 'Waitlist open',
   'housing.cost.monthly': 'Monthly cost',
   'housing.cost.deposit': 'Deposit',
 
@@ -2381,6 +2385,10 @@ const es: Dict = {
   'housing.curfew.no': 'Sin hora de queda',
 
   'housing.applyOnline': 'Solicitar en línea',
+  'housing.filter.kinds': 'Tipo de vivienda',
+  'housing.filter.vouchers': 'Acepta vales',
+  'housing.filter.record': 'Considera antecedentes',
+  'housing.filter.waitlist': 'Lista de espera abierta',
   'housing.cost.monthly': 'Costo mensual',
   'housing.cost.deposit': 'Depósito',
 

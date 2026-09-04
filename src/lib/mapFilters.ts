@@ -822,6 +822,18 @@ interface Predicate {
 // this one decides which resources the map search box surfaces at all.
 const SPANISH_SEARCH_GROUPS: { terms: string[]; match: (r: Resource) => boolean }[] = [
   { terms: ['refugio', 'refugios', 'albergue', 'albergues'], match: NEED_DEFS.shelter.match },
+  // Housing. Without this a Spanish speaker typing "vivienda" got nothing,
+  // because name/category/resource_type are all English DB content — the
+  // translated Housing UI would have been reachable only by tapping the chip.
+  // "seccion 8" is here because that is what people actually search for, in
+  // both languages, even though the canonical field names say voucher.
+  {
+    terms: [
+      'vivienda', 'viviendas', 'casa', 'casas', 'apartamento', 'apartamentos',
+      'alojamiento', 'renta', 'alquiler', 'vale', 'vales', 'seccion 8', 'sección 8',
+    ],
+    match: NEED_DEFS.housing.match,
+  },
   { terms: ['comida', 'comidas', 'alimento', 'alimentos', 'alimentacion', 'alimentación', 'despensa', 'despensas'], match: NEED_DEFS.food.match },
   { terms: ['ducha', 'duchas', 'regadera', 'regaderas', 'bano', 'baño', 'banos', 'baños', 'lavanderia', 'lavandería', 'higiene'], match: NEED_DEFS.hygiene.match },
   { terms: ['espacio diurno', 'durante el dia', 'durante el día', 'diurno', 'centro diurno'], match: NEED_DEFS.daytime.match },
@@ -1285,6 +1297,15 @@ export function countActiveRefinements(filters: MapFilters): number {
   if (filters.populationFocus?.length) n++
   if (filters.availabilityStatus)      n++
   if (filters.radius != null)          n++
+  // Housing facets narrow the results like any other refinement, so they have
+  // to be counted like one. Omitting them let a persisted shortcut facet keep
+  // filtering silently — the visitor would come back to plain /map, see only a
+  // generic "Housing" chip and no active-filter badge, and have no way to tell
+  // why the list was shorter than Housing should be.
+  if (filters.housingKinds?.length)    n++
+  if (filters.acceptsVouchers)         n++
+  if (filters.considersRecord)         n++
+  if (filters.waitlistOpen)            n++
   for (const def of TOGGLE_DEFS) if (filters[def.key]) n++
   return n
 }
@@ -1312,6 +1333,13 @@ export function activeFilterLabels(filters: MapFilters, t: (key: string) => stri
   for (const gp of filters.genderPolicy ?? []) out.push(t(GENDER_POLICY_LABEL_KEY[gp] ?? gp))
   for (const tag of filters.populationFocus ?? []) out.push(t(POPULATION_FOCUS_LABEL_KEY[tag] ?? tag))
   if (filters.availabilityStatus) out.push(filters.availabilityStatus)
+
+  // Same reasoning as countActiveRefinements: a narrowing the visitor cannot
+  // see is a narrowing they cannot undo.
+  if (filters.housingKinds?.length) out.push(t('housing.filter.kinds'))
+  if (filters.acceptsVouchers)      out.push(t('housing.filter.vouchers'))
+  if (filters.considersRecord)      out.push(t('housing.filter.record'))
+  if (filters.waitlistOpen)         out.push(t('housing.filter.waitlist'))
 
   return out
 }
@@ -1347,6 +1375,14 @@ export function clearedFilter(
       if (!patch.populationFocus.length) patch.populationFocus = undefined
     }
   }
+
+  // Housing facets. Showing them as chips without making them removable would
+  // just move the problem: the visitor could finally see why the list was
+  // narrow, and still have no way to widen it.
+  if (t('housing.filter.kinds')    === label) patch.housingKinds    = undefined
+  if (t('housing.filter.vouchers') === label) patch.acceptsVouchers = undefined
+  if (t('housing.filter.record')   === label) patch.considersRecord = undefined
+  if (t('housing.filter.waitlist') === label) patch.waitlistOpen    = undefined
 
   return patch
 }
