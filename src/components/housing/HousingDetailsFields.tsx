@@ -127,10 +127,22 @@ export default function HousingDetailsFields({
   const qc = useQueryClient()
   const toast = useToast()
   const [form, setForm] = useState<FormState>(BLANK)
+  /**
+   * Explicit "I checked the waitlist again today" flag.
+   *
+   * The save below only stamps waitlist_last_checked_at when the STATUS
+   * changes, which is deliberate — editing the rent must not silently claim
+   * the waitlist was re-verified. But that alone made the freshness one-way:
+   * a waitlist that stays open and gets confirmed as still open never got its
+   * date refreshed, so after WAITLIST_TRUST_DAYS it dropped out of the
+   * "waitlist open" search with no way to put it back. This is the missing
+   * affirmative act — a human saying the unchanged answer is still true.
+   */
+  const [reconfirmWaitlist, setReconfirmWaitlist] = useState(false)
 
   const enabled = category === 'housing' && !!resourceId
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, isSuccess, refetch } = useQuery({
     queryKey: ['housing-details', resourceId],
     queryFn: async () => {
       const { data, error } = await table().select('*').eq('resource_id', resourceId).maybeSingle()
@@ -172,7 +184,7 @@ export default function HousingDetailsFields({
       // never shown without it, so a status saved with no date would render as
       // "we have not checked this" — which would be true, and useless.
       const checkedAt =
-        next !== null && next !== previous
+        next !== null && (next !== previous || reconfirmWaitlist)
           ? new Date().toISOString()
           : form.waitlist_last_checked_at
 
@@ -190,6 +202,7 @@ export default function HousingDetailsFields({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['housing-details', resourceId] })
+      setReconfirmWaitlist(false)
       toast.success('Housing details saved')
     },
     onError: (e: Error) => toast.error('Could not save housing details', e.message),
@@ -297,6 +310,24 @@ export default function HousingDetailsFields({
               Last checked {new Date(form.waitlist_last_checked_at).toLocaleDateString('en-US')}
             </p>
           )}
+          {/* Re-verification without a status change. Saving the form does not
+              refresh this date on its own, so that editing the rent cannot
+              masquerade as a waitlist check. */}
+          {form.waitlist_status && form.waitlist_last_checked_at && (
+            reconfirmWaitlist ? (
+              <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">
+                Will be marked checked today when you save.
+              </p>
+            ) : (
+              <button
+                type="button"
+                className="btn-secondary btn-sm mt-2"
+                onClick={() => setReconfirmWaitlist(true)}
+              >
+                I checked this again today
+              </button>
+            )
+          )}
         </div>
         <div>
           <label htmlFor="h-phone" className="label">Intake phone</label>
@@ -318,17 +349,31 @@ export default function HousingDetailsFields({
           onChange={(e) => setForm({ ...form, eligibility_notes: e.target.value })} />
       </div>
 
-      {/* Disabled until the existing row has loaded.
+      {/* Saving requires a SUCCESSFUL read first — not merely "not loading".
           `form` starts as BLANK and is only populated from the query result, so
-          a save that lands first would upsert nulls over every eligibility,
-          cost and waitlist value already recorded — silently converting a
-          filled-in listing back to "not stated". Losing a provider's data to a
-          fast click is not an acceptable failure mode here. */}
+          a save that lands before it would upsert nulls over every eligibility,
+          cost and waitlist value already recorded, silently converting a
+          filled-in listing back to "not stated".
+          Gating on isLoading alone was not enough: a failed read also leaves
+          isLoading false with the form still blank, so a transient network
+          error would have re-armed exactly the same data loss. */}
+      {isError && (
+        <div role="alert" className="rounded-lg bg-amber-50 p-3 dark:bg-amber-500/10">
+          <p className="text-sm text-amber-900 dark:text-amber-200">
+            We could not load the existing housing details, so saving is disabled — otherwise
+            this form would overwrite them with blanks.
+          </p>
+          <button type="button" className="btn-secondary btn-sm mt-2" onClick={() => refetch()}>
+            Try again
+          </button>
+        </div>
+      )}
+
       <button
         type="button"
         className="btn-primary inline-flex items-center gap-2"
         onClick={() => save.mutate()}
-        disabled={save.isPending || isLoading}
+        disabled={save.isPending || !isSuccess}
       >
         <Save className="h-4 w-4" aria-hidden="true" />
         {isLoading ? 'Loading…' : save.isPending ? 'Saving…' : 'Save housing details'}

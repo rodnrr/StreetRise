@@ -95,10 +95,18 @@ export default function ResourceDetailPage() {
         error = retry.error
       }
       if (error) throw error
+
+      // Return null, do NOT fall through to the spread. `{ ...null }` is legal
+      // and evaluates to `{}`, so spreading a missing row here produced a
+      // TRUTHY `{ housing: null }` — the not-found branch below became
+      // unreachable and the render crashed on `resource.address`. An unknown or
+      // withdrawn id is a normal request, not an exception.
+      if (!data) return null
+
       const row = data as unknown as Record<string, unknown>
       return {
         ...(row as unknown as Resource),
-        housing: normalizeHousingEmbed(row?.housing),
+        housing: normalizeHousingEmbed(row.housing),
       } as Resource
     },
     enabled: !!id,
