@@ -22,13 +22,50 @@ import {
   fetchHousingResources,
   matchesShortcut,
 } from '@/lib/housing'
-import { RESOURCE_TYPE_LABEL_KEY } from '@/lib/mapFilters'
+import { db } from '@/lib/supabase'
+import { GENDER_POLICY_LABEL_KEY, RESOURCE_TYPE_LABEL_KEY } from '@/lib/mapFilters'
 import { useI18n } from '@/lib/i18n'
 import SeoHead from '@/lib/seo/SeoHead'
 import { breadcrumbSchema } from '@/lib/seo/structuredData'
 import Section from '@/components/ui/Section'
 import Container from '@/components/ui/Container'
 import ScamWarningLink from '@/components/housing/ScamWarningLink'
+
+/**
+ * /housing intentionally fetches a narrow, privacy-safe listing projection from
+ * fetchHousingResources(). The browse card also needs two non-location access
+ * facts that materially change whether somebody should pursue a listing:
+ * referral-only placement and gender eligibility.
+ *
+ * Keep those as a second narrow projection instead of broadening the housing
+ * query to ship street addresses/coordinates for confidential or scattered
+ * residences. If this companion query fails, the page fails closed rather than
+ * silently hiding a referral requirement.
+ */
+async function fetchHousingBrowseResources() {
+  const base = await fetchHousingResources()
+  if (base.length === 0) return []
+
+  const { data, error } = await db.resources()
+    .select('id, requires_referral, gender_policy')
+    .in('id', base.map((r) => r.id))
+
+  if (error) throw error
+
+  const accessById = new Map(
+    ((data ?? []) as { id: string; requires_referral: boolean; gender_policy: string }[])
+      .map((row) => [row.id, row] as const),
+  )
+
+  return base.map((r) => {
+    const access = accessById.get(r.id)
+    return {
+      ...r,
+      requires_referral: access?.requires_referral ?? false,
+      gender_policy: access?.gender_policy ?? 'unknown',
+    }
+  })
+}
 
 export default function HousingLandingPage() {
   const { t } = useI18n()
@@ -42,7 +79,7 @@ export default function HousingLandingPage() {
   // linked out to the map. See fetchHousingResources().
   const { data: all, isLoading, isError, refetch } = useQuery({
     queryKey: ['housing-resources'],
-    queryFn: fetchHousingResources,
+    queryFn: fetchHousingBrowseResources,
     staleTime: 1000 * 60 * 5,
   })
 
@@ -159,6 +196,22 @@ export default function HousingLandingPage() {
                       {r.resource_type ? t(RESOURCE_TYPE_LABEL_KEY[r.resource_type] ?? r.resource_type) : null}
                       {r.city ? ` · ${r.city}${r.state ? `, ${r.state}` : ''}` : null}
                     </p>
+
+                    {(r.requires_referral || r.gender_policy !== 'unknown') && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {r.requires_referral && (
+                          <span className="badge bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                            {t('resourceDetail.referralRequired')}
+                          </span>
+                        )}
+                        {r.gender_policy !== 'unknown' && (
+                          <span className="badge bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                            {t(GENDER_POLICY_LABEL_KEY[r.gender_policy] ?? r.gender_policy)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {/* Keyed on access_type, NOT on missing coordinates.
                         Those are different facts: a listing awaiting geocoding
                         has no lat/lng and a perfectly real front door, while a
@@ -167,7 +220,7 @@ export default function HousingLandingPage() {
                         "no walk-in" and stay silent on some that genuinely
                         are. */}
                     {['phone_intake', 'web_intake', 'confidential_address'].includes(r.access_type) && (
-                      <p className="mt-1 flex items-center gap-1 text-base text-slate-500 dark:text-slate-400">
+                      <p className="mt-2 flex items-center gap-1 text-base text-slate-500 dark:text-slate-400">
                         <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
                         {t('housing.page.noWalkIn')}
                       </p>
