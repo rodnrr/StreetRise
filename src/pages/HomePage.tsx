@@ -20,7 +20,7 @@ import type { Resource } from '@/types'
 // (better SEO + real content); the rest fall back to a pre-filtered /map link.
 const CATEGORIES = [
   { labelKey: 'home.category.shelter',      emoji: '🏠', to: '/shelters' },
-  { labelKey: 'home.category.housing',      emoji: '🏢', to: '/housing' },
+  { labelKey: 'resourceType.housingNavigation', emoji: '🏘️', to: '/housing' },
   { labelKey: 'home.category.food',         emoji: '🍽️', to: '/food-pantries' },
   { labelKey: 'home.category.hygiene',      emoji: '🚿', to: '/hygiene' },
   { labelKey: 'home.category.medical',      emoji: '⚕️', to: '/medical' },
