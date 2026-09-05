@@ -10,18 +10,30 @@ import { useI18n } from '@/lib/i18n'
 // The four primary destinations — shared by the dropdown and the mobile tab
 // bar, which only has room for these.
 const NAV_LINKS = [
-  { to: '/map',    key: 'nav.findResources', icon: MapPin },
+  { to: '/find',   key: 'nav.findResources', icon: MapPin },
   { to: '/work',   key: 'nav.workExchange',  icon: Briefcase },
   { to: '/donate', key: 'nav.donate',        icon: Heart },
   { to: '/faq',    key: 'nav.faq',           icon: HelpCircle },
 ]
 
 // Dropdown-only entries: reachable from the footer, but buried there on mobile.
+// These sit under the Find umbrella below, so on one of these pages both the
+// umbrella and the exact entry read as selected — deliberate, it shows where
+// the page lives.
 const MENU_LINKS = [
   ...NAV_LINKS,
   { to: '/housing',        key: 'footer.housing',        icon: Home },
   { to: '/transportation', key: 'footer.transportation', icon: Bus },
   { to: '/blog',           key: 'footer.blog',           icon: Newspaper },
+]
+
+// Find is an information-architecture umbrella, not synonymous with /map.
+// Keep it selected while the visitor is inside one of its specialized resource
+// experiences so Housing/Transportation do not look like unrelated products.
+const FIND_PATH_PREFIXES = [
+  '/find', '/map', '/resources/', '/book/', '/shelters', '/housing',
+  '/food-pantries', '/hygiene', '/showers', '/medical', '/transportation',
+  '/legal', '/veterans', '/youth', '/students', '/families',
 ]
 
 export default function RootLayout() {
@@ -30,6 +42,7 @@ export default function RootLayout() {
   const { t, lang } = useI18n()
   const isMapPage = location.pathname === '/map'
   const isHomePage = location.pathname === '/'
+  const isFindContext = FIND_PATH_PREFIXES.some((prefix) => location.pathname.startsWith(prefix))
 
   // Collapse the menu whenever the route changes.
   useEffect(() => { setMenuOpen(false) }, [location.pathname])
@@ -89,12 +102,13 @@ export default function RootLayout() {
                     <NavLink
                       key={to}
                       to={to}
-                      className={({ isActive }) =>
-                        clsx('flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors', {
-                          'bg-primary-50 text-primary-700': isActive,
-                          'text-gray-700 hover:bg-gray-50': !isActive,
+                      className={({ isActive }) => {
+                        const selected = isActive || (to === '/find' && isFindContext)
+                        return clsx('flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors', {
+                          'bg-primary-50 text-primary-700': selected,
+                          'text-gray-700 hover:bg-gray-50': !selected,
                         })
-                      }
+                      }}
                     >
                       <Icon size={18} />
                       {t(key)}
@@ -157,12 +171,13 @@ export default function RootLayout() {
           <NavLink
             key={to}
             to={to}
-            className={({ isActive }) =>
-              clsx('flex flex-col items-center gap-0.5 py-2 px-3 text-[10px] font-medium transition-colors', {
-                'text-primary-600': isActive,
-                'text-gray-400':    !isActive,
+            className={({ isActive }) => {
+              const selected = isActive || (to === '/find' && isFindContext)
+              return clsx('flex flex-col items-center gap-0.5 py-2 px-3 text-[10px] font-medium transition-colors', {
+                'text-primary-600': selected,
+                'text-gray-400':    !selected,
               })
-            }
+            }}
           >
             <Icon size={22} strokeWidth={isMapPage ? 1.5 : 2} />
             {t(key).split(' ')[0]}

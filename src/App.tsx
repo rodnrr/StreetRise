@@ -12,6 +12,7 @@ import AdminLayout   from '@/components/admin/AdminLayout'
 import HomePage      from '@/pages/HomePage'
 
 // Lazy pages — split by route for smaller initial bundle
+const FindResourcesPage    = lazy(() => import('@/pages/FindResourcesPage'))
 const MapPage              = lazy(() => import('@/pages/MapPage'))
 const ResourceDetailPage   = lazy(() => import('@/pages/ResourceDetailPage'))
 const BookingPage          = lazy(() => import('@/pages/BookingPage'))
@@ -95,6 +96,7 @@ export default function App() {
         {/* ── Public ── */}
         <Route element={<RootLayout />}>
           <Route index             element={<HomePage />} />
+          <Route path="find"       element={<FindResourcesPage />} />
           <Route path="map"        element={<MapPage />} />
           <Route path="resources/:id" element={<ResourceDetailPage />} />
           <Route path="book/:resourceId" element={<BookingPage />} />
