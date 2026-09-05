@@ -95,6 +95,7 @@ const COPY = {
     request: 'Request help',
     requestHint: 'This sends StreetRise the trip details for follow-up. It does not book a ride.',
     otherArea: 'Programs in other service areas',
+    otherAreaRequest: 'This program serves a different area, so StreetRise will not send it a trip request for this destination.',
     directory: 'Browse transportation programs',
     directoryHint: 'Fare assistance and paratransit often serve an area rather than a walk-in address.',
     startOver: 'Start over',
@@ -128,6 +129,7 @@ const COPY = {
     request: 'Solicitar ayuda',
     requestHint: 'Esto envía a StreetRise los detalles del viaje para seguimiento. No reserva un viaje.',
     otherArea: 'Programas en otras áreas de servicio',
+    otherAreaRequest: 'Este programa sirve otra área, por lo que StreetRise no le enviará una solicitud de viaje para este destino.',
     directory: 'Explorar programas de transporte',
     directoryHint: 'La ayuda de pasajes y el paratránsito suelen servir un área en lugar de una dirección para visitas.',
     startOver: 'Comenzar de nuevo',
@@ -218,6 +220,7 @@ function ProgramCard({ option, destination, onRequest }: {
   const kinds = rideFacet(resource, 'kind')
   const areas = rideFacet(resource, 'area')
   const wheelchair = rideFacet(resource, 'mode').includes('wheelchair')
+  const requestDisabled = !destination || option.fit === 'other_area'
 
   return (
     <article className="card overflow-hidden p-0">
@@ -283,14 +286,14 @@ function ProgramCard({ option, destination, onRequest }: {
           )}
           <button
             type="button"
-            className="btn-secondary min-h-11 gap-2"
+            className="btn-secondary min-h-11 gap-2 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => onRequest(resource)}
-            disabled={!destination}
+            disabled={requestDisabled}
           >
             <HelpCircle size={15} /> {copy.request}
           </button>
         </div>
-        <p className="mt-2 text-xs text-gray-500">{copy.requestHint}</p>
+        <p className="mt-2 text-xs text-gray-500">{option.fit === 'other_area' ? copy.otherAreaRequest : copy.requestHint}</p>
       </div>
     </article>
   )
@@ -370,6 +373,10 @@ export default function TransportationExperiencePage() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setOrigin({ lat: position.coords.latitude, lng: position.coords.longitude })
+        // Once current location is selected, a previously typed origin is no
+        // longer the active pickup point. Clearing it prevents a stale address
+        // from being carried into a request while routing uses coordinates.
+        setOriginText('')
         setLocating(false)
       },
       () => {
@@ -396,6 +403,7 @@ export default function TransportationExperiencePage() {
     setTransportationRequestDraft({
       destinationResourceId: destination.resourceId,
       originText: originText.trim(),
+      originCoordinate: origin,
       destinationText: destination.label,
       when,
       modes,
