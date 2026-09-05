@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Navigation, HelpCircle, TramFront, CarFront } from 'lucide-react'
+import { Navigation, HelpCircle, TramFront, CarFront, ChevronRight } from 'lucide-react'
 import clsx from 'clsx'
 import {
   TRAVEL_MODES,
@@ -16,32 +16,14 @@ import { useMapStore } from '@/lib/store'
 import { useI18n } from '@/lib/i18n'
 import type { Resource } from '@/types'
 
-/**
- * The nearest-stop line.
- *
- * Renders one of exactly three things, and nothing is a bigger part of the
- * design than the cases where it renders nothing at all: an expired feed or an
- * address outside the agency data we hold both produce silence, never a guess.
- * See src/lib/transit.ts.
- */
 function NearestStop({ resource, compact }: { resource: Resource; compact: boolean }) {
   const { t } = useI18n()
   const { data } = useQuery({
-    // The coordinates and city are in the key, not just the id, because they
-    // are the query's actual inputs: an admin correcting a geocode changes
-    // where this listing is without changing which listing it is, and the
-    // edit flows invalidate ['resource', id] rather than this query. Keyed on
-    // the id alone the panel would keep showing a stop, agency and distance
-    // computed for the old address for the whole hour (caught in review on
-    // PR #100).
     queryKey: ['nearest-stop', resource.id, resource.lat, resource.lng, resource.address?.city],
-    // Stop locations change on service-change dates, not by the minute.
     staleTime: 1000 * 60 * 60,
     enabled: resource.lat != null && resource.lng != null,
     queryFn: () => lookupNearestStop(
       { lat: resource.lat!, lng: resource.lng! },
-      // The city decides whether we hold a feed for this county at all, and
-      // therefore whether an absence of stops means anything. See coverageFor().
       { city: resource.address?.city },
     ),
   })
@@ -87,8 +69,6 @@ function NearestStop({ resource, compact }: { resource: Resource; compact: boole
             .replace('{last}', data.stop.weekday_last)}</>
         )}
       </p>
-      {/* HART's own fare data prices the streetcar and SkyConnect at $0.00.
-          Free transport matters more here than anywhere else on the page. */}
       {data.fareFreeRoutes.length > 0 && (
         <p className="mt-1 pl-5 font-semibold">
           {t('transit.fareFree').replace('{routes}', data.fareFreeRoutes.join(', '))}
@@ -98,129 +78,119 @@ function NearestStop({ resource, compact }: { resource: Resource; compact: boole
   )
 }
 
-/**
- * "Get There" — the transportation layer's entry point on a single listing.
- *
- * Four of the six tiles hand the trip straight to the visitor's map app with
- * the destination filled in. The other two — ride assistance and accessible
- * transportation — open the Ride Assistance Finder, because "how do I get
- * there" and "who will help me pay for or provide the trip" are different
- * questions and only the second one needs StreetRise.
- *
- * When the listing cannot honestly be routed to — a confidential address, or a
- * phone-intake listing whose stored address is an office rather than the place
- * the service is delivered — no map links are offered and no destination is
- * carried into the finder. The transportation directory is still linked,
- * because needing a ride is true whether or not we can publish the address.
- */
-
 interface Props {
   resource: Resource
-  /** 'card' for the detail page, 'compact' for the map sheet. */
   variant?: 'card' | 'compact'
 }
 
+/**
+ * Contextual transportation entry point for a resource.
+ *
+ * Ordinary directions are visually grouped as one task. Ride assistance and
+ * accessible transportation are a second task, so they no longer compete as
+ * six equal-weight tiles. Confidential/non-walk-in destinations preserve the
+ * existing safety gate and never receive map links or a carried destination.
+ */
 export default function GetThere({ resource, variant = 'card' }: Props) {
   const { t } = useI18n()
   const userLocation = useMapStore((s) => s.userLocation)
   const routable = canRouteTo(resource)
+  const compact = variant === 'compact'
 
   const rideHref = routable ? `/transportation?to=${resource.id}` : '/transportation'
   const accessibleHref = routable
     ? `/transportation?to=${resource.id}&mode=wheelchair`
     : '/transportation?mode=wheelchair'
 
-  const compact = variant === 'compact'
-
-  const tileClass = clsx(
-    'flex items-center justify-center gap-1.5 rounded-xl font-semibold text-center',
-    'transition-colors active:scale-[0.98] select-none',
-    'bg-gray-100 text-gray-800 hover:bg-gray-200',
-    compact ? 'px-2 py-2 text-xs' : 'px-3 py-3 text-sm',
-  )
-  const helpTileClass = clsx(
-    'flex items-center justify-center gap-1.5 rounded-xl font-semibold text-center',
-    'transition-colors active:scale-[0.98] select-none',
-    'bg-primary-50 text-primary-700 hover:bg-primary-100',
-    compact ? 'px-2 py-2 text-xs' : 'px-3 py-3 text-sm',
-  )
-
   return (
-    <div className={compact ? 'space-y-2' : 'card space-y-3'}>
-      <h2
-        className={clsx(
-          'flex items-center gap-2 font-semibold text-gray-900',
-          compact ? 'text-sm' : 'text-base',
-        )}
-      >
-        <Navigation size={compact ? 14 : 16} className="text-gray-400" />
-        {t('getThere.title')}
-      </h2>
+    <div className={compact ? 'space-y-3' : 'card space-y-4'}>
+      <div className="flex items-center gap-2">
+        <span className={clsx('flex items-center justify-center rounded-xl bg-gray-100 text-gray-600', compact ? 'h-8 w-8' : 'h-10 w-10')}>
+          <Navigation size={compact ? 15 : 18} aria-hidden="true" />
+        </span>
+        <h2 className={clsx('font-bold text-gray-900', compact ? 'text-sm' : 'text-base')}>
+          {t('getThere.title')}
+        </h2>
+      </div>
 
       {routable ? (
         <>
-          {/* Gated on `routable` for the same reason the map links are, and it
-              matters more here: naming the nearest cross street to a
-              confidential-address shelter would leak the location the rest of
-              this component is careful not to publish. */}
           <NearestStop resource={resource} compact={compact} />
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {TRAVEL_MODES.map((m) => {
-              const href = googleMapsDirectionsUrl(resource, m.mode, userLocation)
-              if (!href) return null
-              return (
+          <div className="rounded-2xl border border-gray-200 bg-white p-3">
+            <div className="grid grid-cols-4 gap-2">
+              {TRAVEL_MODES.map((mode) => {
+                const href = googleMapsDirectionsUrl(resource, mode.mode, userLocation)
+                if (!href) return null
+                return (
+                  <a
+                    key={mode.mode}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={clsx(
+                      'flex min-h-11 flex-col items-center justify-center rounded-xl bg-gray-50 px-1 font-semibold text-gray-800 transition hover:bg-gray-100 active:scale-[0.98]',
+                      compact ? 'gap-0.5 text-[11px]' : 'gap-1 text-xs',
+                    )}
+                  >
+                    <span className={compact ? 'text-base' : 'text-lg'} aria-hidden>{mode.icon}</span>
+                    {t(mode.labelKey)}
+                  </a>
+                )
+              })}
+            </div>
+
+            {prefersAppleMaps() && (
+              <p className={clsx('text-gray-400', compact ? 'mt-2 text-[10px]' : 'mt-3 text-xs')}>
                 <a
-                  key={m.mode}
-                  href={href}
+                  href={appleMapsDirectionsUrl(resource, 'transit', userLocation) ?? '#'}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={tileClass}
+                  className="underline hover:text-gray-600"
                 >
-                  <span aria-hidden>{m.icon}</span> {t(m.labelKey)}
+                  {t('getThere.openInAppleMaps')}
                 </a>
-              )
-            })}
-            <Link to={rideHref} className={helpTileClass}>
-              <span aria-hidden>🚕</span> {t('getThere.mode.rideAssistance')}
-            </Link>
-            <Link to={accessibleHref} className={helpTileClass}>
-              <span aria-hidden>♿</span> {t('getThere.mode.accessible')}
-            </Link>
+              </p>
+            )}
           </div>
-
-          {/* Offered only where it is likely to be the default map app. Getting
-              the guess wrong costs one unused link, never a missing one. */}
-          {prefersAppleMaps() && (
-            <p className={clsx('text-gray-400', compact ? 'text-[11px]' : 'mt-3 text-xs')}>
-              <a
-                href={appleMapsDirectionsUrl(resource, 'transit', userLocation) ?? '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:text-gray-600"
-              >
-                {t('getThere.openInAppleMaps')}
-              </a>
-            </p>
-          )}
         </>
       ) : (
-        // No address we can honestly route to. The need for a ride is real
-        // either way, so the directory stays reachable — without a destination.
-        <p className={clsx('text-gray-600', compact ? 'text-xs' : 'text-sm')}>
+        <p className={clsx('rounded-xl bg-amber-50 px-3 py-2 text-amber-900', compact ? 'text-xs' : 'text-sm')}>
           {t('getThere.callForLocation')}
         </p>
       )}
 
-      <Link
-        to={rideHref}
-        className={clsx(
-          'inline-flex items-center gap-1.5 font-semibold text-primary-600 hover:text-primary-700',
-          compact ? 'text-xs' : 'text-sm',
-        )}
-      >
-        <HelpCircle size={compact ? 13 : 15} /> {t('getThere.needHelpGettingThere')}
-      </Link>
+      <div className={clsx('rounded-2xl border border-primary-100 bg-primary-50', compact ? 'p-3' : 'p-4')}>
+        <Link
+          to={rideHref}
+          className="flex min-h-11 items-center gap-3 rounded-xl text-left text-primary-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        >
+          <span className={clsx('flex shrink-0 items-center justify-center rounded-xl bg-white text-primary-700 shadow-sm', compact ? 'h-9 w-9' : 'h-11 w-11')}>
+            <HelpCircle size={compact ? 17 : 20} aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className={clsx('block font-bold', compact ? 'text-xs' : 'text-sm')}>
+              {t('getThere.needHelpGettingThere')}
+            </span>
+            <span className={clsx('mt-0.5 block text-primary-700', compact ? 'text-[10px]' : 'text-xs')}>
+              {t('getThere.mode.rideAssistance')}
+            </span>
+          </span>
+          <ChevronRight size={17} className="shrink-0 text-primary-500" aria-hidden="true" />
+        </Link>
+
+        <div className="mt-2 border-t border-primary-100 pt-2">
+          <Link
+            to={accessibleHref}
+            className={clsx(
+              'inline-flex min-h-10 items-center gap-2 font-semibold text-primary-700 hover:text-primary-800',
+              compact ? 'text-xs' : 'text-sm',
+            )}
+          >
+            <span aria-hidden>♿</span> {t('getThere.mode.accessible')}
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }
