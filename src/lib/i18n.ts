@@ -459,6 +459,7 @@ const en: Dict = {
   'home.partnerWithUs': 'Partner with us',
   'home.browseByNeed': 'Browse by Need',
   'home.category.shelter': 'Shelter',
+  'home.category.housing': 'Housing',
   'home.category.food': 'Food',
   'home.category.hygiene': 'Hygiene',
   'home.category.medical': 'Medical',
@@ -1108,6 +1109,7 @@ const en: Dict = {
   'ride.county.broward': 'Broward County',
 
   'footer.transportation': 'Transportation Help',
+  'footer.housing': 'Housing Help',
   'home.category.transportation': 'Transportation',
 
   // ── Nearest transit stop (static GTFS, migrations 042/043) ──
@@ -1692,6 +1694,7 @@ const es: Dict = {
   'home.partnerWithUs': 'Colabora con nosotros',
   'home.browseByNeed': 'Explora por Necesidad',
   'home.category.shelter': 'Refugio',
+  'home.category.housing': 'Vivienda',
   'home.category.food': 'Comida',
   'home.category.hygiene': 'Higiene',
   'home.category.medical': 'Médico',
@@ -2336,6 +2339,7 @@ const es: Dict = {
   'ride.county.broward': 'Condado de Broward',
 
   'footer.transportation': 'Ayuda con Transporte',
+  'footer.housing': 'Ayuda con Vivienda',
   'home.category.transportation': 'Transporte',
 
   // ── Parada de autobús más cercana (GTFS estático, migraciones 042/043) ──
