@@ -79,7 +79,12 @@ export default function RootLayout() {
                   className="fixed inset-0 z-30 cursor-default"
                   onClick={() => setMenuOpen(false)}
                 />
-                <div className="absolute right-4 top-full z-40 mt-2 w-64 rounded-2xl border border-gray-100 bg-white p-2 shadow-lg animate-fade-in">
+                {/* The header is 3.5rem tall and the menu hangs 0.5rem below it, so cap
+                    the panel at what is left of the viewport and let it scroll — on a
+                    phone in landscape the last entries would otherwise sit off-screen
+                    with no way to reach them (the page itself does not scroll them into
+                    view, since the panel is anchored to the sticky header). */}
+                <div className="absolute right-4 top-full z-40 mt-2 max-h-[calc(100dvh-5rem)] w-64 overflow-y-auto overscroll-contain rounded-2xl border border-gray-100 bg-white p-2 shadow-lg animate-fade-in">
                   {MENU_LINKS.map(({ to, key, icon: Icon }) => (
                     <NavLink
                       key={to}
