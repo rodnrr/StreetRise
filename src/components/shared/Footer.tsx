@@ -56,6 +56,7 @@ export default function Footer() {
           <nav className="flex flex-col gap-1.5">
             <Link to="/about" className="text-xs text-gray-500 hover:text-primary-600 transition-colors dark:text-slate-400">{t('footer.about')}</Link>
             <Link to="/blog" className="text-xs text-gray-500 hover:text-primary-600 transition-colors dark:text-slate-400">{t('footer.blog')}</Link>
+            <Link to="/housing" className="text-xs text-gray-500 hover:text-primary-600 transition-colors dark:text-slate-400">{t('footer.housing')}</Link>
             <Link to="/transportation" className="text-xs text-gray-500 hover:text-primary-600 transition-colors dark:text-slate-400">{t('footer.transportation')}</Link>
             <Link to="/community-voices" className="text-xs text-gray-500 hover:text-primary-600 transition-colors dark:text-slate-400">{t('footer.communityVoices')}</Link>
             <Link to="/partner-with-us" className="text-xs text-gray-500 hover:text-primary-600 transition-colors dark:text-slate-400">{t('footer.partner')}</Link>

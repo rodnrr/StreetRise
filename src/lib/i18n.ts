@@ -1108,6 +1108,7 @@ const en: Dict = {
   'ride.county.broward': 'Broward County',
 
   'footer.transportation': 'Transportation Help',
+  'footer.housing': 'Housing Help',
   'home.category.transportation': 'Transportation',
 
   // ── Nearest transit stop (static GTFS, migrations 042/043) ──
@@ -2336,6 +2337,7 @@ const es: Dict = {
   'ride.county.broward': 'Condado de Broward',
 
   'footer.transportation': 'Ayuda con Transporte',
+  'footer.housing': 'Ayuda con Vivienda',
   'home.category.transportation': 'Transporte',
 
   // ── Parada de autobús más cercana (GTFS estático, migraciones 042/043) ──
