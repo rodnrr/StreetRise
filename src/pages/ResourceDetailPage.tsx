@@ -64,6 +64,41 @@ function getAvailabilityLabel(resource: Resource, t: (key: string) => string): s
   return labels[resource.availability_status] ?? t('status.availabilityUnknown')
 }
 
+/**
+ * Intake booleans predate housing's tri-state evidence model. On ordinary
+ * resources the historical true/false labels are preserved. On housing,
+ * however, `false` often means only "the source did not establish this" — it
+ * must not become a public promise such as "No ID required" or "No need to
+ * call first". Housing therefore renders only affirmative, source-backed
+ * restrictions/capabilities from these legacy booleans; unknown negatives stay
+ * silent and the UI tells the visitor to ask.
+ */
+function intakeRows(resource: Resource): [boolean, string, string][] {
+  if (resource.category !== 'housing') {
+    return [
+      [resource.walk_ins_accepted,              'resourceDetail.walkInsAccepted',   'faq.intake.noWalkInsCallAhead'],
+      [!resource.requires_id,                   'faq.intake.noIdRequired',           'resourceDetail.idRequiredToEnter'],
+      [!resource.requires_referral,             'faq.intake.noReferralRequired',     'resourceDetail.referralRequired'],
+      [!resource.phone_required_before_arrival, 'faq.intake.noNeedToCallFirst',      'faq.intake.callBeforeVisiting'],
+    ]
+  }
+
+  const rows: [boolean, string, string][] = []
+  if (resource.walk_ins_accepted) {
+    rows.push([true, 'resourceDetail.walkInsAccepted', 'faq.intake.noWalkInsCallAhead'])
+  }
+  if (resource.requires_id) {
+    rows.push([false, 'faq.intake.noIdRequired', 'resourceDetail.idRequiredToEnter'])
+  }
+  if (resource.requires_referral) {
+    rows.push([false, 'faq.intake.noReferralRequired', 'resourceDetail.referralRequired'])
+  }
+  if (resource.phone_required_before_arrival) {
+    rows.push([false, 'faq.intake.noNeedToCallFirst', 'faq.intake.callBeforeVisiting'])
+  }
+  return rows
+}
+
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
 
 export default function ResourceDetailPage() {
@@ -273,21 +308,17 @@ export default function ResourceDetailPage() {
       <div className="card">
         <h2 className="font-semibold text-gray-900 mb-3">{t('resourceDetail.intakeRequirements')}</h2>
         <div className="space-y-2">
-          {(
-            [
-              [resource.walk_ins_accepted,              'resourceDetail.walkInsAccepted',   'faq.intake.noWalkInsCallAhead'],
-              [!resource.requires_id,                   'faq.intake.noIdRequired',           'resourceDetail.idRequiredToEnter'],
-              [!resource.requires_referral,             'faq.intake.noReferralRequired',     'resourceDetail.referralRequired'],
-              [!resource.phone_required_before_arrival, 'faq.intake.noNeedToCallFirst',      'faq.intake.callBeforeVisiting'],
-            ] as [boolean, string, string][]
-          ).map(([ok, yesKey, noKey]) => (
-            <div key={yesKey} className="flex items-center gap-2.5 text-sm">
+          {intakeRows(resource).map(([ok, yesKey, noKey]) => (
+            <div key={`${yesKey}:${noKey}`} className="flex items-center gap-2.5 text-sm">
               {ok
                 ? <CheckCircle size={16} className="text-success-600 shrink-0" />
                 : <XCircle     size={16} className="text-danger-500 shrink-0"  />}
               <span className={ok ? 'text-gray-700' : 'text-gray-500'}>{t(ok ? yesKey : noKey)}</span>
             </div>
           ))}
+          {resource.category === 'housing' && (
+            <p className="text-xs text-gray-500">{t('housing.notStated')}</p>
+          )}
           {resource.age_min != null && (
             <p className="text-sm text-gray-600">🎂 {t('resourceDetail.ages')} {resource.age_min}{resource.age_max ? `–${resource.age_max}` : '+'}</p>
           )}
