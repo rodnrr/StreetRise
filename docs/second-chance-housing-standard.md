@@ -129,6 +129,20 @@ Set `requires_referral = true` when placement is controlled by BOP, FDC, a court
 
 Do not set it merely because the provider *accepts* referrals or works with referral partners.
 
+### Legacy intake booleans and unknowns
+
+`requires_id`, `requires_referral`, `phone_required_before_arrival`, and `walk_ins_accepted` are legacy non-null booleans. Unlike the housing-specific eligibility fields, they cannot represent an unknown value cleanly.
+
+For housing resources:
+
+- Never interpret an unsupported `false` as an affirmative public promise such as **“No ID required,” “No referral required,”** or **“No need to call first.”**
+- Only publish or render a positive intake claim when a current source actually establishes that fact.
+- When an intake rule is not established, the public housing experience must treat it as unknown and direct the visitor to call/ask rather than infer an answer from the stored default.
+- Continue to set `requires_referral = true` whenever referral or correctional placement is explicitly required.
+- Do not change non-housing resource semantics merely to accommodate housing uncertainty; the housing UI must fail safely around these legacy fields.
+
+This rule is enforced in the housing rendering path on `ResourceDetailPage`: legacy `false` values are not converted into unsupported negative promises for housing listings.
+
 ### Access type
 
 Use the actual public entry path:
@@ -252,6 +266,8 @@ At minimum, the listing/detail experience must surface `requires_referral` and t
 
 Unknown criminal-history eligibility must render as "not stated / call to ask," never as a rejection.
 
+Unknown intake requirements must likewise remain unknown. A database default or legacy `false` must never become a public guarantee that an applicant needs no ID, referral, phone call, or other intake step unless a current source supports that statement.
+
 ---
 
 ## 7. Pre-publish QA checklist
@@ -269,6 +285,7 @@ Before applying a regional seed migration:
 - [ ] `accepts_felony` is not inferred casually.
 - [ ] Violent/sex-offense fields are explicit or `NULL`.
 - [ ] Referral-only/correctional programs set `requires_referral = true`.
+- [ ] Legacy intake booleans are not being used to make unsupported negative promises.
 - [ ] Housing navigation is not described as a residence.
 - [ ] Confidential/scattered/administrative locations are `is_map_ready = false`.
 - [ ] Fees are modeled as the correct kind of charge.
