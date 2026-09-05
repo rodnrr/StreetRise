@@ -16,7 +16,8 @@ const MapPage              = lazy(() => import('@/pages/MapPage'))
 const ResourceDetailPage   = lazy(() => import('@/pages/ResourceDetailPage'))
 const BookingPage          = lazy(() => import('@/pages/BookingPage'))
 const WorkExchangePage     = lazy(() => import('@/pages/WorkExchangePage'))
-const TransportationPage   = lazy(() => import('@/pages/TransportationPage'))
+const TransportationPage   = lazy(() => import('@/pages/transportation/TransportationExperiencePage'))
+const TransportationRequestPage = lazy(() => import('@/pages/transportation/TransportationRequestPage'))
 const DonatePage           = lazy(() => import('@/pages/DonatePage'))
 const FaqPage              = lazy(() => import('@/pages/FaqPage'))
 const LoginPage            = lazy(() => import('@/pages/LoginPage'))
@@ -98,12 +99,11 @@ export default function App() {
           <Route path="resources/:id" element={<ResourceDetailPage />} />
           <Route path="book/:resourceId" element={<BookingPage />} />
           <Route path="work"       element={<WorkExchangePage />} />
-          {/* Transportation assistance directory + Ride Assistance Finder.
-              Deliberately NOT a CategoryPage: transportation programmes are
-              service-area-scoped rather than point-located, so several have no
-              coordinates and CategoryPage's map-shaped query would hide them.
-              See src/lib/rideOptions.ts. */}
+          {/* Transportation remains a specialized task-oriented view over
+              canonical resources. Assistance programs may be service-area or
+              phone based rather than map pins. */}
           <Route path="transportation" element={<TransportationPage />} />
+          <Route path="transportation/request/:programId" element={<TransportationRequestPage />} />
           <Route path="donate"     element={<DonatePage />} />
           <Route path="faq"        element={<FaqPage />} />
           <Route path="login"              element={<LoginPage />} />
