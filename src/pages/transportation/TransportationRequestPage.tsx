@@ -4,7 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ArrowLeft, CheckCircle, Lock, MapPin, Navigation, PhoneCall } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Crosshair, Lock, MapPin, Navigation, PhoneCall } from 'lucide-react'
 import { db, supabase } from '@/lib/supabase'
 import { useI18n } from '@/lib/i18n'
 import { useToast } from '@/lib/store'
@@ -33,6 +33,10 @@ const COPY = {
     timePlaceholder: 'Tomorrow morning, after 3 PM, flexible',
     asap: 'As soon as possible',
     today: 'Today',
+    currentLocationTitle: 'Use the current device location I selected',
+    currentLocationBody: 'If you select this, the precise coordinates from the finder will be included in the private request when you submit it. They are not saved before submission.',
+    currentLocationActive: 'Current device location will be shared with this request.',
+    originOrLocation: 'Enter a pickup address or choose the current device location above.',
     need: 'What kind of help do you need?',
     ride: 'A ride',
     accessible: 'Wheelchair-accessible ride',
@@ -60,7 +64,7 @@ const COPY = {
     requiredContact: 'Enter a phone number or email address.',
     requiredConsent: 'Contact consent is required.',
     genericError: 'We could not send the transportation request. Try again or contact the program directly.',
-    privacy: 'Trip details are only saved when you submit this form. StreetRise does not save your browser geolocation from the finder.',
+    privacy: 'Trip details are only saved when you submit this form. Device coordinates are included only if you explicitly choose to share them above.',
   },
   es: {
     title: 'Solicitar ayuda de transporte',
@@ -78,6 +82,10 @@ const COPY = {
     timePlaceholder: 'Mañana por la mañana, después de las 3 p. m., flexible',
     asap: 'Lo antes posible',
     today: 'Hoy',
+    currentLocationTitle: 'Usar la ubicación actual del dispositivo que seleccioné',
+    currentLocationBody: 'Si selecciona esto, las coordenadas precisas del buscador se incluirán en la solicitud privada cuando la envíe. No se guardan antes del envío.',
+    currentLocationActive: 'La ubicación actual del dispositivo se compartirá con esta solicitud.',
+    originOrLocation: 'Ingrese una dirección de recogida o elija la ubicación actual del dispositivo arriba.',
     need: '¿Qué tipo de ayuda necesita?',
     ride: 'Un viaje',
     accessible: 'Viaje accesible para silla de ruedas',
@@ -105,7 +113,7 @@ const COPY = {
     requiredContact: 'Ingrese un número de teléfono o correo electrónico.',
     requiredConsent: 'Se requiere consentimiento para contactarle.',
     genericError: 'No pudimos enviar la solicitud de transporte. Inténtelo de nuevo o comuníquese directamente con el programa.',
-    privacy: 'Los detalles del viaje solo se guardan cuando envía este formulario. StreetRise no guarda la ubicación del navegador usada en el buscador.',
+    privacy: 'Los detalles del viaje solo se guardan cuando envía este formulario. Las coordenadas del dispositivo solo se incluyen si elige compartirlas arriba.',
   },
 } as const
 
@@ -118,9 +126,10 @@ type ProgramWithProvider = Resource & {
   } | null
 }
 
-function makeSchema(requiredContact: string, requiredConsent: string) {
+function makeSchema(requiredContact: string, requiredConsent: string, originOrLocation: string) {
   return z.object({
-    origin_text: z.string().trim().min(2).max(500),
+    origin_text: z.string().trim().max(500).optional(),
+    share_current_location: z.boolean().default(false),
     destination_text: z.string().trim().min(2).max(500),
     requested_trip_at: z.string().optional(),
     requested_time_window: z.string().trim().max(160).optional(),
@@ -134,6 +143,9 @@ function makeSchema(requiredContact: string, requiredConsent: string) {
     notes: z.string().trim().max(500).optional(),
     contact_consent: z.boolean().refine(Boolean, requiredConsent),
   }).superRefine((data, ctx) => {
+    if (!data.share_current_location && (!data.origin_text || data.origin_text.trim().length < 2)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['origin_text'], message: originOrLocation })
+    }
     if (!data.requester_phone && !data.requester_email) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['requester_phone'], message: requiredContact })
     }
@@ -142,13 +154,13 @@ function makeSchema(requiredContact: string, requiredConsent: string) {
 
 type FormData = z.infer<ReturnType<typeof makeSchema>>
 
-function formatSummary(data: FormData, modes: RideMode[]): string {
+function formatSummary(data: FormData, modes: RideMode[], submittedOrigin: string): string {
   const when = data.requested_trip_at
     ? new Date(data.requested_trip_at).toLocaleString()
     : data.requested_time_window || 'Not specified'
   return [
     '[Transportation request]',
-    `From: ${data.origin_text}`,
+    `From: ${submittedOrigin}`,
     `To: ${data.destination_text}`,
     `When: ${when}`,
     `Request: ${data.requested_kind.replace(/_/g, ' ')}`,
@@ -174,8 +186,12 @@ export default function TransportationRequestPage() {
   const draft = useMemo(() => getTransportationRequestDraft(), [])
   const destinationId = params.get('to') ?? draft?.destinationResourceId ?? null
   const modes = draft?.modes ?? []
+  const hasCurrentLocation = !!draft?.originCoordinate
 
-  const schema = useMemo(() => makeSchema(copy.requiredContact, copy.requiredConsent), [copy])
+  const schema = useMemo(
+    () => makeSchema(copy.requiredContact, copy.requiredConsent, copy.originOrLocation),
+    [copy],
+  )
 
   const { data: program, isLoading: programLoading } = useQuery<ProgramWithProvider | null>({
     queryKey: ['transport-request-program', programId],
@@ -206,11 +222,13 @@ export default function TransportationRequestPage() {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       origin_text: draft?.originText ?? '',
+      share_current_location: false,
       destination_text: draft?.destinationText ?? '',
       requested_kind: draft?.wheelchairRequired ? 'accessible_ride' : 'not_sure',
       requested_time_window: draft?.when === 'now' ? copy.asap : draft?.when === 'today' ? copy.today : '',
@@ -218,6 +236,8 @@ export default function TransportationRequestPage() {
       contact_consent: false,
     },
   })
+
+  const shareCurrentLocation = watch('share_current_location')
 
   useEffect(() => {
     if (!draft?.destinationText && destinationResource) {
@@ -232,6 +252,13 @@ export default function TransportationRequestPage() {
 
   const submit = useMutation({
     mutationFn: async (data: FormData) => {
+      const coordinate = draft?.originCoordinate
+      const submittedOrigin = data.share_current_location && coordinate
+        ? `Current device location (${coordinate.lat.toFixed(6)}, ${coordinate.lng.toFixed(6)})`
+        : data.origin_text?.trim() ?? ''
+
+      if (submittedOrigin.length < 2) throw new Error('pickup location required')
+
       const requestedTripAt = data.requested_trip_at
         ? new Date(data.requested_trip_at).toISOString()
         : null
@@ -240,7 +267,7 @@ export default function TransportationRequestPage() {
       const { error } = await (supabase as any).rpc('submit_transportation_request', {
         p_resource_id: programId,
         p_destination_resource_id: destinationId,
-        p_origin_text: data.origin_text,
+        p_origin_text: submittedOrigin,
         p_destination_text: data.destination_text,
         p_requested_trip_at: requestedTripAt,
         p_requested_time_window: data.requested_time_window || null,
@@ -260,9 +287,6 @@ export default function TransportationRequestPage() {
       if (!error) return
       if (!isMissingRpc(error)) throw error
 
-      // Known deploy-order fallback: merging deploys the app while migrations
-      // are hand-applied. If migration 058 is not present yet, preserve the
-      // request in canonical bookings with a complete private trip summary.
       const { error: fallbackError } = await db.bookings().insert({
         resource_id: programId!,
         requester_name: data.requester_name,
@@ -271,7 +295,7 @@ export default function TransportationRequestPage() {
         contact_preference: data.contact_preference,
         best_contact_time: data.best_contact_time || null,
         contact_consent: data.contact_consent,
-        notes: formatSummary(data, modes),
+        notes: formatSummary(data, modes, submittedOrigin),
         status: 'pending',
         adults: 1,
         children: 0,
@@ -358,9 +382,29 @@ export default function TransportationRequestPage() {
           <h2 className="flex items-center gap-2 text-lg font-bold text-gray-900">
             <MapPin size={18} className="text-primary-600" aria-hidden="true" /> {copy.trip}
           </h2>
+
+          {hasCurrentLocation && (
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-primary-100 bg-primary-50 p-4">
+              <input type="checkbox" {...register('share_current_location')} className="mt-1 h-4 w-4 accent-primary-600" />
+              <span>
+                <span className="flex items-center gap-2 font-semibold text-primary-900">
+                  <Crosshair size={16} aria-hidden="true" /> {copy.currentLocationTitle}
+                </span>
+                <span className="mt-1 block text-xs leading-relaxed text-primary-700">{copy.currentLocationBody}</span>
+                {shareCurrentLocation && <span className="mt-2 block text-xs font-semibold text-emerald-700">{copy.currentLocationActive}</span>}
+              </span>
+            </label>
+          )}
+
           <div>
             <label className="label" htmlFor="tr-origin">{copy.from} *</label>
-            <input id="tr-origin" {...register('origin_text')} className={errors.origin_text ? 'input-error' : 'input'} autoComplete="street-address" />
+            <input
+              id="tr-origin"
+              {...register('origin_text')}
+              className={errors.origin_text ? 'input-error' : 'input'}
+              autoComplete="street-address"
+              disabled={shareCurrentLocation}
+            />
             {errors.origin_text && <p className="error-text">{errors.origin_text.message}</p>}
           </div>
           <div>
