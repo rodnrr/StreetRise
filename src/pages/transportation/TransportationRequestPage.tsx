@@ -8,6 +8,7 @@ import { ArrowLeft, CheckCircle, Lock, MapPin, Navigation, PhoneCall } from 'luc
 import { db, supabase } from '@/lib/supabase'
 import { useI18n } from '@/lib/i18n'
 import { useToast } from '@/lib/store'
+import SeoHead from '@/lib/seo/SeoHead'
 import {
   clearTransportationRequestDraft,
   getTransportationRequestDraft,
@@ -18,7 +19,10 @@ import type { Resource } from '@/types'
 const COPY = {
   en: {
     title: 'Request transportation help',
-    intro: 'Send StreetRise the trip details so the listed transportation program or StreetRise team can follow up.',
+    connectedIntro: 'Send the trip details to this provider through its StreetRise request queue.',
+    mediatedIntro: 'Send the trip details to the StreetRise team so we can help connect you with this program. The agency is not connected to StreetRise yet.',
+    connectedDelivery: 'This request will be available to the listed provider in StreetRise.',
+    mediatedDelivery: 'This request goes to the StreetRise team for follow-up. It is not sent directly to the agency through StreetRise.',
     notBooked: 'This is a request for assistance. It does not confirm, schedule, or dispatch a ride.',
     trip: 'Your trip',
     from: 'Where should the trip start?',
@@ -27,6 +31,8 @@ const COPY = {
     whenHint: 'Use a date and time if you know it, or describe the window below.',
     timeWindow: 'Time window',
     timePlaceholder: 'Tomorrow morning, after 3 PM, flexible',
+    asap: 'As soon as possible',
+    today: 'Today',
     need: 'What kind of help do you need?',
     ride: 'A ride',
     accessible: 'Wheelchair-accessible ride',
@@ -46,7 +52,8 @@ const COPY = {
     submit: 'Request transportation help',
     sending: 'Sending request…',
     sent: 'Transportation request received',
-    sentBody: 'StreetRise received your request. A request is not a confirmed ride; follow-up depends on the program and its eligibility or scheduling rules.',
+    connectedSentBody: 'Your request is in the provider’s StreetRise queue. It is still not a confirmed ride; the provider must follow up and confirm eligibility or scheduling.',
+    mediatedSentBody: 'StreetRise received your request for follow-up. It was not sent directly to the agency through StreetRise and it is not a confirmed ride.',
     back: 'Back to transportation options',
     program: 'Program',
     missingProgram: 'This transportation program is not available.',
@@ -57,7 +64,10 @@ const COPY = {
   },
   es: {
     title: 'Solicitar ayuda de transporte',
-    intro: 'Envíe a StreetRise los detalles del viaje para que el programa de transporte indicado o el equipo de StreetRise pueda darle seguimiento.',
+    connectedIntro: 'Envíe los detalles del viaje a este proveedor mediante su cola de solicitudes de StreetRise.',
+    mediatedIntro: 'Envíe los detalles del viaje al equipo de StreetRise para que podamos ayudarle a conectarse con este programa. La agencia todavía no está conectada a StreetRise.',
+    connectedDelivery: 'Esta solicitud estará disponible para el proveedor indicado en StreetRise.',
+    mediatedDelivery: 'Esta solicitud llega al equipo de StreetRise para seguimiento. StreetRise no la envía directamente a la agencia.',
     notBooked: 'Esta es una solicitud de ayuda. No confirma, programa ni despacha un viaje.',
     trip: 'Su viaje',
     from: '¿Dónde debe comenzar el viaje?',
@@ -66,6 +76,8 @@ const COPY = {
     whenHint: 'Use una fecha y hora si la sabe, o describa el horario abajo.',
     timeWindow: 'Horario aproximado',
     timePlaceholder: 'Mañana por la mañana, después de las 3 p. m., flexible',
+    asap: 'Lo antes posible',
+    today: 'Hoy',
     need: '¿Qué tipo de ayuda necesita?',
     ride: 'Un viaje',
     accessible: 'Viaje accesible para silla de ruedas',
@@ -85,7 +97,8 @@ const COPY = {
     submit: 'Solicitar ayuda de transporte',
     sending: 'Enviando solicitud…',
     sent: 'Solicitud de transporte recibida',
-    sentBody: 'StreetRise recibió su solicitud. Una solicitud no es un viaje confirmado; el seguimiento depende del programa y de sus requisitos o reglas de programación.',
+    connectedSentBody: 'Su solicitud está en la cola de StreetRise del proveedor. Aún no es un viaje confirmado; el proveedor debe darle seguimiento y confirmar elegibilidad o programación.',
+    mediatedSentBody: 'StreetRise recibió su solicitud para darle seguimiento. StreetRise no la envió directamente a la agencia y no es un viaje confirmado.',
     back: 'Volver a las opciones de transporte',
     program: 'Programa',
     missingProgram: 'Este programa de transporte no está disponible.',
@@ -97,6 +110,13 @@ const COPY = {
 } as const
 
 type RequestKind = 'ride' | 'accessible_ride' | 'fare_assistance' | 'not_sure'
+
+type ProgramWithProvider = Resource & {
+  provider?: {
+    organization_name?: string | null
+    claim_status?: string | null
+  } | null
+}
 
 function makeSchema(requiredContact: string, requiredConsent: string) {
   return z.object({
@@ -157,17 +177,17 @@ export default function TransportationRequestPage() {
 
   const schema = useMemo(() => makeSchema(copy.requiredContact, copy.requiredConsent), [copy])
 
-  const { data: program, isLoading: programLoading } = useQuery<Resource | null>({
+  const { data: program, isLoading: programLoading } = useQuery<ProgramWithProvider | null>({
     queryKey: ['transport-request-program', programId],
     queryFn: async () => {
       const { data, error } = await db.resources()
-        .select('*')
+        .select('*, provider:providers(organization_name, claim_status)')
         .eq('id', programId!)
         .eq('category', 'transportation')
         .eq('is_active', true)
         .maybeSingle()
       if (error) throw error
-      return (data as unknown as Resource | null) ?? null
+      return (data as unknown as ProgramWithProvider | null) ?? null
     },
     enabled: !!programId,
   })
@@ -193,7 +213,7 @@ export default function TransportationRequestPage() {
       origin_text: draft?.originText ?? '',
       destination_text: draft?.destinationText ?? '',
       requested_kind: draft?.wheelchairRequired ? 'accessible_ride' : 'not_sure',
-      requested_time_window: draft?.when === 'now' ? 'As soon as possible' : draft?.when === 'today' ? 'Today' : '',
+      requested_time_window: draft?.when === 'now' ? copy.asap : draft?.when === 'today' ? copy.today : '',
       contact_preference: 'either',
       contact_consent: false,
     },
@@ -204,6 +224,11 @@ export default function TransportationRequestPage() {
       setValue('destination_text', destinationResource.name)
     }
   }, [destinationResource, draft?.destinationText, setValue])
+
+  const providerConnected = program?.provider?.claim_status === 'claimed'
+  const pageIntro = providerConnected ? copy.connectedIntro : copy.mediatedIntro
+  const deliveryCopy = providerConnected ? copy.connectedDelivery : copy.mediatedDelivery
+  const sentBody = providerConnected ? copy.connectedSentBody : copy.mediatedSentBody
 
   const submit = useMutation({
     mutationFn: async (data: FormData) => {
@@ -267,6 +292,7 @@ export default function TransportationRequestPage() {
   if (!program) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
+        <SeoHead title={copy.title} description={copy.notBooked} path="/transportation/request" noindex />
         <p className="text-gray-600">{copy.missingProgram}</p>
         <Link to="/transportation" className="btn-primary mt-5">{copy.back}</Link>
       </div>
@@ -276,9 +302,10 @@ export default function TransportationRequestPage() {
   if (done) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
+        <SeoHead title={copy.title} description={copy.notBooked} path={`/transportation/request/${program.id}`} noindex />
         <CheckCircle className="mx-auto h-14 w-14 text-success-600" aria-hidden="true" />
         <h1 className="mt-4 text-2xl font-bold text-gray-900">{copy.sent}</h1>
-        <p className="mt-2 text-gray-600">{copy.sentBody}</p>
+        <p className="mt-2 text-gray-600">{sentBody}</p>
         <div className="mt-6 flex flex-col gap-3">
           {program.phone && (
             <a href={`tel:${program.phone}`} className="btn-primary gap-2">
@@ -300,6 +327,8 @@ export default function TransportationRequestPage() {
 
   return (
     <div className="mx-auto max-w-xl px-4 py-8 pb-24">
+      <SeoHead title={copy.title} description={copy.notBooked} path={`/transportation/request/${program.id}`} noindex />
+
       <Link to="/transportation" className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-700">
         <ArrowLeft size={16} /> {copy.back}
       </Link>
@@ -309,16 +338,18 @@ export default function TransportationRequestPage() {
           <Navigation size={24} aria-hidden="true" />
         </div>
         <h1 className="mt-4 text-3xl font-bold tracking-tight text-gray-900">{copy.title}</h1>
-        <p className="mt-2 text-gray-600">{copy.intro}</p>
+        <p className="mt-2 text-gray-600">{pageIntro}</p>
       </div>
 
       <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        {copy.notBooked}
+        <p className="font-semibold">{copy.notBooked}</p>
+        <p className="mt-1">{deliveryCopy}</p>
       </div>
 
       <div className="mt-5 card">
         <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">{copy.program}</p>
         <p className="mt-1 font-bold text-gray-900">{program.name}</p>
+        {program.provider?.organization_name && <p className="mt-0.5 text-sm text-gray-500">{program.provider.organization_name}</p>}
         {program.description && <p className="mt-1 line-clamp-2 text-sm text-gray-600">{program.description}</p>}
       </div>
 
