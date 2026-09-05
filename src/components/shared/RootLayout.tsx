@@ -1,5 +1,5 @@
 import { Outlet, NavLink, Link, useLocation } from 'react-router-dom'
-import { MapPin, Heart, Briefcase, HelpCircle, Menu, X, UserPlus } from 'lucide-react'
+import { MapPin, Heart, Briefcase, HelpCircle, Menu, X, UserPlus, Newspaper, Home, Bus } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import clsx from 'clsx'
 import ToastContainer from './ToastContainer'
@@ -7,11 +7,21 @@ import Footer from './Footer'
 import LangToggle from './LangToggle'
 import { useI18n } from '@/lib/i18n'
 
+// The four primary destinations — shared by the dropdown and the mobile tab
+// bar, which only has room for these.
 const NAV_LINKS = [
   { to: '/map',    key: 'nav.findResources', icon: MapPin },
   { to: '/work',   key: 'nav.workExchange',  icon: Briefcase },
   { to: '/donate', key: 'nav.donate',        icon: Heart },
   { to: '/faq',    key: 'nav.faq',           icon: HelpCircle },
+]
+
+// Dropdown-only entries: reachable from the footer, but buried there on mobile.
+const MENU_LINKS = [
+  ...NAV_LINKS,
+  { to: '/housing',        key: 'footer.housing',        icon: Home },
+  { to: '/transportation', key: 'footer.transportation', icon: Bus },
+  { to: '/blog',           key: 'footer.blog',           icon: Newspaper },
 ]
 
 export default function RootLayout() {
@@ -70,7 +80,7 @@ export default function RootLayout() {
                   onClick={() => setMenuOpen(false)}
                 />
                 <div className="absolute right-4 top-full z-40 mt-2 w-64 rounded-2xl border border-gray-100 bg-white p-2 shadow-lg animate-fade-in">
-                  {NAV_LINKS.map(({ to, key, icon: Icon }) => (
+                  {MENU_LINKS.map(({ to, key, icon: Icon }) => (
                     <NavLink
                       key={to}
                       to={to}

@@ -1,10 +1,13 @@
 import { Heart, MapPin, ShieldCheck } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import clsx from 'clsx'
 import Section from '@/components/ui/Section'
 import SectionHeading from '@/components/ui/SectionHeading'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Container from '@/components/ui/Container'
 import SeoHead from '@/lib/seo/SeoHead'
+import { CITIES } from '@/lib/cities'
 import { useI18n } from '@/lib/i18n'
 
 export default function AboutPage() {
@@ -146,6 +149,30 @@ export default function AboutPage() {
           title={t('marketing.about.whereTitle')}
           subtitle={t('marketing.about.whereSubtitle')}
         />
+        {/* Metro-by-metro coverage. Lives here rather than on the home page,
+            where it repeated the hero's live-stats panel. */}
+        <div className="mb-8 grid gap-3 text-left sm:grid-cols-2">
+          {CITIES.map(({ name, live }) => (
+            <div
+              key={name}
+              className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-800"
+            >
+              <span className="flex items-center gap-2 font-medium text-slate-900 dark:text-white">
+                <MapPin size={16} className="text-slate-400" />
+                {name}, FL
+              </span>
+              <span className={clsx('badge', live ? 'badge-available' : 'badge-unknown')}>
+                {live ? t('home.live') : t('home.comingSoon')}
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="mb-8 text-sm text-slate-400">
+          {t('home.wantInCity')}{' '}
+          <Link to="/partner-with-us" className="font-medium text-primary-600 hover:underline dark:text-primary-400">
+            {t('home.partnerWithUs')}
+          </Link>
+        </p>
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
           <Button to="/map">{t('marketing.about.seeMap')}</Button>
           <Button to="/contact" variant="secondary">

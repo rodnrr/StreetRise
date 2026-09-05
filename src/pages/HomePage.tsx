@@ -13,6 +13,7 @@ import EmptyState from '@/components/ui/EmptyState'
 import SeoHead from '@/lib/seo/SeoHead'
 import { organizationSchema } from '@/lib/seo/structuredData'
 import { fetchPublishedPosts } from '@/lib/blog'
+import { CITIES } from '@/lib/cities'
 import { useI18n } from '@/lib/i18n'
 import type { Resource } from '@/types'
 
@@ -31,16 +32,6 @@ const CATEGORIES = [
   { labelKey: 'home.category.transportation', emoji: '🚌', to: '/transportation' },
   { labelKey: 'home.category.parksDayUse',  emoji: '🌳', to: '/map?category=outdoor_space' },
   { labelKey: 'home.category.allResources', emoji: '📍', to: '/map' },
-]
-
-// Metros StreetRise serves. Set `live: true` ONLY when a metro has real,
-// publicly visible listings seeded on the map — otherwise it reads as
-// "Coming soon". (Verify with the public resources query before flipping.)
-const CITIES = [
-  { name: 'Tampa Bay',    live: true },
-  { name: 'Orlando',      live: true },
-  { name: 'Miami',        live: true },
-  { name: 'Jacksonville', live: false },
 ]
 
 const HOW_IT_WORKS = [
@@ -217,9 +208,27 @@ export default function HomePage() {
         </Container>
       </section>
 
+      {/* ── Browse by need ── */}
+      <Section tone="gray" containerSize="wide">
+        <SectionHeading title={t('home.browseByNeed')} align="left" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {CATEGORIES.map(({ labelKey, emoji, to }) => (
+            <Link
+              key={labelKey}
+              to={to}
+              className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors hover:border-primary-300 dark:border-slate-700 dark:bg-slate-800"
+            >
+              <span className="text-2xl">{emoji}</span>
+              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t(labelKey)}</span>
+              <ArrowRight size={14} className="ml-auto text-slate-300" />
+            </Link>
+          ))}
+        </div>
+      </Section>
+
       {/* ── Featured resources ── */}
       {featured && featured.length > 0 && (
-        <Section tone="gray" containerSize="wide">
+        <Section containerSize="wide">
           <SectionHeading eyebrow={t('home.verifiedTodayEyebrow')} title={t('home.realResourcesTitle')} align="left" />
           <div className="grid gap-4 md:grid-cols-3">
             {featured.map((r) => (
@@ -241,7 +250,7 @@ export default function HomePage() {
       )}
 
       {/* ── How It Works ── */}
-      <Section containerSize="wide">
+      <Section tone="gray" containerSize="wide">
         <SectionHeading title={t('home.howItWorksTitle')} align="left" />
         <div className="grid gap-8 md:grid-cols-3">
           {HOW_IT_WORKS.map(({ step, titleKey, descriptionKey, icon: Icon }) => (
@@ -258,60 +267,15 @@ export default function HomePage() {
       </Section>
 
       {/* ── Mission ── */}
-      <Section tone="gray" containerSize="prose">
+      <Section containerSize="prose">
         <SectionHeading title={t('home.missionTitle')} align="left" />
         <p className="leading-relaxed text-slate-600 dark:text-slate-300 md:text-lg">
           {t('home.missionBody')}
         </p>
       </Section>
 
-      {/* ── Where we're available ── */}
-      <Section containerSize="wide">
-        <SectionHeading title={t('home.whereAvailableTitle')} align="left" />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {CITIES.map(({ name, live }) => (
-            <div
-              key={name}
-              className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-800"
-            >
-              <span className="flex items-center gap-2 font-medium text-slate-900 dark:text-white">
-                <MapPin size={16} className="text-slate-400" />
-                {name}, FL
-              </span>
-              <span className={clsx('badge', live ? 'badge-available' : 'badge-unknown')}>
-                {live ? t('home.live') : t('home.comingSoon')}
-              </span>
-            </div>
-          ))}
-        </div>
-        <p className="mt-4 text-center text-sm text-slate-400">
-          {t('home.wantInCity')}{' '}
-          <Link to="/partner-with-us" className="font-medium text-primary-600 hover:underline dark:text-primary-400">
-            {t('home.partnerWithUs')}
-          </Link>
-        </p>
-      </Section>
-
-      {/* ── Browse by need ── */}
-      <Section tone="gray" containerSize="wide">
-        <SectionHeading title={t('home.browseByNeed')} align="left" />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {CATEGORIES.map(({ labelKey, emoji, to }) => (
-            <Link
-              key={labelKey}
-              to={to}
-              className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors hover:border-primary-300 dark:border-slate-700 dark:bg-slate-800"
-            >
-              <span className="text-2xl">{emoji}</span>
-              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t(labelKey)}</span>
-              <ArrowRight size={14} className="ml-auto text-slate-300" />
-            </Link>
-          ))}
-        </div>
-      </Section>
-
       {/* ── From the blog (honest empty state until posts are published) ── */}
-      <Section containerSize="prose">
+      <Section tone="gray" containerSize="prose">
         <SectionHeading title={t('home.fromBlog')} align="left" />
         {latestPosts.length === 0 ? (
           <EmptyState
