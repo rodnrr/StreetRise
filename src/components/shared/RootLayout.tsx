@@ -1,5 +1,5 @@
 import { Outlet, NavLink, Link, useLocation } from 'react-router-dom'
-import { MapPin, Heart, Briefcase, HelpCircle, Menu, X, UserPlus } from 'lucide-react'
+import { MapPin, Heart, Briefcase, HelpCircle, Menu, X, UserPlus, Newspaper, Home, Bus } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import clsx from 'clsx'
 import ToastContainer from './ToastContainer'
@@ -7,11 +7,24 @@ import Footer from './Footer'
 import LangToggle from './LangToggle'
 import { useI18n } from '@/lib/i18n'
 
+// The four primary destinations — shared by the dropdown and the mobile tab
+// bar, which only has room for these.
 const NAV_LINKS = [
   { to: '/find',   key: 'nav.findResources', icon: MapPin },
   { to: '/work',   key: 'nav.workExchange',  icon: Briefcase },
   { to: '/donate', key: 'nav.donate',        icon: Heart },
   { to: '/faq',    key: 'nav.faq',           icon: HelpCircle },
+]
+
+// Dropdown-only entries: reachable from the footer, but buried there on mobile.
+// These sit under the Find umbrella below, so on one of these pages both the
+// umbrella and the exact entry read as selected — deliberate, it shows where
+// the page lives.
+const MENU_LINKS = [
+  ...NAV_LINKS,
+  { to: '/housing',        key: 'footer.housing',        icon: Home },
+  { to: '/transportation', key: 'footer.transportation', icon: Bus },
+  { to: '/blog',           key: 'footer.blog',           icon: Newspaper },
 ]
 
 // Find is an information-architecture umbrella, not synonymous with /map.
@@ -79,8 +92,13 @@ export default function RootLayout() {
                   className="fixed inset-0 z-30 cursor-default"
                   onClick={() => setMenuOpen(false)}
                 />
-                <div className="absolute right-4 top-full z-40 mt-2 w-64 rounded-2xl border border-gray-100 bg-white p-2 shadow-lg animate-fade-in">
-                  {NAV_LINKS.map(({ to, key, icon: Icon }) => (
+                {/* The header is 3.5rem tall and the menu hangs 0.5rem below it, so cap
+                    the panel at what is left of the viewport and let it scroll — on a
+                    phone in landscape the last entries would otherwise sit off-screen
+                    with no way to reach them (the page itself does not scroll them into
+                    view, since the panel is anchored to the sticky header). */}
+                <div className="absolute right-4 top-full z-40 mt-2 max-h-[calc(100dvh-5rem)] w-64 overflow-y-auto overscroll-contain rounded-2xl border border-gray-100 bg-white p-2 shadow-lg animate-fade-in">
+                  {MENU_LINKS.map(({ to, key, icon: Icon }) => (
                     <NavLink
                       key={to}
                       to={to}

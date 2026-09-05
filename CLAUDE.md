@@ -53,7 +53,7 @@ Known open items (most recently verified 2026-09-01 unless a line says otherwise
 - **streetrise.org** — the bare domain; redirects to `app.streetrise.org`. Not a separate codebase or CMS anymore.
 - **Desired future state (not yet done):** the maintainer wants the app to live directly on `streetrise.org` instead of the `app.` subdomain, with the redirect reversed or removed. This needs a Cloudflare Pages custom-domain change (and probably an `VITE_APP_URL`/canonical-URL sweep across `src/lib/seo/`, `public/sitemap.xml`, and `public/robots.txt`, all of which currently hardcode `app.streetrise.org`) — nobody has scoped or started this yet. Treat any reference to "streetrise.org vs app.streetrise.org" as separate sites in older docs (`LAUNCH_REVIEW.md`) as historical, not current.
 
-StreetRise connects people in need with local service providers (shelters, food pantries, clinics, legal aid, etc.). Original coverage was Tampa Bay, FL; seed migrations 017/020/022 expanded to Central Florida (Orlando, Hernando, Pasco, Manatee/Bradenton); migration 032 added South Florida (Miami-Dade + South Broward/Hollywood). Public copy says "Tampa Bay, Orlando, and Miami" — `HomePage`'s `CITIES` array is the source of truth for which metros read as live, and a metro is only flipped to `live: true` once it has publicly visible seeded listings. Providers manage listings; the public searches the map; no sign-up required to find resources.
+StreetRise connects people in need with local service providers (shelters, food pantries, clinics, legal aid, etc.). Original coverage was Tampa Bay, FL; seed migrations 017/020/022 expanded to Central Florida (Orlando, Hernando, Pasco, Manatee/Bradenton); migration 032 added South Florida (Miami-Dade + South Broward/Hollywood). Public copy says "Tampa Bay, Orlando, and Miami" — `src/lib/cities.ts`'s `CITIES` array is the source of truth for which metros read as live (read by the home page's live-stats panel and the About page's coverage list), and a metro is only flipped to `live: true` once it has publicly visible seeded listings. Providers manage listings; the public searches the map; no sign-up required to find resources.
 
 ---
 
@@ -126,6 +126,7 @@ src/
                             # single source of truth for what the map can filter on.
     geo.ts                  # Haversine distance + mile formatting (map sorting/filtering)
     categories.ts           # Public category-page config (/food-pantries etc. → map filters)
+    cities.ts               # CITIES — which metros read as live/coming soon (home hero + /about)
     conversations.ts        # Unread logic + markConversationRead for admin/provider chat
     blog.ts                 # Blog post queries
     adminCounts.ts          # Shared pending-count queries for admin nav badges
